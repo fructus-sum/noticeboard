@@ -1,4 +1,4 @@
-# Noticeboard — CLAUDE.md
+# Noticeboard — Development Guide
 
 ## Session-Based Build
 This project is built across 8 sessions. Each session has a fixed scope defined in
@@ -21,8 +21,7 @@ This project is built across 8 sessions. Each session has a fixed scope defined 
 ## Ending a Session
 1. Finish the current file completely
 2. Write HANDOVER.md using the template below
-3. Tell the user: "Session N complete. Please start a new Claude Code session and say
-   'continue noticeboard from handover'."
+3. Tell the user: "Session N complete. Please start a new session and say 'continue noticeboard from handover'."
 
 ## HANDOVER.md Template
 
@@ -43,8 +42,7 @@ This project is built across 8 sessions. Each session has a fixed scope defined 
 [Anything incomplete, edge cases to revisit, warnings noticed]
 
 ## How to Resume
-Start a new Claude Code session in the project directory and say:
-"continue noticeboard from handover"
+Open the project directory and say: "continue noticeboard from handover"
 ```
 
 ## No Duplication Rule

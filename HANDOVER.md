@@ -21,7 +21,7 @@
 - server/routes/index.js — mounts all route groups in correct order
 - server/app.js — Express factory with helmet, cors (dev), cookieParser
 - server/index.js — HTTP server entry; graceful SIGTERM/SIGINT shutdown
-- CLAUDE.md — session management instructions
+- DEVELOPMENT.md — session management instructions
 - client/display/dist/index.html — placeholder (replaced in Session 4)
 - client/admin/dist/index.html — placeholder (replaced in Session 5)
 
@@ -42,7 +42,7 @@ Auth + Core API + Socket.io + Scheduler:
 - MAC filtering defaults to DISABLED (enabled: false) so the system works out of the box.
 - passwordHash and jwtSecret are generated async at first run; not hardcoded anywhere.
 - /admin (no trailing slash) returns 301 → /admin/ (200). This is correct express.static behaviour; browsers follow the redirect transparently.
-- dist/ placeholder files are NOT gitignored (so the repo can run without a build step for testing). The real built files will overwrite them in Sessions 4/5.
+- dist/ placeholder files are gitignored; server serves inline fallback HTML when dist is missing.
 
 ## Known Issues / TODOs
 - multer 2.x upgrade needed in Session 3 before upload route is written.
@@ -51,5 +51,4 @@ Auth + Core API + Socket.io + Scheduler:
 - Socket.io not yet wired; server/index.js has a placeholder comment.
 
 ## How to Resume
-Start a new Claude Code session in the project directory and say:
-"continue noticeboard from handover"
+Open the project directory and say: "continue noticeboard from handover"
