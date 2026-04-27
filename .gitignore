@@ -1,0 +1,10 @@
+node_modules/
+data/
+tmp/
+logs/
+client/display/dist/
+client/admin/dist/
+.env
+*.log
+*.tmp
+.claude/
