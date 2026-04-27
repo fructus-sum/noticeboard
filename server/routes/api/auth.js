@@ -16,10 +16,11 @@ const loginLimiter = rateLimit({
 });
 
 const COOKIE = 'nb_admin_token';
+// SECURE_COOKIES=true only if serving over HTTPS; Pi installs run HTTP, so leave false
 const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: 'strict',
-  secure: process.env.NODE_ENV === 'production',
+  secure: process.env.SECURE_COOKIES === 'true',
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 

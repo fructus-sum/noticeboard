@@ -5,6 +5,7 @@ const adminAuth = require('../../middleware/adminAuth');
 const authRouter = require('./auth');
 const settingsRouter = require('./settings');
 const slideshowsRouter = require('./slideshows');
+const slidesRouter = require('./slides');
 
 const router = express.Router();
 
@@ -22,5 +23,6 @@ router.use('/auth', macFilter, authRouter);
 // Protected: MAC + JWT
 router.use('/settings', adminAuth, settingsRouter);
 router.use('/slideshows', adminAuth, slideshowsRouter);
+router.use('/slideshows/:folder/slides', adminAuth, slidesRouter);
 
 module.exports = router;

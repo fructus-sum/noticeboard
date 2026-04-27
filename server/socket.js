@@ -31,8 +31,17 @@ function buildPlaylist(activeSlideshows) {
   return { slides };
 }
 
+let io;
+
+function broadcastPlaylist() {
+  if (!io) return;
+  const playlist = buildPlaylist(schedulerService.getActive());
+  io.emit('playlist:update', playlist);
+  logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length });
+}
+
 function initSocket(server) {
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: process.env.NODE_ENV !== 'production'
       ? { origin: DEV_ORIGINS, credentials: true }
       : undefined,
@@ -52,14 +61,10 @@ function initSocket(server) {
     });
   });
 
-  schedulerService.on('update', (active) => {
-    const playlist = buildPlaylist(active);
-    io.emit('playlist:update', playlist);
-    logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length });
-  });
+  schedulerService.on('update', broadcastPlaylist);
 
   logger.info('Socket.io initialised');
   return io;
 }
 
-module.exports = { initSocket, buildPlaylist };
+module.exports = { initSocket, buildPlaylist, broadcastPlaylist };

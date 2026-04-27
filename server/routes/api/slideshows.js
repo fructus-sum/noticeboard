@@ -54,6 +54,13 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+router.get('/:folder', (req, res) => {
+  const list = configService.get('slideshows') || [];
+  const ss = list.find(s => s.folder === req.params.folder);
+  if (!ss) return res.status(404).json({ error: 'Slideshow not found' });
+  res.json({ ...ss, slideCount: readSlideshowJson(ss.folder).slides.length });
+});
+
 router.put('/:folder', async (req, res, next) => {
   try {
     const list = configService.get('slideshows') || [];
