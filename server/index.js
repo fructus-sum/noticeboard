@@ -1,6 +1,8 @@
 const http = require('http');
 const configService = require('./services/configService');
+const schedulerService = require('./services/schedulerService');
 const createApp = require('./app');
+const { initSocket } = require('./socket');
 const logger = require('./utils/logger');
 
 async function main() {
@@ -10,9 +12,8 @@ async function main() {
   const app = createApp();
   const server = http.createServer(app);
 
-  // Socket.io is wired up in Session 2; placeholder kept here for clarity
-  // const { initSocket } = require('./socket');
-  // initSocket(server);
+  initSocket(server);
+  schedulerService.init();
 
   server.listen(port, () => {
     logger.info('Noticeboard server started', { port });
@@ -20,15 +21,13 @@ async function main() {
     logger.info(`Admin   : http://localhost:${port}/admin`);
   });
 
-  process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down gracefully');
+  function shutdown() {
+    schedulerService.stop();
     server.close(() => process.exit(0));
-  });
+  }
 
-  process.on('SIGINT', () => {
-    logger.info('SIGINT received, shutting down gracefully');
-    server.close(() => process.exit(0));
-  });
+  process.on('SIGTERM', () => { logger.info('SIGTERM received, shutting down gracefully'); shutdown(); });
+  process.on('SIGINT',  () => { logger.info('SIGINT received, shutting down gracefully');  shutdown(); });
 }
 
 main().catch((err) => {

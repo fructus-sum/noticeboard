@@ -25,14 +25,14 @@ function mountRoutes(app) {
     express.static(slideshowsDir())
   );
 
-  // 2. Admin static assets — MAC + adminAuth (Vite builds with base '/admin/')
-  app.use('/admin', adminAuth, express.static(ADMIN_DIST));
+  // 2. Admin static assets — MAC filtered; JWT is not required to download the SPA shell
+  app.use('/admin', macFilter, express.static(ADMIN_DIST));
 
   // 3. Admin SPA — serves index.html for all /admin/* Vue Router routes
-  app.use('/admin', adminAuth, adminRouter);
+  app.use('/admin', macFilter, adminRouter);
 
-  // 4. API routes (added in Session 2)
-  // app.use('/api', require('./api'));
+  // 4. API routes
+  app.use('/api', require('./api'));
 
   // 5. Display static assets — MAC filtered
   app.use('/', macFilter, express.static(DISPLAY_DIST));
