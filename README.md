@@ -2,6 +2,8 @@
 
 A self-hosted digital notice board and slideshow system designed to run on a Raspberry Pi 4. Displays images, videos, and text slides on a local network screen, managed through a browser-based control panel.
 
+> **Note:** This project is currently under active development and is not yet functional.
+
 ## Features
 
 - **Slideshow display** — full-screen, auto-scaling with letterboxing, looped playback
