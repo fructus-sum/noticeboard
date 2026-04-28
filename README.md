@@ -105,6 +105,10 @@ Environment variables (optional, set in `.env`):
 - **Media processing** — FFmpeg, Sharp
 - **Storage** — JSON files + media on disk (no database)
 
+## Documentation
+
+A full user guide covering installation, managing slideshows, scheduling, MAC filtering, and troubleshooting is included as `noticeboard-guide.html` in the project root. Open it in any browser — no server required.
+
 ## License
 
 MIT — see [LICENSE](LICENSE)
