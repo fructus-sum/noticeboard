@@ -25,10 +25,12 @@ function buildPlaylist(activeSlideshows) {
     }
     for (const slide of data.slides.filter(s => s.status === 'ready')) {
       slides.push({
-        type: slide.type,
-        url: mediaUrl(ss.folder, slide.filename),
-        duration: slide.type === 'image' ? (slide.duration ?? defaultDuration) : null,
+        type:      slide.type,
+        url:       slide.type !== 'text' ? mediaUrl(ss.folder, slide.filename) : null,
+        duration:  slide.type !== 'video' ? (slide.duration ?? defaultDuration) : null,
         slideshow: ss.folder,
+        overlay:   slide.overlay ?? null,
+        bgColor:   slide.bgColor ?? null,
       });
     }
   }

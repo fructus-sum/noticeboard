@@ -93,6 +93,36 @@ router.post('/', upload.array('files', 50), async (req, res, next) => {
   }
 });
 
+// POST /api/slideshows/:folder/slides/text
+// Body: { overlay, bgColor, duration }
+router.post('/text', async (req, res, next) => {
+  try {
+    const { folder } = req.params;
+    const { overlay, bgColor, duration } = req.body;
+
+    if (!overlay?.text?.trim()) return res.status(400).json({ error: 'overlay.text is required' });
+
+    const data = readSlideshowJson(folder);
+    const entry = {
+      id: crypto.randomUUID(),
+      type: 'text',
+      filename: null,
+      status: 'ready',
+      duration: duration ?? 10,
+      addedAt: new Date().toISOString(),
+      bgColor: bgColor ?? '#1e293b',
+      overlay,
+    };
+    data.slides.push(entry);
+    await writeConfig(slideshowJsonPath(folder), data);
+    configService.emit('change');
+    logger.info('Text slide created', { folder, id: entry.id });
+    res.status(201).json(entry);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /api/slideshows/:folder/slides/:id
 router.delete('/:id', async (req, res, next) => {
   try {
@@ -140,6 +170,35 @@ router.put('/reorder', async (req, res, next) => {
     configService.emit('change');
     logger.info('Slides reordered', { folder });
     res.json(reordered);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/slideshows/:folder/slides/:id
+// Body: { overlay, duration, bgColor } — patch allowed fields; overlay:null clears it
+router.put('/:id', async (req, res, next) => {
+  try {
+    const { folder, id } = req.params;
+    const data = readSlideshowJson(folder);
+    const slide = data.slides.find(s => s.id === id);
+    if (!slide) return res.status(404).json({ error: 'Slide not found' });
+
+    const allowed = ['overlay', 'duration', 'bgColor'];
+    for (const key of allowed) {
+      if (key in req.body) {
+        if (req.body[key] === null) {
+          delete slide[key];
+        } else {
+          slide[key] = req.body[key];
+        }
+      }
+    }
+
+    await writeConfig(slideshowJsonPath(folder), data);
+    configService.emit('change');
+    logger.info('Slide updated', { folder, id });
+    res.json(slide);
   } catch (err) {
     next(err);
   }

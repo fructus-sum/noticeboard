@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
+import SlideEditor from '../components/SlideEditor.vue';
 
 const route  = useRoute();
 const router = useRouter();
@@ -33,6 +34,25 @@ async function toggleEnabled() {
   } finally {
     toggling.value = false;
   }
+}
+
+// Slide editor modal
+// null = closed; { ...slide } = editing overlay; 'new' = creating text slide
+const editorTarget = ref(null);
+
+function openEditor(slide) { editorTarget.value = slide; }
+function openTextSlideCreator() { editorTarget.value = 'new'; }
+function closeEditor() { editorTarget.value = null; }
+
+function onOverlaySaved(updatedSlide) {
+  const idx = slides.value.findIndex(s => s.id === updatedSlide.id);
+  if (idx !== -1) slides.value[idx] = updatedSlide;
+  closeEditor();
+}
+
+function onSlideCreated(newSlide) {
+  slides.value.push(newSlide);
+  closeEditor();
 }
 
 // Upload
@@ -282,8 +302,9 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <h2 style="margin:0">Slides ({{ slides.length }})</h2>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
+          <button class="btn-ghost" style="font-size:13px;padding:7px 14px" @click="openTextSlideCreator">T+ Text Slide</button>
           <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
             {{ uploading ? `Uploading${uploadCount > 1 ? ` ${uploadCount} files` : ''}…` : '+ Upload' }}
             <input ref="fileInput" type="file" accept="image/*,video/*" multiple style="display:none" :disabled="uploading" @change="uploadFile" />
@@ -304,13 +325,35 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
           <div style="font-size:12px;word-break:break-all">{{ slide.filename ?? '—' }}</div>
         </div>
         <span class="badge" :class="`badge--${slide.status}`">{{ slide.status }}</span>
+        <span
+          v-if="slide.overlay"
+          title="Has text overlay"
+          style="font-size:11px;padding:2px 6px;border-radius:10px;background:rgba(99,102,241,0.15);color:#6366f1;border:1px solid rgba(99,102,241,0.3);white-space:nowrap"
+        >T</span>
         <div style="display:flex;gap:4px">
+          <button
+            v-if="slide.status === 'ready'"
+            class="btn-ghost"
+            style="padding:4px 8px;font-size:12px"
+            title="Edit text overlay"
+            @click="openEditor(slide)"
+          >✏</button>
           <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :disabled="i === 0" @click="move(i, -1)">↑</button>
           <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :disabled="i === slides.length - 1" @click="move(i, 1)">↓</button>
           <button class="btn-danger" style="padding:4px 8px;font-size:12px" @click="deleteSlide(slide.id)">✕</button>
         </div>
       </div>
     </div>
+
+    <!-- Slide editor modal -->
+    <SlideEditor
+      v-if="editorTarget !== null"
+      :folder="folder"
+      :slide="editorTarget === 'new' ? null : editorTarget"
+      @saved="onOverlaySaved"
+      @created="onSlideCreated"
+      @close="closeEditor"
+    />
   </div>
 </template>
 

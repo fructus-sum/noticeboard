@@ -1,23 +1,33 @@
 <script setup>
-defineProps({
-  src: { type: String, required: true },
+import SlideOverlay from './SlideOverlay.vue';
+
+const props = defineProps({
+  src:     { type: String, required: true },
+  overlay: { type: Object, default: null },
 });
 
 const emit = defineEmits(['ended']);
 </script>
 
 <template>
-  <video
-    :src="src"
-    class="slide-video"
-    autoplay
-    muted
-    playsinline
-    @ended="emit('ended')"
-  />
+  <div class="slide-wrap">
+    <video
+      :src="src"
+      class="slide-video"
+      autoplay
+      muted
+      playsinline
+      @ended="emit('ended')"
+    />
+    <SlideOverlay v-if="overlay" :overlay="overlay" />
+  </div>
 </template>
 
 <style scoped>
+.slide-wrap {
+  position: absolute;
+  inset: 0;
+}
 .slide-video {
   position: absolute;
   inset: 0;

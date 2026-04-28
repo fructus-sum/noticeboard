@@ -2,6 +2,7 @@
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 import ImageSlide from './ImageSlide.vue';
 import VideoSlide from './VideoSlide.vue';
+import TextSlide  from './TextSlide.vue';
 
 const props = defineProps({
   slides: { type: Array, required: true },
@@ -20,9 +21,7 @@ function advance() {
   clearTimer();
   const next = (currentIndex.value + 1) % props.slides.length;
   if (next === currentIndex.value) {
-    // Single-slide loop: the index won't change, so Vue won't re-render.
-    // Step to -1 (renders nothing) then back to 0 on the next tick to
-    // force the slide component to remount and retry.
+    // Single-slide loop: step to -1 then back to 0 on next tick to force remount.
     currentIndex.value = -1;
     nextTick(() => { currentIndex.value = 0; });
   } else {
@@ -32,7 +31,6 @@ function advance() {
 
 function onImageReady() {
   clearTimer();
-  // duration is in seconds; fall back to 10 s if null/undefined
   timer = setTimeout(advance, (currentSlide.value?.duration ?? 10) * 1000);
 }
 
@@ -53,6 +51,7 @@ onUnmounted(clearTimer);
         :key="currentSlide.url"
         :src="currentSlide.url"
         :duration="currentSlide.duration"
+        :overlay="currentSlide.overlay"
         @ready="onImageReady"
         @error="advance"
       />
@@ -60,7 +59,16 @@ onUnmounted(clearTimer);
         v-else-if="currentSlide?.type === 'video'"
         :key="currentSlide.url"
         :src="currentSlide.url"
+        :overlay="currentSlide.overlay"
         @ended="advance"
+      />
+      <TextSlide
+        v-else-if="currentSlide?.type === 'text'"
+        :key="currentSlide.slideshow + '-' + currentIndex"
+        :bgColor="currentSlide.bgColor"
+        :overlay="currentSlide.overlay"
+        :duration="currentSlide.duration"
+        @ready="onImageReady"
       />
     </Transition>
   </div>
