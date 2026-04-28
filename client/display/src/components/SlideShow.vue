@@ -80,8 +80,8 @@ onUnmounted(clearTimer);
 <style scoped>
 .slideshow {
   position: relative;
-  width: 100%;
-  height: 100%;
+  aspect-ratio: 16 / 9;
+  width: min(100%, calc(100vh * 16 / 9));
   background: #000;
   overflow: hidden;
 }
