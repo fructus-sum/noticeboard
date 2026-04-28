@@ -36,9 +36,10 @@ async function toggleEnabled() {
 }
 
 // Upload
-const fileInput  = ref(null);
-const uploading  = ref(false);
-const uploadErr  = ref('');
+const fileInput    = ref(null);
+const uploading    = ref(false);
+const uploadErr    = ref('');
+const uploadCount  = ref(0);
 
 // Polling for processing slides
 let pollTimer = null;
@@ -100,19 +101,21 @@ async function saveMeta() {
 }
 
 async function uploadFile(e) {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
   uploadErr.value = '';
   uploading.value = true;
+  uploadCount.value = files.length;
   const fd = new FormData();
-  fd.append('file', file);
+  for (const file of files) fd.append('files', file);
   try {
-    const slide = await api.upload(`/slideshows/${folder}/slides`, fd);
-    slides.value.push(slide);
+    const newSlides = await api.upload(`/slideshows/${folder}/slides`, fd);
+    slides.value.push(...newSlides);
   } catch (err) {
     uploadErr.value = err.message;
   } finally {
     uploading.value = false;
+    uploadCount.value = 0;
     if (fileInput.value) fileInput.value.value = '';
   }
 }
@@ -282,8 +285,8 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
         <div style="display:flex;gap:8px;align-items:center">
           <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
           <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
-            {{ uploading ? 'Uploading…' : '+ Upload' }}
-            <input ref="fileInput" type="file" accept="image/*,video/*" style="display:none" :disabled="uploading" @change="uploadFile" />
+            {{ uploading ? `Uploading${uploadCount > 1 ? ` ${uploadCount} files` : ''}…` : '+ Upload' }}
+            <input ref="fileInput" type="file" accept="image/*,video/*" multiple style="display:none" :disabled="uploading" @change="uploadFile" />
           </label>
         </div>
       </div>

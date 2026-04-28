@@ -57,32 +57,37 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/slideshows/:folder/slides
-router.post('/', upload.single('file'), async (req, res, next) => {
+router.post('/', upload.array('files', 50), async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
 
     const { folder } = req.params;
-    const mime = req.file.mimetype;
-    const type = typeFromMime(mime);
-    const slideId = crypto.randomUUID();
-
-    // Write a placeholder entry so the SPA can show a progress indicator
     const data = readSlideshowJson(folder);
-    const entry = {
-      id: slideId,
-      type,
-      filename: null,
-      status: 'processing',
-      duration: null,
-      addedAt: new Date().toISOString(),
-    };
-    data.slides.push(entry);
+    const queued = [];
+
+    for (const file of req.files) {
+      const slideId = crypto.randomUUID();
+      const type = typeFromMime(file.mimetype);
+      const entry = {
+        id: slideId,
+        type,
+        filename: null,
+        status: 'processing',
+        duration: null,
+        addedAt: new Date().toISOString(),
+      };
+      data.slides.push(entry);
+      queued.push({ entry, slideId, tmpPath: file.path, mime: file.mimetype });
+    }
+
     await writeConfig(slideshowJsonPath(folder), data);
 
-    enqueueProcessing({ folder, slideId, tmpPath: req.file.path, mime });
+    for (const { slideId, tmpPath, mime } of queued) {
+      enqueueProcessing({ folder, slideId, tmpPath, mime });
+    }
 
-    logger.info('Slide upload accepted', { folder, slideId, type, ...queueSize() });
-    res.status(202).json(entry);
+    logger.info('Slides upload accepted', { folder, count: queued.length, ...queueSize() });
+    res.status(202).json(queued.map(q => q.entry));
   } catch (err) {
     next(err);
   }
