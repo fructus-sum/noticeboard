@@ -17,5 +17,5 @@ const hasSlides = computed(() => playlist.value.slides.length > 0);
 
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html, body, .app { width: 100%; height: 100%; overflow: hidden; background: #000; }
+html, body, #app, .app { width: 100%; height: 100%; overflow: hidden; background: #000; }
 </style>

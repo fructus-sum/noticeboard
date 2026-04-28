@@ -5,7 +5,12 @@ const configService = require('./services/configService');
 const { slideshowJsonPath, mediaUrl } = require('./utils/pathHelpers');
 const logger = require('./utils/logger');
 
-const DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+const DEV_ORIGINS = [
+  'http://localhost:3000',   // production build served by Express
+  'http://localhost:5173',   // display Vite dev server
+  'http://localhost:5174',   // admin Vite dev server
+  'http://localhost:5175',
+];
 
 function buildPlaylist(activeSlideshows) {
   const defaultDuration = configService.get('display')?.defaultSlideDurationSeconds ?? 10;
@@ -18,7 +23,7 @@ function buildPlaylist(activeSlideshows) {
     } catch {
       // empty or missing slideshow.json — skip
     }
-    for (const slide of data.slides) {
+    for (const slide of data.slides.filter(s => s.status === 'ready')) {
       slides.push({
         type: slide.type,
         url: mediaUrl(ss.folder, slide.filename),

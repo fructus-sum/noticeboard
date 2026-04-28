@@ -31,6 +31,7 @@ class SchedulerService extends EventEmitter {
     const now = new Date();
 
     const candidates = slideshows
+      .filter(ss => ss.enabled !== false)
       .filter(ss => this._matchesSchedule(ss.schedule, now))
       .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
       .slice(0, 5);

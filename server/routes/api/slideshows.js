@@ -43,6 +43,7 @@ router.post('/', async (req, res, next) => {
       name: name.trim(),
       priority: typeof priority === 'number' ? priority : existing.length + 1,
       schedule: schedule || { type: 'always' },
+      enabled: false,
       addedAt: new Date().toISOString(),
     };
 
@@ -68,7 +69,7 @@ router.put('/:folder', async (req, res, next) => {
     if (idx === -1) return res.status(404).json({ error: 'Slideshow not found' });
 
     const updated = { ...list[idx] };
-    for (const key of ['name', 'priority', 'schedule']) {
+    for (const key of ['name', 'priority', 'schedule', 'enabled']) {
       if (req.body[key] !== undefined) updated[key] = req.body[key];
     }
 

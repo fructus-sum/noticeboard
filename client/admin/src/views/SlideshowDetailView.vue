@@ -20,6 +20,21 @@ const editSched  = ref({ type: 'always' });
 const saving     = ref(false);
 const saveMsg    = ref('');
 
+// Publish / disable toggle
+const toggling = ref(false);
+
+async function toggleEnabled() {
+  toggling.value = true;
+  try {
+    const updated = await api.put(`/slideshows/${folder}`, { enabled: !(meta.value.enabled !== false) });
+    meta.value = { ...meta.value, enabled: updated.enabled };
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    toggling.value = false;
+  }
+}
+
 // Upload
 const fileInput  = ref(null);
 const uploading  = ref(false);
@@ -144,11 +159,44 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
         </button>
       </div>
 
-      <div v-if="!editing" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:13px">
+      <div v-if="!editing" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;font-size:13px;align-items:start">
         <div><span style="color:var(--text-muted)">Name</span><br>{{ meta.name }}</div>
         <div><span style="color:var(--text-muted)">Priority</span><br>{{ meta.priority }}</div>
         <div><span style="color:var(--text-muted)">Schedule</span><br>
           {{ meta.schedule?.type === 'always' ? 'Always active' : `Timed (${meta.schedule.startTime}–${meta.schedule.endTime})` }}
+        </div>
+        <div>
+          <span style="color:var(--text-muted)">Status</span><br>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+            <span
+              :style="{
+                fontSize: '11px',
+                fontWeight: '600',
+                padding: '2px 7px',
+                borderRadius: '10px',
+                background: meta.enabled !== false ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)',
+                color:      meta.enabled !== false ? '#16a34a'              : 'var(--text-muted)',
+                border:     meta.enabled !== false ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(148,163,184,0.25)',
+                letterSpacing: '0.03em',
+                textTransform: 'uppercase',
+              }"
+            >{{ meta.enabled !== false ? 'Published' : 'Disabled' }}</span>
+            <button
+              :style="{
+                fontSize: '11px',
+                padding: '3px 10px',
+                borderRadius: 'var(--radius)',
+                border: 'none',
+                cursor: toggling ? 'not-allowed' : 'pointer',
+                fontWeight: '600',
+                background: meta.enabled !== false ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)',
+                color:      meta.enabled !== false ? '#dc2626'              : '#16a34a',
+                outline:    meta.enabled !== false ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(34,197,94,0.3)',
+              }"
+              :disabled="toggling"
+              @click="toggleEnabled"
+            >{{ meta.enabled !== false ? 'Disable' : 'Publish' }}</button>
+          </div>
         </div>
       </div>
 
@@ -205,6 +253,26 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
           <span :class="saveMsg.startsWith('Saved') ? 'success-msg' : 'error-msg'" v-if="saveMsg">{{ saveMsg }}</span>
         </div>
       </form>
+    </div>
+
+    <!-- Disabled warning banner -->
+    <div
+      v-if="meta && meta.enabled === false"
+      style="
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        border-radius: var(--radius);
+        background: rgba(251,191,36,0.08);
+        border: 1px solid rgba(251,191,36,0.25);
+        color: #d97706;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      "
+    >
+      <span style="font-size:16px">⚠</span>
+      <span>This slideshow is <strong>disabled</strong> — it will not appear on the display regardless of schedule settings. Click <strong>Publish</strong> above to make it live.</span>
     </div>
 
     <!-- Slides card -->

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-REPO_URL="https://github.com/PLACEHOLDER/noticeboard.git"
+REPO_URL="https://github.com/fructus-sum/noticeboard.git"
 INSTALL_DIR="/opt/noticeboard"
 SERVICE_NAME="noticeboard"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"

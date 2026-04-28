@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue';
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 import ImageSlide from './ImageSlide.vue';
 import VideoSlide from './VideoSlide.vue';
 
@@ -18,7 +18,16 @@ function clearTimer() {
 
 function advance() {
   clearTimer();
-  currentIndex.value = (currentIndex.value + 1) % props.slides.length;
+  const next = (currentIndex.value + 1) % props.slides.length;
+  if (next === currentIndex.value) {
+    // Single-slide loop: the index won't change, so Vue won't re-render.
+    // Step to -1 (renders nothing) then back to 0 on the next tick to
+    // force the slide component to remount and retry.
+    currentIndex.value = -1;
+    nextTick(() => { currentIndex.value = 0; });
+  } else {
+    currentIndex.value = next;
+  }
 }
 
 function onImageReady() {
