@@ -1,11 +1,13 @@
 <script setup>
 import { onMounted } from 'vue';
 import SlideOverlay from './SlideOverlay.vue';
+import WatermarkOverlay from './WatermarkOverlay.vue';
 
 const props = defineProps({
-  bgColor:  { type: String, default: '#000000' },
-  overlay:  { type: Object, default: null },
-  duration: { type: Number, default: null },
+  bgColor:   { type: String, default: '#000000' },
+  overlay:   { type: Object, default: null },
+  watermark: { type: Object, default: null },
+  duration:  { type: Number, default: null },
 });
 
 const emit = defineEmits(['ready']);
@@ -16,6 +18,7 @@ onMounted(() => emit('ready'));
 <template>
   <div class="text-slide" :style="{ background: bgColor }">
     <SlideOverlay v-if="overlay" :overlay="overlay" />
+    <WatermarkOverlay v-if="watermark" :watermark="watermark" />
   </div>
 </template>
 

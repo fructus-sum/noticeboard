@@ -1,9 +1,35 @@
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+const crypto = require('crypto');
 const configService = require('../../services/configService');
-const { slideshowDir, slideshowJsonPath, slidesDir } = require('../../utils/pathHelpers');
+const { slideshowDir, slideshowJsonPath, slidesDir, watermarkDir, watermarkPath, watermarkUrl, tmpDir } = require('../../utils/pathHelpers');
 const { uniqueSlug } = require('../../utils/slugify');
 const logger = require('../../utils/logger');
+
+const WATERMARK_MIME = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml']);
+
+const watermarkStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = tmpDir();
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    cb(null, `wm-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+  },
+});
+
+const uploadWatermark = multer({
+  storage: watermarkStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (WATERMARK_MIME.has(file.mimetype)) return cb(null, true);
+    cb(Object.assign(new Error('Watermark must be an image file'), { status: 400 }));
+  },
+});
 
 const router = express.Router();
 
@@ -69,7 +95,7 @@ router.put('/:folder', async (req, res, next) => {
     if (idx === -1) return res.status(404).json({ error: 'Slideshow not found' });
 
     const updated = { ...list[idx] };
-    for (const key of ['name', 'priority', 'schedule', 'enabled']) {
+    for (const key of ['name', 'priority', 'schedule', 'enabled', 'watermark']) {
       if (req.body[key] !== undefined) updated[key] = req.body[key];
     }
 
@@ -78,6 +104,77 @@ router.put('/:folder', async (req, res, next) => {
     await configService.set('slideshows', newList);
     logger.info('Slideshow updated', { folder: req.params.folder });
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/slideshows/:folder/watermark  — upload a logo/watermark image
+router.post('/:folder/watermark', uploadWatermark.single('file'), async (req, res, next) => {
+  try {
+    const { folder } = req.params;
+    const list = configService.get('slideshows') || [];
+    const idx = list.findIndex(s => s.folder === folder);
+    if (idx === -1) return res.status(404).json({ error: 'Slideshow not found' });
+
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    // Delete any existing watermark file first
+    const existing = list[idx].watermark;
+    if (existing?.filename) {
+      const old = watermarkPath(folder, existing.filename);
+      if (fs.existsSync(old)) fs.unlink(old, () => {});
+    }
+
+    // Move uploaded file to watermark dir
+    const wmDir = watermarkDir(folder);
+    fs.mkdirSync(wmDir, { recursive: true });
+    const ext = path.extname(req.file.originalname).toLowerCase() || path.extname(req.file.filename);
+    const filename = `watermark${ext}`;
+    const dest = watermarkPath(folder, filename);
+    fs.renameSync(req.file.path, dest);
+
+    // Merge with existing watermark config, preserving position/size/opacity if already set
+    const prevConfig = existing ?? {};
+    const wmConfig = {
+      position:       prevConfig.position       ?? 'bottom-right',
+      size:           prevConfig.size           ?? 10,
+      opacity:        prevConfig.opacity        ?? 0.85,
+      showOnAllSlides: prevConfig.showOnAllSlides ?? true,
+      filename,
+    };
+
+    const newList = [...list];
+    newList[idx] = { ...list[idx], watermark: wmConfig };
+    await configService.set('slideshows', newList);
+    configService.emit('change');
+    logger.info('Watermark uploaded', { folder, filename });
+    res.json({ ...newList[idx], url: watermarkUrl(folder, filename) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/slideshows/:folder/watermark  — remove the logo/watermark
+router.delete('/:folder/watermark', async (req, res, next) => {
+  try {
+    const { folder } = req.params;
+    const list = configService.get('slideshows') || [];
+    const idx = list.findIndex(s => s.folder === folder);
+    if (idx === -1) return res.status(404).json({ error: 'Slideshow not found' });
+
+    const existing = list[idx].watermark;
+    if (existing?.filename) {
+      const filePath = watermarkPath(folder, existing.filename);
+      if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
+    }
+
+    const newList = [...list];
+    newList[idx] = { ...list[idx], watermark: null };
+    await configService.set('slideshows', newList);
+    configService.emit('change');
+    logger.info('Watermark removed', { folder });
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

@@ -55,6 +55,86 @@ function onSlideCreated(newSlide) {
   closeEditor();
 }
 
+// Watermark
+const wmInput      = ref(null);
+const wmUploading  = ref(false);
+const wmErr        = ref('');
+const wmSaving     = ref(false);
+const wmMsg        = ref('');
+
+// Local editable copy of watermark config (position/size/opacity/showOnAllSlides)
+const editWm = ref({ position: 'bottom-right', size: 10, opacity: 0.85, showOnAllSlides: true });
+
+function syncEditWm() {
+  const wm = meta.value?.watermark;
+  editWm.value = {
+    position:       wm?.position       ?? 'bottom-right',
+    size:           wm?.size           ?? 10,
+    opacity:        wm?.opacity        ?? 0.85,
+    showOnAllSlides: wm?.showOnAllSlides ?? true,
+  };
+}
+
+async function uploadWatermark(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  wmErr.value = '';
+  wmUploading.value = true;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const updated = await api.upload(`/slideshows/${folder}/watermark`, fd);
+    meta.value = { ...meta.value, watermark: updated.watermark };
+    syncEditWm();
+  } catch (err) {
+    wmErr.value = err.message;
+  } finally {
+    wmUploading.value = false;
+    if (wmInput.value) wmInput.value.value = '';
+  }
+}
+
+async function removeWatermark() {
+  if (!confirm('Remove the watermark from this slideshow?')) return;
+  try {
+    await api.del(`/slideshows/${folder}/watermark`);
+    meta.value = { ...meta.value, watermark: null };
+    syncEditWm();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function saveWatermarkConfig() {
+  wmMsg.value = '';
+  wmSaving.value = true;
+  try {
+    const updated = await api.put(`/slideshows/${folder}`, {
+      watermark: { ...meta.value.watermark, ...editWm.value },
+    });
+    meta.value = { ...meta.value, watermark: updated.watermark };
+    wmMsg.value = 'Saved.';
+    setTimeout(() => { wmMsg.value = ''; }, 2000);
+  } catch (e) {
+    wmMsg.value = e.message;
+  } finally {
+    wmSaving.value = false;
+  }
+}
+
+// Cycle per-slide watermark override: null → false → true → null
+async function cycleSlideWatermark(slide) {
+  const cur = slide.watermarkEnabled;
+  const next = cur === undefined || cur === null ? false : cur === false ? true : null;
+  try {
+    const updated = await api.put(`/slideshows/${folder}/slides/${slide.id}`, { watermarkEnabled: next });
+    const idx = slides.value.findIndex(s => s.id === slide.id);
+    if (idx !== -1) slides.value[idx] = updated;
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
 // Upload
 const fileInput    = ref(null);
 const uploading    = ref(false);
@@ -75,6 +155,7 @@ async function loadMeta() {
   editName.value  = meta.value.name;
   editPrio.value  = meta.value.priority;
   editSched.value = meta.value.schedule ? JSON.parse(JSON.stringify(meta.value.schedule)) : { type: 'always' };
+  syncEditWm();
 }
 
 async function loadSlides() {
@@ -298,6 +379,80 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
       <span>This slideshow is <strong>disabled</strong> — it will not appear on the display regardless of schedule settings. Click <strong>Publish</strong> above to make it live.</span>
     </div>
 
+    <!-- Watermark card -->
+    <div class="card">
+      <h2 style="margin:0 0 14px">Watermark / Logo</h2>
+
+      <!-- No watermark yet -->
+      <div v-if="!meta.watermark" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <p style="margin:0;font-size:13px;color:var(--text-muted);flex:1">
+          No watermark set. Upload a PNG, JPG, or WebP logo to show it on slides.
+        </p>
+        <span v-if="wmErr" class="error-msg">{{ wmErr }}</span>
+        <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
+          {{ wmUploading ? 'Uploading…' : 'Upload Watermark' }}
+          <input ref="wmInput" type="file" accept="image/*" style="display:none" :disabled="wmUploading" @change="uploadWatermark" />
+        </label>
+      </div>
+
+      <!-- Watermark exists -->
+      <div v-else>
+        <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+          <!-- Preview -->
+          <div style="width:100px;height:60px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+            <img :src="`/media/${folder}/watermark/${meta.watermark.filename}`" style="max-width:90%;max-height:90%;object-fit:contain" />
+          </div>
+          <div style="flex:1;min-width:160px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">{{ meta.watermark.filename }}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span v-if="wmErr" class="error-msg">{{ wmErr }}</span>
+              <label class="btn-ghost" style="cursor:pointer;font-size:12px;padding:4px 10px">
+                {{ wmUploading ? 'Replacing…' : 'Replace' }}
+                <input ref="wmInput" type="file" accept="image/*" style="display:none" :disabled="wmUploading" @change="uploadWatermark" />
+              </label>
+              <button class="btn-danger" style="font-size:12px;padding:4px 10px" @click="removeWatermark">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Config controls -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="field">
+            <label>Position</label>
+            <select v-model="editWm.position">
+              <option value="top-left">Top left</option>
+              <option value="top-right">Top right</option>
+              <option value="bottom-left">Bottom left</option>
+              <option value="bottom-right">Bottom right</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Default visibility</label>
+            <select v-model="editWm.showOnAllSlides">
+              <option :value="true">Show on all slides</option>
+              <option :value="false">Hidden by default (enable per slide)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="field">
+            <label>Size — {{ editWm.size }}% of slide width</label>
+            <input type="range" v-model.number="editWm.size" min="3" max="30" />
+          </div>
+          <div class="field">
+            <label>Opacity — {{ Math.round(editWm.opacity * 100) }}%</label>
+            <input type="range" v-model.number="editWm.opacity" min="0.05" max="1" step="0.05" />
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-primary" style="font-size:13px" :disabled="wmSaving" @click="saveWatermarkConfig">
+            {{ wmSaving ? 'Saving…' : 'Save settings' }}
+          </button>
+          <span v-if="wmMsg" :class="wmMsg.startsWith('Saved') ? 'success-msg' : 'error-msg'">{{ wmMsg }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Slides card -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -331,6 +486,17 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
           style="font-size:11px;padding:2px 6px;border-radius:10px;background:rgba(99,102,241,0.15);color:#6366f1;border:1px solid rgba(99,102,241,0.3);white-space:nowrap"
         >T</span>
         <div style="display:flex;gap:4px">
+          <!-- Watermark per-slide toggle (only shown when slideshow has a watermark) -->
+          <button
+            v-if="meta.watermark && slide.status === 'ready'"
+            class="btn-ghost"
+            style="padding:4px 8px;font-size:12px"
+            :title="slide.watermarkEnabled === false ? 'Watermark hidden on this slide (click to reset)' : slide.watermarkEnabled === true ? 'Watermark forced on this slide (click to cycle)' : 'Watermark inherited from slideshow (click to override)'"
+            :style="{
+              color: slide.watermarkEnabled === false ? '#ef4444' : slide.watermarkEnabled === true ? '#3b82f6' : 'var(--text-muted)',
+            }"
+            @click="cycleSlideWatermark(slide)"
+          >⬡</button>
           <button
             v-if="slide.status === 'ready'"
             class="btn-ghost"
@@ -342,6 +508,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
           <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :disabled="i === slides.length - 1" @click="move(i, 1)">↓</button>
           <button class="btn-danger" style="padding:4px 8px;font-size:12px" @click="deleteSlide(slide.id)">✕</button>
         </div>
+
       </div>
     </div>
 

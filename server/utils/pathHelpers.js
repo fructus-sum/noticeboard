@@ -13,8 +13,12 @@ function logsDir() { return path.join(ROOT, 'logs'); }
 function tmpDir() { return path.join(ROOT, 'tmp', 'noticeboard-uploads'); }
 function sampleDataDir() { return path.join(ROOT, 'sample-data'); }
 
+function watermarkDir(folderName) { return path.join(slideshowDir(folderName), 'watermark'); }
+function watermarkPath(folderName, filename) { return path.join(watermarkDir(folderName), filename); }
+
 function mediaUrl(folderName, filename) { return `/media/${folderName}/slides/${filename}`; }
 function audioUrl(folderName) { return `/media/${folderName}/audio.mp3`; }
+function watermarkUrl(folderName, filename) { return `/media/${folderName}/watermark/${filename}`; }
 
 module.exports = {
   ROOT,
@@ -24,10 +28,13 @@ module.exports = {
   slidesDir,
   audioPath,
   slideshowJsonPath,
+  watermarkDir,
+  watermarkPath,
   configPath,
   logsDir,
   tmpDir,
   sampleDataDir,
   mediaUrl,
   audioUrl,
+  watermarkUrl,
 };

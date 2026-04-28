@@ -52,6 +52,7 @@ onUnmounted(clearTimer);
         :src="currentSlide.url"
         :duration="currentSlide.duration"
         :overlay="currentSlide.overlay"
+        :watermark="currentSlide.watermark"
         @ready="onImageReady"
         @error="advance"
       />
@@ -60,6 +61,7 @@ onUnmounted(clearTimer);
         :key="currentSlide.url"
         :src="currentSlide.url"
         :overlay="currentSlide.overlay"
+        :watermark="currentSlide.watermark"
         @ended="advance"
       />
       <TextSlide
@@ -67,6 +69,7 @@ onUnmounted(clearTimer);
         :key="currentSlide.slideshow + '-' + currentIndex"
         :bgColor="currentSlide.bgColor"
         :overlay="currentSlide.overlay"
+        :watermark="currentSlide.watermark"
         :duration="currentSlide.duration"
         @ready="onImageReady"
       />

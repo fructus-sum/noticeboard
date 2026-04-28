@@ -1,10 +1,12 @@
 <script setup>
 import SlideOverlay from './SlideOverlay.vue';
+import WatermarkOverlay from './WatermarkOverlay.vue';
 
 const props = defineProps({
-  src:      { type: String, required: true },
-  duration: { type: Number, default: null },
-  overlay:  { type: Object, default: null },
+  src:       { type: String, required: true },
+  duration:  { type: Number, default: null },
+  overlay:   { type: Object, default: null },
+  watermark: { type: Object, default: null },
 });
 
 const emit = defineEmits(['ready', 'error']);
@@ -20,6 +22,7 @@ const emit = defineEmits(['ready', 'error']);
       @error="emit('error')"
     />
     <SlideOverlay v-if="overlay" :overlay="overlay" />
+    <WatermarkOverlay v-if="watermark" :watermark="watermark" />
   </div>
 </template>
 

@@ -264,6 +264,9 @@
   .section:nth-child(9) { animation-delay: 0.45s; }
   .section:nth-child(10){ animation-delay: 0.5s; }
   .section:nth-child(11){ animation-delay: 0.55s; }
+  .section:nth-child(12){ animation-delay: 0.6s; }
+  .section:nth-child(13){ animation-delay: 0.65s; }
+  .section:nth-child(14){ animation-delay: 0.7s; }
 
   @keyframes fadeUp {
     to { opacity: 1; transform: translateY(0); }
@@ -587,6 +590,75 @@
   .mock-btn.disable { background: rgba(248,81,73,0.12); color: #f85149; outline: 1px solid rgba(248,81,73,0.3); }
   .mock-btn.manage  { background: var(--bg-3); color: var(--text-dim); outline: 1px solid var(--border-mid); }
   .mock-btn.delete  { background: rgba(248,81,73,0.08); color: #f85149; outline: 1px solid rgba(248,81,73,0.2); }
+  .mock-btn.ghost   { background: var(--bg-3); color: var(--text-dim); outline: 1px solid var(--border-mid); }
+  .mock-btn.text-slide { background: rgba(99,102,241,0.12); color: #818cf8; outline: 1px solid rgba(99,102,241,0.3); }
+  .mock-btn.upload  { background: rgba(88,166,255,0.15); color: var(--blue); outline: 1px solid rgba(88,166,255,0.3); }
+
+  /* ── Slide row mock ─────────────────────────────── */
+  .slide-row-mock {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .slide-row-mock:last-child { border-bottom: none; }
+  .slide-thumb-mock {
+    width: 56px;
+    height: 40px;
+    background: var(--bg);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .slide-info { flex: 1; min-width: 0; }
+  .slide-info-type { font-size: 11px; color: var(--text-dimmer); font-family: 'JetBrains Mono', monospace; }
+  .slide-info-name { font-size: 12px; color: var(--text-dim); }
+  .slide-actions { display: flex; gap: 4px; }
+  .mock-icon-btn {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-mid);
+    background: var(--bg-2);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .mock-icon-btn.danger { border-color: rgba(248,81,73,0.3); color: #f85149; background: rgba(248,81,73,0.08); }
+  .mock-icon-btn.blue   { border-color: rgba(88,166,255,0.3); color: var(--blue); background: rgba(88,166,255,0.08); }
+
+  /* ── Watermark mock ─────────────────────────────── */
+  .wm-preview-mock {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: var(--bg-2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .wm-thumb {
+    width: 80px;
+    height: 50px;
+    background: var(--bg-3);
+    border-radius: 6px;
+    border: 1px solid var(--border-mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .wm-info { flex: 1; }
+  .wm-filename { font-size: 13px; font-weight: 500; color: #fff; margin-bottom: 6px; }
+  .wm-btns { display: flex; gap: 8px; }
 
   /* ── Table ──────────────────────────────────────── */
   table {
@@ -677,16 +749,18 @@
       <div class="nav-section-label">Managing Content</div>
       <a class="nav-link" href="#slideshows"><span class="nav-num">04</span>Creating Slideshows</a>
       <a class="nav-link" href="#uploading"><span class="nav-num">05</span>Uploading Media</a>
-      <a class="nav-link" href="#publish"><span class="nav-num">06</span>Publish &amp; Disable</a>
-      <a class="nav-link" href="#scheduling"><span class="nav-num">07</span>Scheduling</a>
-      <a class="nav-link" href="#ordering"><span class="nav-num">08</span>Ordering &amp; Priority</a>
+      <a class="nav-link" href="#text-slides"><span class="nav-num">06</span>Text Overlays &amp; Text Slides</a>
+      <a class="nav-link" href="#watermark"><span class="nav-num">07</span>Watermark &amp; Logo</a>
+      <a class="nav-link" href="#publish"><span class="nav-num">08</span>Publish &amp; Disable</a>
+      <a class="nav-link" href="#scheduling"><span class="nav-num">09</span>Scheduling</a>
+      <a class="nav-link" href="#ordering"><span class="nav-num">10</span>Ordering &amp; Priority</a>
     </div>
 
     <div class="nav-section">
       <div class="nav-section-label">Administration</div>
-      <a class="nav-link" href="#displays"><span class="nav-num">09</span>Remote Displays</a>
-      <a class="nav-link" href="#settings"><span class="nav-num">10</span>Settings</a>
-      <a class="nav-link" href="#troubleshooting"><span class="nav-num">11</span>Troubleshooting</a>
+      <a class="nav-link" href="#displays"><span class="nav-num">11</span>Remote Displays</a>
+      <a class="nav-link" href="#settings"><span class="nav-num">12</span>Settings</a>
+      <a class="nav-link" href="#troubleshooting"><span class="nav-num">13</span>Troubleshooting</a>
     </div>
   </nav>
 
@@ -695,12 +769,14 @@
 
     <!-- Hero -->
     <div class="hero">
-      <div class="hero-eyebrow">User Guide — v1.0</div>
+      <div class="hero-eyebrow">User Guide — v1.1</div>
       <h1>The <em>complete</em><br>Noticeboard guide</h1>
       <p class="hero-intro">Everything you need to set up, manage, and display content on your Raspberry Pi noticeboard system — from installation to daily use.</p>
       <div class="hero-meta">
         <div class="hero-meta-item"><span class="dot"></span>Raspberry Pi</div>
         <div class="hero-meta-item"><span class="dot"></span>Images &amp; Video</div>
+        <div class="hero-meta-item"><span class="dot"></span>Text overlays</div>
+        <div class="hero-meta-item"><span class="dot"></span>Watermark logos</div>
         <div class="hero-meta-item"><span class="dot"></span>Multi-display</div>
         <div class="hero-meta-item"><span class="dot"></span>Scheduled content</div>
       </div>
@@ -714,7 +790,7 @@
         <h2>Overview</h2>
       </div>
 
-      <p>Noticeboard turns one or more Raspberry Pis into a managed digital display system. One Pi runs the server and admin panel. Any number of additional Pis (or browsers on a local network) can act as display screens — showing slideshows of images and videos that you control remotely from the admin panel.</p>
+      <p>Noticeboard turns one or more Raspberry Pis into a managed digital display system. One Pi runs the server and admin panel. Any number of additional Pis (or browsers on a local network) can act as display screens — showing slideshows of images, videos, and text slides that you control remotely from the admin panel.</p>
 
       <h3>How it works</h3>
       <p>The system has three parts that work together:</p>
@@ -729,7 +805,7 @@
           </tr>
           <tr>
             <td><strong>Admin Panel</strong></td>
-            <td>A web page (at <code>/admin</code>) where you log in, create slideshows, upload images, and control what appears on screen.</td>
+            <td>A web page (at <code>/admin</code>) where you log in, create slideshows, upload images, add text slides, and control what appears on screen.</td>
             <td>You — the administrator</td>
           </tr>
           <tr>
@@ -828,7 +904,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Approve the display in the admin panel</strong>
-            <p>If MAC filtering is enabled on the server, the new display will show its MAC address on screen. You must add it to the approved list in Admin → Settings before it can show content. See <a href="#displays" style="color:var(--amber)">Section 9</a>.</p>
+            <p>If MAC filtering is enabled on the server, the new display will show its MAC address on screen. You must add it to the approved list in Admin → Settings before it can show content. See <a href="#displays" style="color:var(--amber)">Section 11</a>.</p>
           </div>
         </div>
         <div class="step">
@@ -931,7 +1007,7 @@
         <h2>Creating Slideshows</h2>
       </div>
 
-      <p>A <strong>slideshow</strong> is a named collection of images and/or videos that plays on the display screen. You can have multiple slideshows and control which ones are active, when they appear, and in what order.</p>
+      <p>A <strong>slideshow</strong> is a named collection of slides — images, videos, and text slides — that plays on the display screen. You can have multiple slideshows and control which ones are active, when they appear, and in what order.</p>
 
       <h3>Creating your first slideshow</h3>
       <div class="steps">
@@ -967,7 +1043,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">New slideshows always start as <strong>Disabled</strong>. This lets you upload all your content and get everything set up before it appears on screen. When you're ready, click <strong>Publish</strong>. See <a href="#publish" style="color:var(--amber)">Section 6</a>.</div>
+        <div class="callout-body">New slideshows always start as <strong>Disabled</strong>. This lets you upload all your content and get everything set up before it appears on screen. When you're ready, click <strong>Publish</strong>. See <a href="#publish" style="color:var(--amber)">Section 8</a>.</div>
       </div>
 
       <h3>Managing an existing slideshow</h3>
@@ -979,7 +1055,10 @@
           <tr><td>Change the schedule</td><td>Click Edit, change Schedule type, click Save</td></tr>
           <tr><td>Change the priority</td><td>Click Edit, adjust the Priority number, click Save</td></tr>
           <tr><td>Publish or disable</td><td>Click the <strong>Publish</strong> / <strong>Disable</strong> button in the Status field</td></tr>
-          <tr><td>Upload slides</td><td>Click <strong>+ Upload</strong> in the Slides card</td></tr>
+          <tr><td>Upload image or video slides</td><td>Click <strong>+ Upload</strong> in the Slides card — select one or more files</td></tr>
+          <tr><td>Create a text slide</td><td>Click <strong>T+ Text Slide</strong> — see <a href="#text-slides" style="color:var(--amber)">Section 6</a></td></tr>
+          <tr><td>Add text overlay to a slide</td><td>Click the ✏ button on any ready slide — see <a href="#text-slides" style="color:var(--amber)">Section 6</a></td></tr>
+          <tr><td>Upload a watermark / logo</td><td>Use the <strong>Watermark / Logo</strong> card — see <a href="#watermark" style="color:var(--amber)">Section 7</a></td></tr>
           <tr><td>Reorder slides</td><td>Use the ↑ ↓ arrow buttons next to each slide</td></tr>
           <tr><td>Delete a slide</td><td>Click the ✕ button next to the slide</td></tr>
         </tbody>
@@ -997,7 +1076,7 @@
         <h2>Uploading Media</h2>
       </div>
 
-      <p>Each slideshow holds an ordered list of slides. A slide is either an image or a video clip. You upload them one at a time from the slideshow's detail page.</p>
+      <p>Each slideshow holds an ordered list of slides. A slide can be an image, a video clip, or a text slide (see <a href="#text-slides" style="color:var(--amber)">Section 6</a>). You upload image and video files from the slideshow's detail page — you can select multiple files at once.</p>
 
       <h3>Supported file types</h3>
       <table>
@@ -1018,10 +1097,10 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.264 MP4 for reliable playback in Chromium. On a Raspberry Pi 4 this process takes 10–60 seconds per file depending on size. The slide will show <span class="pill amber">processing</span> during this time.</div>
+        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.264 MP4 for reliable playback in Chromium. On a Raspberry Pi 4 this process takes 10–60 seconds per file depending on size. Each slide will show <span class="pill amber">processing</span> during this time.</div>
       </div>
 
-      <h3>Uploading a slide</h3>
+      <h3>Uploading slides</h3>
       <div class="steps">
         <div class="step">
           <div class="step-num"></div>
@@ -1034,21 +1113,80 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Click "+ Upload" in the Slides section</strong>
-            <p>A file picker will open. Select one image or video file.</p>
+            <p>A file picker will open. You can select multiple images or videos at once — hold Ctrl (or Cmd on Mac) to select more than one file.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Wait for the slide to process</strong>
-            <p>You will see the slide appear in the list with a <span class="pill amber">processing</span> badge. This badge changes to <span class="pill green">ready</span> when processing is complete. The page updates automatically — no need to refresh.</p>
+            <strong>Wait for the slides to process</strong>
+            <p>Each uploaded file appears in the list with a <span class="pill amber">processing</span> badge. This changes to <span class="pill green">ready</span> when conversion is complete. The page updates automatically — no need to refresh.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Repeat for additional slides</strong>
-            <p>You can upload the next file immediately without waiting for the previous one to finish processing.</p>
+            <strong>Upload more at any time</strong>
+            <p>You can click Upload again immediately without waiting for the previous batch to finish.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mock-ui">
+        <div class="mock-titlebar">
+          <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+          <div class="mock-url">http://192.168.1.42:3000/admin/slideshows/morning-announcements</div>
+        </div>
+        <div class="mock-body">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <span style="font-weight:500;color:#fff;font-size:14px">Slides (3)</span>
+            <div style="display:flex;gap:8px">
+              <button class="mock-btn text-slide" style="pointer-events:none">T+ Text Slide</button>
+              <button class="mock-btn upload" style="pointer-events:none">+ Upload</button>
+            </div>
+          </div>
+          <div class="slide-row-mock">
+            <div class="slide-thumb-mock">🖼</div>
+            <div class="slide-info">
+              <div class="slide-info-type">image</div>
+              <div class="slide-info-name">banner.png</div>
+            </div>
+            <span class="pill green">ready</span>
+            <div class="slide-actions">
+              <button class="mock-icon-btn" style="pointer-events:none">✏</button>
+              <button class="mock-icon-btn" style="pointer-events:none">↑</button>
+              <button class="mock-icon-btn" style="pointer-events:none">↓</button>
+              <button class="mock-icon-btn danger" style="pointer-events:none">✕</button>
+            </div>
+          </div>
+          <div class="slide-row-mock">
+            <div class="slide-thumb-mock">▶</div>
+            <div class="slide-info">
+              <div class="slide-info-type">video</div>
+              <div class="slide-info-name">promo.mp4</div>
+            </div>
+            <span class="pill amber">processing</span>
+            <div class="slide-actions">
+              <button class="mock-icon-btn" style="pointer-events:none;opacity:0.4">✏</button>
+              <button class="mock-icon-btn" style="pointer-events:none">↑</button>
+              <button class="mock-icon-btn" style="pointer-events:none">↓</button>
+              <button class="mock-icon-btn danger" style="pointer-events:none">✕</button>
+            </div>
+          </div>
+          <div class="slide-row-mock">
+            <div class="slide-thumb-mock" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#818cf8;font-size:14px;font-weight:600">T</div>
+            <div class="slide-info">
+              <div class="slide-info-type">text</div>
+              <div class="slide-info-name">—</div>
+            </div>
+            <span class="pill green">ready</span>
+            <span style="font-size:11px;padding:2px 6px;border-radius:10px;background:rgba(99,102,241,0.15);color:#6366f1;border:1px solid rgba(99,102,241,0.3)">T</span>
+            <div class="slide-actions">
+              <button class="mock-icon-btn blue" style="pointer-events:none">✏</button>
+              <button class="mock-icon-btn" style="pointer-events:none">↑</button>
+              <button class="mock-icon-btn" style="pointer-events:none">↓</button>
+              <button class="mock-icon-btn danger" style="pointer-events:none">✕</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1064,18 +1202,330 @@
       </table>
 
       <h3>How long each slide displays</h3>
-      <p><strong>Images</strong> display for a fixed number of seconds. The default is 10 seconds. You can change the global default in <strong>Settings → Default slide duration</strong>.</p>
-      <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide. The duration field is ignored for videos.</p>
+      <p><strong>Images and text slides</strong> display for a fixed number of seconds. The default is 10 seconds. You can change the global default in <strong>Settings → Default slide duration</strong>. Text slides also have their own per-slide duration you can set when creating or editing them.</p>
+      <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide.</p>
 
       <h3>Reordering slides</h3>
-      <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The display will update to the new order the next time the playlist broadcasts (within a minute, or immediately when you publish/disable the slideshow).</p>
+      <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The display will update to the new order within a few seconds.</p>
     </div>
 
-    <!-- ── 06 Publish & Disable ── -->
+    <!-- ── 06 Text Overlays & Text Slides ── -->
+    <div class="section">
+      <span id="text-slides" class="section-anchor"></span>
+      <div class="section-header">
+        <span class="section-num">06</span>
+        <h2>Text Overlays &amp; Text Slides</h2>
+      </div>
+
+      <p>You can add text directly on top of any slide or create a completely blank text-only slide — like a PowerPoint slide — entirely from the admin panel. No image editing software needed.</p>
+
+      <h3>Text overlays — adding text on top of an image or video</h3>
+      <p>A text overlay places a styled message on top of an existing image or video slide. It appears on the display at the position you choose, and updates in real time as you adjust the controls.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Open the slideshow detail page</strong>
+            <p>Click <strong>Manage</strong> next to the slideshow.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Click the ✏ button on a ready slide</strong>
+            <p>The slide editor opens. Slides that are still <span class="pill amber">processing</span> cannot be edited yet.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Type your message in the Text field</strong>
+            <p>The live preview above the controls updates instantly as you type.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Adjust the style and position</strong>
+            <p>Use the controls below to set font, size, colour, and position. See the table below for what each control does.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Click Save</strong>
+            <p>The overlay is saved and the display updates automatically. A small purple <strong>T</strong> badge appears on the slide row to show it has an overlay.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mock-ui">
+        <div class="mock-titlebar">
+          <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+          <div class="mock-url">Slide Editor — Add Overlay</div>
+        </div>
+        <div class="mock-body">
+          <!-- Mini preview -->
+          <div style="width:100%;aspect-ratio:16/9;background:#1a3a2a;border-radius:6px;border:1px solid var(--border);margin-bottom:14px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+            <div style="position:absolute;inset:0;background:linear-gradient(135deg,#1a3a2a 0%,#0d2218 100%)"></div>
+            <div style="position:absolute;bottom:18%;left:50%;transform:translateX(-50%);font-size:22px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.6);white-space:nowrap;letter-spacing:0.02em">
+              Staff Meeting — 3pm Today
+            </div>
+          </div>
+          <!-- Controls summary -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;color:var(--text-dim)">
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Text</div>
+              <div style="color:var(--text)">Staff Meeting — 3pm Today</div>
+            </div>
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Font</div>
+              <div style="color:var(--text)">Sans-serif · 60px</div>
+            </div>
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Position</div>
+              <div style="color:var(--text)">Horizontal 50% · Vertical 82%</div>
+            </div>
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Alignment</div>
+              <div style="color:var(--text)">Center</div>
+            </div>
+          </div>
+          <div style="margin-top:14px;display:flex;gap:8px">
+            <button class="mock-btn publish" style="pointer-events:none">Save</button>
+            <button class="mock-btn ghost" style="pointer-events:none">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <h3>Overlay controls</h3>
+      <table>
+        <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Text</strong></td><td>The message to display. Supports multiple lines — press Enter for a new line.</td></tr>
+          <tr><td><strong>Font</strong></td><td>Choose from 7 typefaces: Sans-serif, Serif, Monospace, Arial, Georgia, Impact, Trebuchet MS.</td></tr>
+          <tr><td><strong>Font size</strong></td><td>Slider from 12 to 200 px. The live preview scales to show you the result.</td></tr>
+          <tr><td><strong>Text colour</strong></td><td>Colour picker for the text itself.</td></tr>
+          <tr><td><strong>Text background</strong></td><td>Optional coloured box behind the text — useful for readability over busy images. Toggle the checkbox to enable, then pick a colour.</td></tr>
+          <tr><td><strong>Horizontal position</strong></td><td>Slider 0–100%. 0 = far left, 50 = centre, 100 = far right.</td></tr>
+          <tr><td><strong>Vertical position</strong></td><td>Slider 0–100%. 0 = top, 50 = middle, 100 = bottom.</td></tr>
+          <tr><td><strong>Alignment</strong></td><td>Left / Centre / Right — controls text alignment within the overlay block.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Removing an overlay</h3>
+      <p>Open the slide editor (✏ button) and tick <strong>"Remove overlay from this slide"</strong>, then click Save. The overlay is deleted and the purple <strong>T</strong> badge disappears from the slide row.</p>
+
+      <h3>Text slides — blank slides with coloured backgrounds</h3>
+      <p>A text slide is a completely blank slide with a solid colour background and your text on top — no image file required. Think of it like a PowerPoint slide. Use these for announcements, titles, or any message you want to display without a background image.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Click "T+ Text Slide" in the Slides section</strong>
+            <p>The slide editor opens in create mode.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Type your message and choose the style</strong>
+            <p>Use the same controls as a text overlay: font, size, colour, position, and alignment.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Choose a slide background colour</strong>
+            <p>Use the <strong>Slide background colour</strong> picker to set the background of the entire slide. Default is a dark navy.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Set the duration (optional)</strong>
+            <p>How many seconds the slide displays before moving to the next one. Default is 10 seconds.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Click "Create slide"</strong>
+            <p>The slide is added instantly — no processing needed. It appears in the list with a <span class="pill green">ready</span> badge straight away.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mock-ui">
+        <div class="mock-titlebar">
+          <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+          <div class="mock-url">Slide Editor — New Text Slide</div>
+        </div>
+        <div class="mock-body">
+          <!-- Text slide preview -->
+          <div style="width:100%;aspect-ratio:16/9;background:#1e293b;border-radius:6px;border:1px solid var(--border);margin-bottom:14px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+            <div style="font-size:28px;font-weight:300;color:#f1f5f9;text-align:center;letter-spacing:-0.02em;font-family:'Fraunces',serif;font-style:italic">
+              Fire Drill<br><span style="font-size:16px;font-weight:400;opacity:0.7;font-style:normal;font-family:'DM Sans',sans-serif">Assembly point: Car Park B</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Background</div>
+              <div style="display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border-radius:3px;background:#1e293b;border:1px solid var(--border-mid)"></div><span style="color:var(--text)">#1e293b</span></div>
+            </div>
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">Duration</div>
+              <div style="color:var(--text)">10 seconds</div>
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <button class="mock-btn publish" style="pointer-events:none">Create slide</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body">Text slides are created instantly — they don't go through the <span class="pill amber">processing</span> stage like uploaded images and videos. They appear as <span class="pill green">ready</span> straight away and you can reorder, edit, or delete them like any other slide.</div>
+      </div>
+
+      <p>To edit a text slide later, click the ✏ button on its row. You can change the text, colours, font, position, and duration at any time.</p>
+    </div>
+
+    <!-- ── 07 Watermark & Logo ── -->
+    <div class="section">
+      <span id="watermark" class="section-anchor"></span>
+      <div class="section-header">
+        <span class="section-num">07</span>
+        <h2>Watermark &amp; Logo</h2>
+      </div>
+
+      <p>Each slideshow can display a small logo or watermark image in a corner of the screen on all slides — useful for branding or attribution. You can also control the watermark on individual slides, hiding it on some or showing it only on specific ones.</p>
+
+      <h3>Uploading a watermark</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Open the slideshow detail page and scroll to "Watermark / Logo"</strong>
+            <p>This card sits between the Settings card and the Slides card.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Click "Upload Watermark"</strong>
+            <p>Choose a PNG, JPG, or WebP image. Transparent PNG logos work best — they blend seamlessly over any slide.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Configure the appearance</strong>
+            <p>Set position, size, and opacity using the controls that appear. The watermark is saved immediately — use "Save settings" to apply any configuration changes.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mock-ui">
+        <div class="mock-titlebar">
+          <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+          <div class="mock-url">http://192.168.1.42:3000/admin/slideshows/morning-announcements</div>
+        </div>
+        <div class="mock-body">
+          <div style="font-size:14px;font-weight:500;color:#fff;margin-bottom:16px">Watermark / Logo</div>
+          <div class="wm-preview-mock">
+            <div class="wm-thumb">🏢</div>
+            <div class="wm-info">
+              <div class="wm-filename">logo.png</div>
+              <div class="wm-btns">
+                <button class="mock-btn ghost" style="pointer-events:none;font-size:11px;padding:4px 10px">Replace</button>
+                <button class="mock-btn delete" style="pointer-events:none;font-size:11px;padding:4px 10px">Remove</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:12px;color:var(--text-dim)">
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Position</div>
+              <div style="color:var(--text)">Bottom right ▾</div>
+            </div>
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Default visibility</div>
+              <div style="color:var(--text)">Show on all slides ▾</div>
+            </div>
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Size — 10%</div>
+              <div style="height:6px;background:var(--bg-3);border-radius:3px;margin-top:6px;position:relative"><div style="width:33%;height:100%;background:var(--amber);border-radius:3px"></div></div>
+            </div>
+            <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+              <div style="color:var(--text-dimmer);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px">Opacity — 85%</div>
+              <div style="height:6px;background:var(--bg-3);border-radius:3px;margin-top:6px;position:relative"><div style="width:85%;height:100%;background:var(--amber);border-radius:3px"></div></div>
+            </div>
+          </div>
+          <button class="mock-btn publish" style="pointer-events:none">Save settings</button>
+        </div>
+      </div>
+
+      <h3>Watermark configuration options</h3>
+      <table>
+        <thead><tr><th>Setting</th><th>Options</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Position</strong></td><td>Top left, Top right, Bottom left, Bottom right</td><td>The logo is anchored 2% from the chosen corner.</td></tr>
+          <tr><td><strong>Size</strong></td><td>3%–30% of slide width</td><td>10% is a good starting point for most logos.</td></tr>
+          <tr><td><strong>Opacity</strong></td><td>5%–100%</td><td>85% gives a visible but non-distracting watermark.</td></tr>
+          <tr><td><strong>Default visibility</strong></td><td>"Show on all slides" or "Hidden by default"</td><td>See per-slide control below.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Controlling the watermark per slide</h3>
+      <p>Once a watermark is uploaded, a small hexagon button (⬡) appears on each ready slide row. Click it to cycle through three states:</p>
+
+      <table>
+        <thead><tr><th>Button colour</th><th>State</th><th>Behaviour</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span style="color:var(--text-muted,#8b9bab)">Grey ⬡</span></td>
+            <td>Inherited</td>
+            <td>This slide follows the slideshow's default visibility setting.</td>
+          </tr>
+          <tr>
+            <td><span style="color:#ef4444">Red ⬡</span></td>
+            <td>Hidden</td>
+            <td>The watermark is hidden on this slide only, even if the slideshow default is "Show on all".</td>
+          </tr>
+          <tr>
+            <td><span style="color:#3b82f6">Blue ⬡</span></td>
+            <td>Forced on</td>
+            <td>The watermark is shown on this slide only, even if the slideshow default is "Hidden by default".</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body">
+          <strong>Common use cases:</strong><br>
+          • Watermark on all slides except one: set Default to "Show on all", then set that one slide to Red ⬡ (hidden).<br>
+          • Watermark on one slide only: set Default to "Hidden by default", then set that one slide to Blue ⬡ (forced on).
+        </div>
+      </div>
+
+      <h3>Replacing or removing the watermark</h3>
+      <p>To swap the logo, click <strong>Replace</strong> in the Watermark card and upload the new file. The old file is deleted automatically. To remove the watermark entirely, click <strong>Remove</strong> — this deletes the logo file and hides the watermark from all slides.</p>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body">Use a <strong>transparent PNG</strong> for the best results. A logo with a transparent background blends cleanly over both light and dark slides without an unsightly white box.</div>
+      </div>
+    </div>
+
+    <!-- ── 08 Publish & Disable ── -->
     <div class="section">
       <span id="publish" class="section-anchor"></span>
       <div class="section-header">
-        <span class="section-num">06</span>
+        <span class="section-num">08</span>
         <h2>Publish &amp; Disable</h2>
       </div>
 
@@ -1151,18 +1601,18 @@
 
       <h3>Typical workflows</h3>
 
-      <p><strong>Setting up a new slideshow before going live:</strong> Create the slideshow (it starts disabled) → upload all your images → adjust the order and schedule → click Publish when ready.</p>
+      <p><strong>Setting up a new slideshow before going live:</strong> Create the slideshow (it starts disabled) → upload all your images, add text slides and overlays → adjust the order and schedule → click Publish when ready.</p>
 
       <p><strong>Seasonal or event content:</strong> Upload your Christmas/event content weeks in advance. Leave it disabled. On the day, click Publish. After the event, click Disable. The content remains on the server ready for next year — just click Publish again.</p>
 
       <p><strong>Pulling content quickly:</strong> If you need to immediately remove something from display (e.g. outdated information), click Disable on the relevant slideshow. The change takes effect within seconds on all screens.</p>
     </div>
 
-    <!-- ── 07 Scheduling ── -->
+    <!-- ── 09 Scheduling ── -->
     <div class="section">
       <span id="scheduling" class="section-anchor"></span>
       <div class="section-header">
-        <span class="section-num">07</span>
+        <span class="section-num">09</span>
         <h2>Scheduling</h2>
       </div>
 
@@ -1229,11 +1679,11 @@
       <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows a plain black screen with a faint pulsing dot — this is intentional and indicates the display is connected and waiting. It is not an error.</p>
     </div>
 
-    <!-- ── 08 Ordering & Priority ── -->
+    <!-- ── 10 Ordering & Priority ── -->
     <div class="section">
       <span id="ordering" class="section-anchor"></span>
       <div class="section-header">
-        <span class="section-num">08</span>
+        <span class="section-num">10</span>
         <h2>Ordering &amp; Priority</h2>
       </div>
 
@@ -1259,11 +1709,11 @@
       <p>Inside a single slideshow, slides play in the order shown in the Slides card. Use the ↑ and ↓ buttons to reorder them. The playlist cycles continuously — after the last slide, it loops back to the first.</p>
     </div>
 
-    <!-- ── 09 Remote Displays ── -->
+    <!-- ── 11 Remote Displays ── -->
     <div class="section">
       <span id="displays" class="section-anchor"></span>
       <div class="section-header">
-        <span class="section-num">09</span>
+        <span class="section-num">11</span>
         <h2>Remote Displays</h2>
       </div>
 
@@ -1314,11 +1764,11 @@
       </div>
     </div>
 
-    <!-- ── 10 Settings ── -->
+    <!-- ── 12 Settings ── -->
     <div class="section">
       <span id="settings" class="section-anchor"></span>
       <div class="section-header">
-        <span class="section-num">10</span>
+        <span class="section-num">12</span>
         <h2>Settings</h2>
       </div>
 
@@ -1329,7 +1779,7 @@
         <tbody>
           <tr>
             <td><strong>Default slide duration</strong></td>
-            <td>How many seconds each image slide displays before advancing. This applies to all image slides that don't have a custom duration set. Videos always play their full length.</td>
+            <td>How many seconds each image or text slide displays before advancing. This applies to all slides that don't have a custom duration set. Videos always play their full length.</td>
             <td>10 seconds</td>
           </tr>
           <tr>
@@ -1363,11 +1813,11 @@
       <p>Press <code>Ctrl+C</code> to stop following the log.</p>
     </div>
 
-    <!-- ── 11 Troubleshooting ── -->
+    <!-- ── 13 Troubleshooting ── -->
     <div class="section">
       <span id="troubleshooting" class="section-anchor"></span>
       <div class="section-header">
-        <span class="section-num">11</span>
+        <span class="section-num">13</span>
         <h2>Troubleshooting</h2>
       </div>
 
@@ -1385,7 +1835,7 @@
           <tr>
             <td>Published slideshow has no ready slides</td>
             <td>Open the slideshow. Are any slides showing <span class="pill green">ready</span>?</td>
-            <td>Upload images and wait for processing to complete</td>
+            <td>Upload images, add text slides, or wait for processing to complete</td>
           </tr>
           <tr>
             <td>Schedule doesn't match current time</td>
@@ -1405,6 +1855,12 @@
         </tbody>
       </table>
 
+      <h3>Text overlay or text slide doesn't appear on screen</h3>
+      <p>Check that the slideshow is published and the schedule is active. For text overlays, open the slide editor (✏) and confirm the text field is not empty and the position sliders are not pushed completely off the edge (x and y both at 0 or 100 can push the text out of view). For text slides, confirm the slide shows <span class="pill green">ready</span> in the Slides card.</p>
+
+      <h3>Watermark logo isn't showing on the display</h3>
+      <p>Check the following in the Watermark / Logo card: (1) A logo file has been uploaded — a preview image should appear. (2) <strong>Default visibility</strong> is set to "Show on all slides" (or the specific slide's ⬡ button is blue/forced on). (3) Click "Save settings" after making any changes. If it still doesn't appear, re-publish the slideshow to force a playlist refresh.</p>
+
       <h3>Admin panel shows "Session expired" or logs me out</h3>
       <p>Simply log in again. Sessions expire after a period of inactivity. If you are repeatedly logged out very quickly, restart the server — the JWT secret is regenerated on a fresh install and that can occasionally cause stale session cookies.</p>
 
@@ -1423,7 +1879,7 @@
       <p>The display Pi is connected and working, but MAC filtering is blocking it. You need to add its MAC address to the approved list in Admin → Settings → MAC Filtering. The MAC address is shown on the display Pi's screen.</p>
 
       <h3>Display is connected but slides seem slow to update after a change</h3>
-      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Changes to slide content (uploading, reordering, publishing/disabling) take effect within a few seconds.</p>
+      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Changes to slide content (uploading, reordering, adding text slides, publishing/disabling) take effect within a few seconds.</p>
 
       <h3>The Pi display is blank or black on boot (kiosk doesn't start)</h3>
       <p>The kiosk waits for the server to be ready before launching Chromium. If the server takes longer than usual to start (e.g. after a system update), the kiosk should still launch — just more slowly. Check the server is running:</p>
@@ -1449,7 +1905,7 @@
     </div>
 
     <footer class="footer">
-      <span>Noticeboard User Guide — v1.0</span>
+      <span>Noticeboard User Guide — v1.1</span>
       <span>Built for Raspberry Pi OS · Node.js 20 · Vue 3</span>
     </footer>
 

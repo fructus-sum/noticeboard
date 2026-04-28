@@ -184,7 +184,7 @@ router.put('/:id', async (req, res, next) => {
     const slide = data.slides.find(s => s.id === id);
     if (!slide) return res.status(404).json({ error: 'Slide not found' });
 
-    const allowed = ['overlay', 'duration', 'bgColor'];
+    const allowed = ['overlay', 'duration', 'bgColor', 'watermarkEnabled'];
     for (const key of allowed) {
       if (key in req.body) {
         if (req.body[key] === null) {

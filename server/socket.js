@@ -2,7 +2,7 @@ const { Server } = require('socket.io');
 const fs = require('fs');
 const schedulerService = require('./services/schedulerService');
 const configService = require('./services/configService');
-const { slideshowJsonPath, mediaUrl } = require('./utils/pathHelpers');
+const { slideshowJsonPath, mediaUrl, watermarkUrl } = require('./utils/pathHelpers');
 const logger = require('./utils/logger');
 
 const DEV_ORIGINS = [
@@ -23,7 +23,22 @@ function buildPlaylist(activeSlideshows) {
     } catch {
       // empty or missing slideshow.json — skip
     }
+    const wm = ss.watermark;
     for (const slide of data.slides.filter(s => s.status === 'ready')) {
+      let watermark = null;
+      if (wm?.filename) {
+        const showByDefault = wm.showOnAllSlides !== false;
+        const slideOverride = slide.watermarkEnabled;
+        const show = slideOverride === true || (showByDefault && slideOverride !== false);
+        if (show) {
+          watermark = {
+            url:      watermarkUrl(ss.folder, wm.filename),
+            position: wm.position ?? 'bottom-right',
+            size:     wm.size ?? 10,
+            opacity:  wm.opacity ?? 0.85,
+          };
+        }
+      }
       slides.push({
         type:      slide.type,
         url:       slide.type !== 'text' ? mediaUrl(ss.folder, slide.filename) : null,
@@ -31,6 +46,7 @@ function buildPlaylist(activeSlideshows) {
         slideshow: ss.folder,
         overlay:   slide.overlay ?? null,
         bgColor:   slide.bgColor ?? null,
+        watermark,
       });
     }
   }
