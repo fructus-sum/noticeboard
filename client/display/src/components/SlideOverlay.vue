@@ -11,7 +11,7 @@ defineProps({
       left:       overlay.x + '%',
       top:        overlay.y + '%',
       fontFamily: overlay.fontFamily,
-      fontSize:   overlay.fontSize + 'px',
+      '--font-size': overlay.fontSize,
       color:      overlay.color,
       textAlign:  overlay.align,
       background: overlay.bgColor ?? 'transparent',
@@ -22,6 +22,7 @@ defineProps({
 <style scoped>
 .overlay {
   position: absolute;
+  font-size: calc(var(--font-size, 16) * 1px * var(--slide-scale, 1));
   transform: translate(-50%, -50%);
   white-space: pre-wrap;
   padding: 6px 14px;

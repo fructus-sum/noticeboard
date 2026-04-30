@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import ImageSlide from './ImageSlide.vue';
 import VideoSlide from './VideoSlide.vue';
 import TextSlide  from './TextSlide.vue';
@@ -7,6 +7,10 @@ import TextSlide  from './TextSlide.vue';
 const props = defineProps({
   slides: { type: Array, required: true },
 });
+
+const REFERENCE_WIDTH = 1920;
+const slideshowEl = ref(null);
+let resizeObs = null;
 
 const currentIndex = ref(0);
 const currentSlide = computed(() => props.slides[currentIndex.value] ?? null);
@@ -40,11 +44,18 @@ watch(() => props.slides, () => {
   currentIndex.value = 0;
 });
 
-onUnmounted(clearTimer);
+onMounted(() => {
+  resizeObs = new ResizeObserver(([entry]) => {
+    slideshowEl.value?.style.setProperty('--slide-scale', entry.contentRect.width / REFERENCE_WIDTH);
+  });
+  resizeObs.observe(slideshowEl.value);
+});
+
+onUnmounted(() => { clearTimer(); resizeObs?.disconnect(); });
 </script>
 
 <template>
-  <div class="slideshow">
+  <div class="slideshow" ref="slideshowEl">
     <Transition name="fade" mode="out-in">
       <ImageSlide
         v-if="currentSlide?.type === 'image'"
@@ -80,8 +91,8 @@ onUnmounted(clearTimer);
 <style scoped>
 .slideshow {
   position: relative;
-  aspect-ratio: 16 / 9;
-  width: min(100%, calc(100vh * 16 / 9));
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
   background: #000;
   overflow: hidden;
 }
