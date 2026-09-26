@@ -384,7 +384,7 @@
     flex: 1;
   }
 
-  .step-body strong {
+  .step-body > strong {
     display: block;
     color: #fff;
     font-weight: 500;
@@ -399,6 +399,7 @@
     color: var(--text-dim);
     line-height: 1.65;
   }
+  .step-body p strong { color: #fff; font-weight: 500; }
 
   /* ── Code ───────────────────────────────────────── */
   code {
@@ -744,8 +745,28 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">The display screen requires no interaction and is designed to run unattended. Once set up, the Pi running the display can be left alone indefinitely — it even installs new versions by itself (see <a href="#updates" style="color:var(--blue)">Automatic updates</a>). If anyone needs the noticeboard's address, the faint pin in the top-left corner of the screen shows its IP address and port.</div>
+        <div class="callout-body">The display screen requires no interaction and is designed to run unattended for months. Once set up, the Pi running the display can be left alone indefinitely: it recovers from outages and crashes by itself (see <a href="#unattended" style="color:var(--blue)">Running unattended</a>) and even installs new versions by itself (see <a href="#updates" style="color:var(--blue)">Automatic updates</a>). If anyone needs the noticeboard's address, the faint pin in the top-left corner of the screen shows its IP address and port.</div>
       </div>
+
+      <h3 id="unattended" style="scroll-margin-top:80px">Running unattended</h3>
+      <p>Nobody needs to touch a display, and it doesn't need anyone to click on it or keep it in focus. It keeps the slideshow moving by itself, whatever happens:</p>
+
+      <table>
+        <thead><tr><th>When…</th><th>The display…</th></tr></thead>
+        <tbody>
+          <tr><td>A slide is due to change</td><td>Moves on at the right time: images after their duration, videos when they end. It checks every 2 seconds that nothing was missed, so a slide can never get stuck on screen.</td></tr>
+          <tr><td>A slide won't appear (a download that never finishes, a video that won't start)</td><td>Skips it after 30 seconds and carries on with the next one.</td></tr>
+          <tr><td>A video stops playing part-way</td><td>Skips it after 30 seconds without progress. A video the browser paused, for example while the screen was asleep, is started again.</td></tr>
+          <tr><td>The screen sleeps and wakes, or the browser hides or freezes the page</td><td>Catches up as soon as the page runs again.</td></tr>
+          <tr><td>The server restarts, loses power or drops off the network</td><td>Keeps what it has on screen, reconnects by itself, and carries on within seconds of the server coming back. While nothing can load, it tries again every 30 seconds.</td></tr>
+          <tr><td>A new version is installed</td><td>Reloads itself onto the new version as soon as the server answers again.</td></tr>
+          <tr><td>Every slide keeps failing</td><td>Reloads the page (at most once every 30 minutes).</td></tr>
+          <tr><td>It has been running for a day</td><td>Reloads once between 2 and 5 am, to clear anything the browser has built up over a long run.</td></tr>
+          <tr><td>The browser closes or crashes</td><td>The Pi opens it again after a few seconds, once the server answers.</td></tr>
+        </tbody>
+      </table>
+
+      <p>A display only ever reloads once it has checked that the server answers, so a screen is never left on a browser error page. The slide timing has been tested over a simulated 30 days of running, with outages, sleep and missed timers along the way.</p>
     </div>
 
     <!-- ── 02 Installation ── -->
@@ -756,7 +777,7 @@
         <h2>Installation</h2>
       </div>
 
-      <p>One installer sets up both kinds of Pi: when it starts, it asks what the Pi is for. It needs a Raspberry Pi running Raspberry Pi OS (Bookworm or Bullseye recommended) with a desktop environment.</p>
+      <p>One installer sets up both kinds of Pi: when it starts, it asks what the Pi is for. It needs a Raspberry Pi running Raspberry Pi OS with the desktop: the current release (Trixie) or Bookworm.</p>
 
       <h3>Option A — Single Pi (server + display on the same Pi)</h3>
       <p>Use this if you have one Pi that will both run the server and show the display on its own screen.</p>
@@ -794,7 +815,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Reboot the Pi</strong>
-            <p>When the installer finishes, it asks whether to reboot: press Enter. After restarting, Chromium will open automatically in fullscreen kiosk mode showing the display.</p>
+            <p>When the installer finishes, it asks whether to reboot: press Enter. After restarting, Chromium will open automatically in fullscreen kiosk mode showing the display, as soon as the server is ready. If the browser is ever closed or crashes, it opens again by itself.</p>
           </div>
         </div>
       </div>
@@ -847,7 +868,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Reboot the display Pi</strong>
-            <p>When the installer finishes, it asks whether to reboot: press Enter. Chromium will open automatically and connect to the server.</p>
+            <p>When the installer finishes, it asks whether to reboot: press Enter. Chromium will open automatically and connect to the server. Until the server answers, or while it waits for approval, the screen shows a waiting page with this Pi's MAC address; the slideshow replaces it by itself as soon as the server lets the display in (it checks every 10 seconds).</p>
           </div>
         </div>
       </div>
@@ -855,7 +876,8 @@
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
       <h3>Running the installer again</h3>
-      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub.</p>
+      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub. It never touches your slideshows, slides or settings.</p>
+      <p>On a server Pi that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it.</p>
 
       <h3>Accessing the admin panel after installation</h3>
       <p>Open any browser on your network and go to:</p>
@@ -918,7 +940,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">💡</div>
-        <div class="callout-body"><strong>A sample slideshow is ready to try.</strong> Every installation comes with a <em>Sample slideshow</em>: three slides that show for 3 seconds each. It isn't published, so the display won't show it until you click <strong>Publish</strong>. Disable or delete it whenever you like; once deleted, it doesn't come back.</div>
+        <div class="callout-body"><strong>A sample slideshow is ready to try.</strong> Every installation comes with a <em>Sample slideshow</em>: five slides, four images that show for 3 seconds each and a short video that plays to the end. It isn't published, so the display won't show it until you click <strong>Publish</strong>. Disable or delete it whenever you like; once deleted, it doesn't come back. It's only a demo: when a new version of Noticeboard comes with different sample slides, they replace the ones in it, so put your own content in a slideshow of your own.</div>
       </div>
 
       <h3>Changing the admin password</h3>
@@ -1093,8 +1115,10 @@
       <p><strong>Images</strong> display for a fixed number of seconds. The default is 10 seconds. You can change the global default in <strong>Settings → Default slide duration</strong>.</p>
       <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide. The duration field is ignored for videos.</p>
 
+      <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If a slide hasn't appeared after 30 seconds (a file that won't download, a video that won't start), the display skips it, and a video that stops playing for 30 seconds is skipped too. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
+
       <h3>Reordering slides</h3>
-      <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The display will update to the new order the next time the playlist broadcasts (within a minute, or immediately when you publish/disable the slideshow).</p>
+      <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The display picks up the new order the next time the server sends it the playlist: when an upload finishes, when a slideshow is published or disabled, or when the display reconnects (for example after the server restarts).</p>
     </div>
 
     <!-- ── 06 Publish & Disable ── -->
@@ -1373,6 +1397,11 @@
             <td>The port the server listens on. Changing this requires a server restart. Don't change this unless necessary.</td>
             <td>3000</td>
           </tr>
+          <tr>
+            <td><strong>Software updates</strong></td>
+            <td>Shows the version running and how updates went, and switches the GitHub branch updates come from. See <a href="#updates" style="color:var(--blue)">Automatic updates</a> and <a href="#branches" style="color:var(--blue)">Switching branch</a>.</td>
+            <td>main</td>
+          </tr>
         </tbody>
       </table>
 
@@ -1389,25 +1418,90 @@
       <p>Press <code>Ctrl+C</code> to stop following the log.</p>
 
       <h3 id="updates" style="scroll-margin-top:80px">Automatic updates</h3>
-      <p>The server Pi keeps itself up to date with the latest version of Noticeboard on GitHub. Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it, rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way the Pi starts its display (the kiosk) is set up by the installer, so a fix to that needs the installer run again.</p>
+      <p>The server Pi keeps itself up to date with Noticeboard on GitHub, following one <em>branch</em> of it: <em>main</em>, the stable version, unless you choose another (see <a href="#branches" style="color:var(--blue)">Switching branch</a>). Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it, rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way the Pi starts its display (the kiosk) is set up by the installer, so a change to that needs the installer run again.</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body"><strong>Updates are careful.</strong> An update waits while an upload is being processed. If a new version fails to install or doesn't start, the Pi puts the previous version back, keeps running it, and skips that version until a newer one is published. The updater runs as the Pi's normal user, so it never needs <code>sudo</code>.</div>
+        <div class="callout-body"><strong>Updates are careful.</strong> An update waits while an upload is being processed. If a new version fails to install or doesn't start, the Pi puts the previous version back, keeps running it, and skips that version until a newer one is published. Updates never change or delete your slideshows, slides or settings. The updater runs as the Pi's normal user, so it never needs <code>sudo</code>.</div>
       </div>
 
+      <p>The <strong>Software updates</strong> card at the bottom of the Settings page shows:</p>
+      <table>
+        <thead><tr><th>Line</th><th>What it tells you</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Running</strong></td><td>The branch and version (a short code such as <code>5b6d51f</code>) the noticeboard is running now.</td></tr>
+          <tr><td><strong>Updates</strong></td><td>How often it checks, and when it last checked and what it found: up to date, waiting for an upload, GitHub unreachable, and so on.</td></tr>
+          <tr><td><strong>Last update</strong></td><td>The result of the last update or branch switch: <span class="pill green">Done</span>, <span class="pill amber">Rolled back</span>, <span class="pill amber">Cancelled</span> or <span class="pill red">Failed</span>, with what happened in plain words.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="branches" style="scroll-margin-top:80px">Switching branch</h3>
+      <p>Besides <em>main</em>, the project on GitHub can have other branches holding work in progress, such as a new feature being tried out. You can switch this noticeboard to one of them from the admin panel. Updates then come from that branch until you switch back. Nothing changes until you've checked the branch and confirmed twice.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Choose and check the branch</strong>
+            <p>In <strong>Settings → Software updates</strong>, type the branch name or pick it from the list, then click <strong>Check branch</strong>. The noticeboard checks that the branch exists on GitHub and can be used, and shows the change: the branch and version running now → the new branch and its version, with its latest change. Nothing has changed yet.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Read the warning and enter the admin password</strong>
+            <p>Click <strong>Switch to …</strong>. A warning explains that the branch is <em>experimental</em>, <em>may not work with this setup</em>, <em>may be unstable</em>, and may change how it stores your data. Enter the admin password and click <strong>Continue</strong>. A wrong password cancels the switch and changes nothing. After 5 wrong passwords, wait 15 minutes before trying again.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>The final warning</strong>
+            <p><em>"Last chance to avoid doing something stupid!"</em> Your password has already been accepted; this is your last chance to back out. <strong>Cancel</strong> leaves everything exactly as it is. <strong>Confirm</strong> starts the switch straight away.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>The switch runs by itself</strong>
+            <p>The new branch is saved as the one updates come from, and the normal update process starts at once, from that branch. The card follows it: it installs and builds the new version while the noticeboard keeps running, then restarts it. The screens go dark for a few seconds and reload by themselves, and the admin page reloads onto the new version. Every later update comes from the new branch until you switch again.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>Some branches can't be chosen, and the check says why: a branch that doesn't exist; one older than branch switching (the Pi couldn't be switched back from the admin panel afterwards); and one with files in the places the noticeboard keeps its content and settings (<code>data/</code>, <code>tmp/</code>, <code>logs/</code> or <code>.env</code>).</p>
+
+      <div class="callout success">
+        <div class="callout-icon">↩</div>
+        <div class="callout-body"><strong>A switch that fails is undone by itself.</strong> If the branch can't be downloaded or turns out to be unusable, the switch is cancelled and nothing changes. If it fails to install, the previous branch and version are put back (the noticeboard kept running the old version the whole time). If it installs but doesn't start, the previous branch and version are put back and restarted. Either way, updates go back to following the previous branch, and the Software updates card says what happened.</div>
+      </div>
+
+      <p><strong>Your data is kept.</strong> Switching never deletes anything. Slideshows, slides and media stay exactly where they are. Before each switch, the settings (<code>config.json</code> and each slideshow's <code>slideshow.json</code>) are copied to <code>/opt/noticeboard/data/backups/</code>, in a folder named after the time and the branch switched from, in case the new branch changes them. To go back to those settings, copy the files back and restart the service.</p>
+
+      <p>If a switch starts at the next check (within 15 minutes) rather than straight away, the Pi's installer ran before branch switching existed: run it once to make switches start at once.</p>
+
+      <div class="callout warning">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body"><strong>If the Software updates card says putting the previous version back failed,</strong> the noticeboard is still running, but might not start after a restart. Run the installer on the server Pi: it installs the branch in the settings again, or offers to go back to <em>main</em>. Your content is untouched.</div>
+      </div>
+
+      <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
+
+      <h3>Update commands</h3>
       <table>
         <thead><tr><th>To…</th><th>Run this on the server Pi</th></tr></thead>
         <tbody>
-          <tr><td>See what the updater did</td><td><code>sudo journalctl -u noticeboard-update</code></td></tr>
+          <tr><td>See what the updater did</td><td><code>sudo journalctl -u noticeboard-update</code> (or look at Settings → Software updates)</td></tr>
           <tr><td>Check for an update now</td><td><code>bash /opt/noticeboard/installers/update.sh</code></td></tr>
           <tr><td>Retry a version that was skipped</td><td><code>bash /opt/noticeboard/installers/update.sh --force</code></td></tr>
+          <tr><td>Switch branch</td><td>Use Settings → Software updates in the admin panel</td></tr>
+          <tr><td>Go back to <em>main</em> from the Pi itself</td><td>Run the installer and choose <em>Go back to main</em></td></tr>
           <tr><td>Turn automatic updates off</td><td><code>sudo systemctl disable --now noticeboard-update.timer</code></td></tr>
           <tr><td>Turn them back on</td><td><code>sudo systemctl enable --now noticeboard-update.timer</code></td></tr>
         </tbody>
       </table>
 
-      <p><strong>Installed before automatic updates existed?</strong> Run the installer once and let it reboot at the end; after that the Pi updates itself.</p>
+      <p><strong>Installed before automatic updates existed?</strong> Run the installer once and let it reboot at the end; after that the Pi updates itself. Remote display Pis only need the installer again when the way they start the display changes. Run it once on each display Pi set up before the kiosk learned to reopen the browser and leave the waiting page by itself (over SSH is fine); after that they never need a visit.</p>
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
     </div>
@@ -1469,13 +1563,13 @@
       <pre data-label="Terminal"><code>sudo apt-get install -y ffmpeg</code></pre>
 
       <h3>Remote display Pi won't connect / shows MAC address screen</h3>
-      <p>The display Pi is connected and working, but MAC filtering is blocking it. You need to add its MAC address to the approved list in Admin → Settings → MAC Filtering. The MAC address is shown on the display Pi's screen.</p>
+      <p>If the display Pi shows its MAC address and says it's <em>waiting for MAC address approval</em>, it can reach the server, but MAC filtering is blocking it. Add its MAC address to the approved list in Admin → Settings → MAC Filtering; the slideshow appears by itself within about 10 seconds. If it says it's <em>waiting for the Noticeboard server</em>, it can't reach the server at all: check the server Pi is on and running, and that the address on screen is right (to change it, run the installer on the display Pi again). A display Pi set up with an older installer may keep showing the MAC address screen after approval until it's rebooted; run the installer on it once to fix that.</p>
 
       <h3>Display is connected but slides seem slow to update after a change</h3>
-      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Changes to slide content (uploading, reordering, publishing/disabling) take effect within a few seconds.</p>
+      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Uploads, publishing and disabling take effect within a few seconds. Reordering or deleting slides reaches the display the next time the playlist is sent: when an upload finishes, a slideshow is published or disabled, or the display reconnects. To send it straight away, restart the server with <code>sudo systemctl restart noticeboard</code>; the displays reconnect within seconds.</p>
 
       <h3>The Pi display is blank or black on boot (kiosk doesn't start)</h3>
-      <p>The kiosk waits for the server to be ready before launching Chromium. If the server takes longer than usual to start (e.g. after a system update), the kiosk should still launch — just more slowly. Check the server is running:</p>
+      <p>The kiosk waits for the server to be ready before launching Chromium, and opens Chromium again if it ever closes or crashes. If the server takes longer than usual to start (e.g. after a system update), the kiosk still launches — just more slowly. Check the server is running:</p>
 
       <pre data-label="Terminal"><code>sudo systemctl status noticeboard</code></pre>
 
@@ -1487,14 +1581,35 @@
 
       <pre data-label="Terminal"><code>journalctl -t noticeboard-kiosk -b</code></pre>
 
-      <p><em>Waiting for the server</em> with nothing after it means the server isn't answering (check it as above). <em>Chromium isn't installed</em>, or an empty log, means the kiosk setup is from an older installer: run the installer again and reboot. Older installers didn't know that newer Raspberry Pi OS calls the browser <code>chromium</code> instead of <code>chromium-browser</code>.</p>
+      <p><em>Waiting for the server</em> with nothing after it means the server isn't answering (check it as above). <em>Browser exited … starting it again</em> means the browser closed and the kiosk reopened it, as it should. <em>Chromium isn't installed</em>, or an empty log, means the kiosk setup is from an older installer: run the installer again and reboot. Older installers didn't know that newer Raspberry Pi OS calls the browser <code>chromium</code> instead of <code>chromium-browser</code>.</p>
+
+      <h3>The slideshow seems stuck, or the screen goes dark</h3>
+      <p>The display moves on by itself from any slide that won't load or play (after 30 seconds at most), catches up after the screen sleeps, and reconnects after an outage (see <a href="#unattended" style="color:var(--amber)">Running unattended</a>). If a screen still looks stuck:</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li><strong>The same slide for a long time:</strong> it may be a long video. Videos play to the end.</li>
+        <li><strong>The screen goes black after a while:</strong> that's Raspberry Pi OS blanking the screen, not the noticeboard. Turn it off with <code>sudo raspi-config</code> → <em>Display Options</em> → <em>Screen Blanking</em> → <em>No</em>, then reboot.</li>
+        <li><strong>A faint pulsing dot on black:</strong> the display can't reach the server. It reconnects by itself once the server is back; check the server as described above.</li>
+        <li><strong>Only some slides show:</strong> the others may not have finished processing, or failed to. Check them in the admin panel.</li>
+      </ul>
 
       <h3>An update hasn't appeared on the screen</h3>
-      <p>The server Pi checks for updates every 15 minutes and waits while an upload is being processed, so allow about 20 minutes. To see what the updater did last:</p>
+      <p>The server Pi checks for updates every 15 minutes and waits while an upload is being processed, so allow about 20 minutes. <strong>Settings → Software updates</strong> in the admin panel shows the branch and version running, the last check and the last update. Updates only come from the branch shown there, so a change on another branch won't appear. For more detail, see what the updater did:</p>
 
       <pre data-label="Terminal"><code>sudo journalctl -u noticeboard-update --no-pager -n 30</code></pre>
 
       <p>If it says it is <em>skipping</em> a version, that version failed to install or start, so the Pi went back to the previous one. It installs the next version automatically once one is published; to retry the skipped one anyway, run <code>bash /opt/noticeboard/installers/update.sh --force</code>. If the log is empty, the Pi was probably installed before automatic updates existed — see <a href="#updates" style="color:var(--amber)">Automatic updates</a>.</p>
+
+      <h3>A branch switch didn't happen, or was undone</h3>
+      <p>The <strong>Last update</strong> line of Settings → Software updates says what happened:</p>
+      <table>
+        <thead><tr><th>It says</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill amber">Cancelled</span></td><td>The switch never started, so nothing changed: the branch couldn't be downloaded (is the Pi online?), was unusable, or its latest version had already failed once. Try again later, or choose another branch.</td></tr>
+          <tr><td><span class="pill amber">Rolled back</span></td><td>The new branch failed to install (it didn't build, or its downloads failed) or didn't start, so the previous branch and version were put back. Nothing else changed. Try again later, or choose another branch.</td></tr>
+          <tr><td><span class="pill red">Failed</span></td><td>Putting the previous version back failed too. Run the installer on the server Pi, as the message says (see <a href="#branches" style="color:var(--amber)">Switching branch</a>).</td></tr>
+          <tr><td><span class="pill blue">Waiting to start</span> for a while</td><td>Another update, an upload or the installer is running. The switch starts at the next check, within 15 minutes.</td></tr>
+        </tbody>
+      </table>
 
       <h3>sudo now asks for a password</h3>
       <p>That's expected if you answered <strong>y</strong> to the installer's sudo question: commands that start with <code>sudo</code> now need your Pi user's password. To go back to no password, copy the saved setting back. The installer printed the exact command when it made the change; on most Pis it is:</p>
