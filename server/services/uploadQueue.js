@@ -4,7 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { writeConfig } = require('../utils/configIO');
 const { slideshowJsonPath, slidesDir } = require('../utils/pathHelpers');
-const { processImage, processVideo, getVideoDuration, typeFromMime } = require('./mediaService');
+const { processImage, processVideo, getVideoDuration, createThumbnail, typeFromMime } = require('./mediaService');
 const configService = require('./configService');
 const { broadcastPlaylist } = require('../socket');
 const logger = require('../utils/logger');
@@ -35,7 +35,7 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
 
   queue.add(async () => {
     const outDir = slidesDir(folder);
-    let filename, duration = null;
+    let filename, duration = null, thumbnail = null;
 
     try {
       if (type === 'image') {
@@ -43,9 +43,14 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
       } else {
         filename = await processVideo(tmpPath, outDir, slideId);
         duration = await getVideoDuration(path.join(outDir, filename));
+        // Only for the admin panel: a video without one still plays
+        thumbnail = await createThumbnail(path.join(outDir, filename), outDir, slideId).catch((err) => {
+          logger.warn('Video thumbnail failed', { folder, slideId, err: err.message });
+          return null;
+        });
       }
 
-      await updateSlide(folder, slideId, { filename, duration, status: 'ready' });
+      await updateSlide(folder, slideId, { filename, duration, status: 'ready', ...(thumbnail ? { thumbnail } : {}) });
       configService.emit('change');
       broadcastPlaylist();
       logger.info('Slide ready', { folder, slideId, type });
@@ -59,8 +64,22 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
   });
 }
 
+// Thumbnails for videos that don't have one (uploaded before thumbnails existed, or the sample's).
+// Queued with the uploads, so they never compete with processing for the Pi's CPU.
+function enqueueThumbnail({ folder, slideId, filename }) {
+  queue.add(async () => {
+    try {
+      const thumbnail = await createThumbnail(path.join(slidesDir(folder), filename), slidesDir(folder), slideId);
+      await updateSlide(folder, slideId, { thumbnail, thumbnailPending: undefined, thumbnailError: undefined });
+    } catch (err) {
+      await updateSlide(folder, slideId, { thumbnailPending: undefined, thumbnailError: err.message });
+      logger.warn('Video thumbnail failed', { folder, slideId, err: err.message });
+    }
+  });
+}
+
 function queueSize() {
   return { size: queue.size, pending: queue.pending };
 }
 
-module.exports = { enqueueProcessing, queueSize };
+module.exports = { enqueueProcessing, enqueueThumbnail, queueSize };

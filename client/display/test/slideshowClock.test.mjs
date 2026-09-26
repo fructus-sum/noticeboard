@@ -140,16 +140,56 @@ test('the same playlist sent again never stops the slideshow, at any moment of a
   }
 });
 
-test('a changed playlist starts from its first slide, even if that slide is already showing', () => {
+test('a changed playlist starts from its first slide once the slide on screen has had its full time', () => {
   const { sched, log, setSlides } = setup(images(3, 3));
-  sched.run(1_000);   // first slide on screen
-  const gen = log[log.length - 1].generation;
-  assert.equal(setSlides(images(4, 3, 'b')), true);
-  const last = log[log.length - 1];
-  assert.equal(last.index, 0);
-  assert.equal(last.generation, gen + 1, 'must remount even though the index is still 0');
+  sched.run(1_000);   // first slide on screen since LOAD_MS, due to change at LOAD_MS + 3 s
+  const { generation, t } = log[log.length - 1];
+  assert.equal(setSlides(images(4, 5, 'b')), true);
+  assert.equal(log.length, 1, 'the slide on screen must not be cut short');
+  sched.run(LOAD_MS + 3_000 - 1_000 - 1);
+  assert.equal(log.length, 1, 'still the old slide until its time is up');
+  sched.run(1);
+  const next = log[log.length - 1];
+  assert.equal(next.t - t, LOAD_MS + 3_000, 'the old slide kept its whole 3 s');
+  assert.equal(next.index, 0);
+  assert.equal(next.generation, generation + 1, 'must remount even though the index is still 0');
   sched.run(MINUTE);
-  assert.ok(log.length >= 18);
+  assert.ok(log.length >= 10);
+  // The new playlist's own durations apply from its first slide on
+  for (let i = 2; i < log.length; i++) assert.equal(log[i].t - log[i - 1].t, 5_000 + LOAD_MS);
+});
+
+test('a video on screen plays to its end before a new playlist starts', () => {
+  const { sched, log, setSlides } = setup([video(), ...images(2, 3)]);
+  sched.run(5_000);   // the video is playing
+  setSlides(images(2, 4, 'b'));
+  sched.run(VIDEO_MS - 5_000 + LOAD_MS - 1);
+  assert.equal(log.length, 1, 'the video is still playing');
+  sched.run(2);
+  assert.equal(log[log.length - 1].t, VIDEO_MS + LOAD_MS, 'switched exactly when the video ended');
+});
+
+test('a changed playlist replaces a slide that is still loading, or stops when there is nothing left', () => {
+  const loading = setup(images(3, 3));
+  loading.sched.run(LOAD_MS / 2);   // first slide not on screen yet
+  loading.setSlides(images(2, 3, 'b'));
+  assert.equal(loading.log.length, 2, 'a slide that is not on screen yet is replaced at once');
+  const emptied = setup(images(3, 3));
+  emptied.sched.run(1_000);
+  emptied.setSlides([]);
+  assert.equal(emptied.clock.state().phase, 'idle', 'nothing left to show: stop at once');
+  emptied.sched.run(MINUTE);
+  assert.equal(emptied.log.length, 1);
+});
+
+test('going back to the running playlist before the switch cancels it', () => {
+  const { sched, log, setSlides } = setup(images(3, 3));
+  sched.run(1_000);
+  setSlides(images(2, 3, 'b'));
+  assert.equal(setSlides(images(3, 3)), true);
+  sched.run(MINUTE);
+  assert.deepEqual(log.slice(0, 4).map((e) => e.index), [0, 1, 2, 0], 'carried on with the first playlist');
+  assert.ok(log.every((e) => e.generation > 0));
 });
 
 test('a slide that never loads is skipped once its load deadline passes', () => {

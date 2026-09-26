@@ -19,7 +19,8 @@ export function createSlideshowClock({
   timers = globalThis,     // { setTimeout, clearTimeout, setInterval, clearInterval }
 } = {}) {
   let slides = [];
-  let signature = null;
+  let signature = null;    // of the playlist that's running
+  let pending = null;      // { slides, signature }: a new playlist, waiting for the slide on screen
   let index = 0;
   let generation = 0;      // a new number for every slide start, so the view always remounts
   let phase = 'idle';      // idle | loading | showing | playing | retrying
@@ -53,7 +54,25 @@ export function createSlideshowClock({
   }
 
   function next() {
+    if (pending) {
+      adopt(pending);
+      return;
+    }
     if (slides.length) show((index + 1) % slides.length);
+  }
+
+  function adopt(list) {
+    pending = null;
+    slides = list.slides;
+    signature = list.signature;
+    failures = 0;
+    if (slides.length) {
+      show(0);
+    } else {
+      clearTimer();
+      phase = 'idle';
+      deadline = Infinity;
+    }
   }
 
   function fail() {
@@ -77,19 +96,21 @@ export function createSlideshowClock({
 
   return {
     // A playlist arrived. The same one is sent again after every reconnect: keep going.
-    // A changed one starts again from the first slide.
+    // A changed one starts from its first slide, but only once the slide on screen has had its
+    // full time (a video: once it ends), so a slideshow starting or ending never cuts short the
+    // slide being shown. A slide still loading, or nothing to show any more, changes at once.
     setSlides(list) {
       const sig = JSON.stringify(list);
-      if (sig === signature) return false;
-      signature = sig;
-      slides = list;
-      failures = 0;
-      if (slides.length) {
-        show(0);
+      if (sig === (pending ? pending.signature : signature)) return false;
+      if (sig === signature) {
+        pending = null;   // back to the playlist that's running: carry on with it
+        return true;
+      }
+      const incoming = { slides: list, signature: sig };
+      if (list.length && (phase === 'showing' || phase === 'playing')) {
+        pending = incoming;
       } else {
-        clearTimer();
-        phase = 'idle';
-        deadline = Infinity;
+        adopt(incoming);
       }
       return true;
     },
@@ -148,6 +169,6 @@ export function createSlideshowClock({
     },
 
     // For tests and debugging
-    state: () => ({ index, generation, phase, deadline, failures }),
+    state: () => ({ index, generation, phase, deadline, failures, waitingPlaylist: !!pending }),
   };
 }

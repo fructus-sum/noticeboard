@@ -9,9 +9,13 @@ const { displaySettings } = require('./services/brandingService');
 
 function buildPlaylist(activeSlideshows) {
   const defaultDuration = configService.get('display')?.defaultSlideDurationSeconds ?? 10;
+  const current = configService.get('slideshows') || [];
   const slides = [];
 
-  for (const ss of activeSlideshows) {
+  for (const active of activeSlideshows) {
+    // The scheduler lists which slideshows are on; their settings (e.g. a duration changed
+    // while they're on air) come from config.json as it is now
+    const ss = current.find((s) => s.folder === active.folder) || active;
     let data = { slides: [] };
     try {
       data = JSON.parse(fs.readFileSync(slideshowJsonPath(ss.folder), 'utf8'));
@@ -22,7 +26,9 @@ function buildPlaylist(activeSlideshows) {
       slides.push({
         type: slide.type,
         url: mediaUrl(ss.folder, slide.filename),
-        duration: slide.type === 'image' ? (slide.duration ?? defaultDuration) : null,
+        // Images: the slide's own time if it has one, else its slideshow's, else the default.
+        // Each slide carries its own, so a slideshow's last slide keeps its slideshow's time.
+        duration: slide.type === 'image' ? (slide.duration ?? ss.slideDurationSeconds ?? defaultDuration) : null,
         slideshow: ss.folder,
       });
     }
