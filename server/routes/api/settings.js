@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const configService = require('../../services/configService');
+const { lanInterfaces } = require('../../utils/networkInfo');
 const logger = require('../../utils/logger');
 
 const router = express.Router();
@@ -17,6 +18,11 @@ function sanitise(config) {
 
 router.get('/', (req, res) => {
   res.json(sanitise(configService.get()));
+});
+
+// This Pi's IP and MAC addresses, for the admin home page
+router.get('/device', (req, res) => {
+  res.json({ interfaces: lanInterfaces() });
 });
 
 router.put('/', async (req, res, next) => {

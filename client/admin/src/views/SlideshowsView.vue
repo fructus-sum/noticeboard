@@ -19,6 +19,17 @@ const deletingFolder = ref(null);
 // Publish / disable toggle
 const togglingFolder = ref(null);
 
+// This Pi's IP and MAC addresses, shown above the list
+const device = ref(null);
+
+async function loadDevice() {
+  try {
+    device.value = await api.get('/settings/device');
+  } catch {
+    // Optional banner: the page works without it
+  }
+}
+
 async function toggleEnabled(folder, currentEnabled) {
   togglingFolder.value = folder;
   try {
@@ -70,10 +81,24 @@ async function remove(folder) {
 }
 
 onMounted(load);
+onMounted(loadDevice);
 </script>
 
 <template>
   <div>
+    <div
+      v-if="device?.interfaces?.length"
+      class="card"
+      style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 20px;padding:10px 16px;font-size:13px"
+    >
+      <span style="font-weight:600">This noticeboard</span>
+      <span v-for="i in device.interfaces" :key="i.name + i.ip" style="color:var(--text-muted)">
+        <template v-if="device.interfaces.length > 1">{{ i.name }}: </template>
+        IP <code style="color:var(--text)">{{ i.ip }}</code>
+        &nbsp;·&nbsp; MAC <code style="color:var(--text)">{{ i.mac }}</code>
+      </span>
+    </div>
+
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <h1 style="margin:0">Slideshows</h1>
       <button class="btn-primary" @click="showCreate = !showCreate">+ New slideshow</button>
