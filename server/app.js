@@ -1,11 +1,10 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
-const cors = require('cors');
 const mountRoutes = require('./routes/index');
 const errorHandler = require('./middleware/errorHandler');
 
-function createApp() {
+function createApp({ frontends = null } = {}) {
   const app = express();
 
   app.use(
@@ -18,21 +17,7 @@ function createApp() {
   app.use(express.json({ limit: '10mb' }));
   app.use(cookieParser());
 
-  if (process.env.NODE_ENV !== 'production') {
-    app.use(
-      cors({
-        // Vite dev servers for both SPAs
-        origin: [
-          'http://localhost:5173',
-          'http://localhost:5174',
-          'http://localhost:5175',
-        ],
-        credentials: true,
-      })
-    );
-  }
-
-  mountRoutes(app);
+  mountRoutes(app, frontends);
 
   app.use(errorHandler);
 

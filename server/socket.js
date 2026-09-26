@@ -7,13 +7,6 @@ const logger = require('./utils/logger');
 const { displayBuildId } = require('./utils/displayBuildId');
 const { displaySettings } = require('./services/brandingService');
 
-const DEV_ORIGINS = [
-  'http://localhost:3000',   // production build served by Express
-  'http://localhost:5173',   // display Vite dev server
-  'http://localhost:5174',   // admin Vite dev server
-  'http://localhost:5175',
-];
-
 function buildPlaylist(activeSlideshows) {
   const defaultDuration = configService.get('display')?.defaultSlideDurationSeconds ?? 10;
   const slides = [];
@@ -61,11 +54,9 @@ function broadcastPlaylist() {
 }
 
 function initSocket(server) {
-  io = new Server(server, {
-    cors: process.env.NODE_ENV !== 'production'
-      ? { origin: DEV_ORIGINS, credentials: true }
-      : undefined,
-  });
+  // The displays are always served from this server, so no cross-origin access is needed.
+  // In development, Vite's hot-reload connections share the port: leave those to Vite.
+  io = new Server(server, { destroyUpgrade: process.env.NOTICEBOARD_DEV !== '1' });
 
   // Sent on every connect: a display that sees it change reloads to pick up the new build
   const buildId = displayBuildId();

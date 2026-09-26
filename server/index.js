@@ -4,6 +4,7 @@ const schedulerService = require('./services/schedulerService');
 const { syncSampleSlideshow } = require('./services/sampleSlideshow');
 const createApp = require('./app');
 const { initSocket } = require('./socket');
+const { createDevFrontends } = require('./utils/devFrontends');
 const logger = require('./utils/logger');
 
 async function main() {
@@ -12,8 +13,14 @@ async function main() {
   await syncSampleSlideshow().catch((err) => logger.error('Could not set up the sample slideshow', { err: err.message }));
 
   const port = configService.get('port') || 3000;
-  const app = createApp();
+  // npm run dev fills these in once Vite is ready (see utils/devFrontends.js)
+  const frontends = process.env.NOTICEBOARD_DEV === '1' ? {} : null;
+  const app = createApp({ frontends });
   const server = http.createServer(app);
+  if (frontends) {
+    Object.assign(frontends, await createDevFrontends(server));
+    logger.info('Development: Vite serves the viewer and the admin panel on this port');
+  }
 
   const io = initSocket(server);
   schedulerService.init();

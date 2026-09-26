@@ -10,14 +10,6 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, '../shared'),
     },
   },
-  server: {
-    port: 5174,
-    proxy: {
-      '/api': 'http://localhost:3000',
-      '/media': 'http://localhost:3000',
-      '/admin/help': 'http://localhost:3000',   // user guide, served by the server
-    },
-  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
