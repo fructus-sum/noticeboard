@@ -3,8 +3,10 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { PROJECT_URL } from '@shared/constants.js';
 import { api } from '../composables/useApi.js';
+import { useBranding } from '../composables/useBranding.js';
 
 const router = useRouter();
+const { logo, refreshLogo } = useBranding();
 
 // When the installed version was made (its commit date), not when this page loaded
 const version = ref(null);
@@ -14,6 +16,7 @@ const versionTitle = computed(() => version.value
   && `Version ${version.value.commit.slice(0, 7)}${version.value.branch ? ` from ${version.value.branch}` : ''}. Opens the project on GitHub.`);
 
 onMounted(async () => {
+  refreshLogo();
   try {
     version.value = (await api.get('/settings/version'))?.version ?? null;
   } catch {
@@ -30,6 +33,7 @@ async function logout() {
 <template>
   <nav class="nav">
     <div class="nav__brand">
+      <img v-if="logo?.enabled" :src="logo.url" alt="" class="nav__logo" />
       Noticeboard
       <div class="nav__by">By <a :href="PROJECT_URL" target="_blank" rel="noopener">Fructus Sum</a></div>
     </div>
@@ -37,6 +41,8 @@ async function logout() {
     <RouterLink to="/settings"   class="nav__link">Settings</RouterLink>
     <!-- The user guide is a separate page served by the server; open it beside the admin -->
     <a href="/admin/help" target="_blank" rel="noopener" class="nav__link">Help ↗</a>
+    <!-- The slideshow viewer, as the screens show it; the admin stays open in this tab -->
+    <a href="/" target="_blank" rel="noopener" class="nav__link" title="Open the slideshow viewer (display) in a new tab">Open viewer ↗</a>
     <div class="nav__spacer" />
     <a v-if="lastUpdated" :href="PROJECT_URL" target="_blank" rel="noopener" class="nav__updated" :title="versionTitle">
       Last updated<br><span>{{ lastUpdated }}</span>
@@ -65,6 +71,14 @@ async function logout() {
   padding: 0 16px 20px;
   border-bottom: 1px solid #334155;
   margin-bottom: 8px;
+}
+
+.nav__logo {
+  display: block;
+  max-width: 100%;
+  max-height: 96px;
+  object-fit: contain;
+  margin-bottom: 10px;
 }
 
 .nav__by {

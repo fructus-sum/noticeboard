@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import NavBar from './components/NavBar.vue';
+import DefaultPasswordWarning from './components/DefaultPasswordWarning.vue';
 
 const route = useRoute();
 const showNav = computed(() => route.path !== '/login');
@@ -11,6 +12,7 @@ const showNav = computed(() => route.path !== '/login');
   <div class="layout" :class="{ 'layout--with-nav': showNav }">
     <NavBar v-if="showNav" />
     <main class="main">
+      <DefaultPasswordWarning v-if="showNav" />
       <RouterView />
     </main>
   </div>

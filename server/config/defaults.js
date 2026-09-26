@@ -11,6 +11,10 @@ module.exports = {
   display: {
     _comment: 'Default duration in seconds for image slides (videos play their full length)',
     defaultSlideDurationSeconds: 10,
+    // The location pin in the display's top-left corner, showing the server's address
+    showDeviceInfo: true,
+    // The logo above "No slideshow published" and in the admin sidebar
+    logo: { enabled: true },
   },
   slideshows: [],
 };

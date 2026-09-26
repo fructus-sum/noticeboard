@@ -2,13 +2,17 @@
 defineProps({
   connected: Boolean,
   received: Boolean,   // the server has sent a playlist (and it has no slides)
+  logo: { type: Object, default: null },   // { url }, or null when the logo is turned off
 });
 </script>
 
 <template>
   <div class="waiting">
     <span v-if="!connected" class="dot-pulse" />
-    <p v-else-if="received" class="message">No slideshow published</p>
+    <template v-else-if="received">
+      <img v-if="logo" :src="logo.url" alt="" class="logo" />
+      <p class="message">No slideshow published</p>
+    </template>
   </div>
 </template>
 
@@ -18,6 +22,8 @@ defineProps({
   height: 100%;
   background: #000;
   display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 4vh, 48px);
   align-items: center;
   justify-content: center;
 }
@@ -35,6 +41,14 @@ defineProps({
 @keyframes pulse {
   0%, 100% { opacity: 0.2; }
   50%       { opacity: 0.6; }
+}
+
+/* The logo is at most 500 × 500 already; on a small screen it shrinks to fit, but it is
+   never enlarged or stretched */
+.logo {
+  max-width: min(500px, 80vw);
+  max-height: 50vh;
+  object-fit: contain;
 }
 
 /* Readable across a room without shouting on a public screen */

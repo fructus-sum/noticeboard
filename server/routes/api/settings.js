@@ -1,9 +1,16 @@
 const express = require('express');
+const fs = require('fs');
+const crypto = require('crypto');
+const path = require('path');
+const multer = require('multer');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const configService = require('../../services/configService');
 const updateService = require('../../services/updateService');
+const brandingService = require('../../services/brandingService');
 const { lanInterfaces } = require('../../utils/networkInfo');
+const { usesDefaultPassword } = require('../../utils/defaultPassword');
+const { tmpDir } = require('../../utils/pathHelpers');
 const logger = require('../../utils/logger');
 
 const router = express.Router();
@@ -27,12 +34,34 @@ router.get('/device', (req, res) => {
   res.json({ interfaces: lanInterfaces() });
 });
 
+// Checks and merges a change to the display settings, so saving one of them never drops the
+// others (e.g. saving the slide duration keeps the location pin and logo settings)
+function mergeDisplay(current, change) {
+  if (!change || typeof change !== 'object') return { error: 'display must be an object' };
+  const merged = { ...current };
+  if (change.defaultSlideDurationSeconds !== undefined) {
+    const seconds = Number(change.defaultSlideDurationSeconds);
+    if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
+      return { error: 'The slide duration must be a whole number of seconds from 1 to 3600' };
+    }
+    merged.defaultSlideDurationSeconds = seconds;
+  }
+  if (change.showDeviceInfo !== undefined) merged.showDeviceInfo = change.showDeviceInfo === true;
+  if (change.logo !== undefined) merged.logo = { ...current.logo, enabled: change.logo?.enabled !== false };
+  return { merged };
+}
+
 router.put('/', async (req, res, next) => {
   try {
     const allowed = ['port', 'macFiltering', 'display'];
     const patch = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) patch[key] = req.body[key];
+    }
+    if (patch.display !== undefined) {
+      const { merged, error } = mergeDisplay(configService.get('display') || {}, patch.display);
+      if (error) return res.status(400).json({ error });
+      patch.display = merged;
     }
     if (Object.keys(patch).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
@@ -43,6 +72,69 @@ router.put('/', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// Whether the admin password is still the default one: the admin panel warns until it's changed
+router.get('/security', async (req, res, next) => {
+  try {
+    res.json({ defaultPassword: await usesDefaultPassword(configService.get('passwordHash')) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
+const logoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(tmpDir(), { recursive: true });
+      cb(null, tmpDir());
+    },
+    filename: (req, file, cb) => cb(null, `logo-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${path.extname(file.originalname).toLowerCase()}`),
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.mimetype)) return cb(null, true);
+    cb(Object.assign(new Error('The logo must be a PNG, JPEG, GIF or WebP image'), { status: 400 }));
+  },
+}).single('logo');
+
+function logoInfo() {
+  return {
+    custom: brandingService.hasCustomLogo(),
+    enabled: brandingService.logoEnabled(),
+    url: `/branding/logo?v=${brandingService.logoVersion()}`,
+    maxSize: brandingService.MAX_SIZE,
+  };
+}
+
+router.get('/logo', (req, res) => res.json(logoInfo()));
+
+// Upload a logo: scaled down to fit 500 × 500 (never stretched or enlarged) and saved as PNG
+router.post('/logo', (req, res, next) => {
+  logoUpload(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    try {
+      const { width, height } = await brandingService.saveLogo(req.file.path);
+      configService.emit('change');   // displays pick up the new logo
+      logger.info('Logo uploaded', { width, height });
+      res.json(logoInfo());
+    } catch (err) {
+      logger.warn('Logo upload rejected', { err: err.message });
+      res.status(400).json({ error: "That file couldn't be read as an image" });
+    } finally {
+      fs.unlink(req.file.path, () => {});
+    }
+  });
+});
+
+// Back to the placeholder logo
+router.delete('/logo', (req, res) => {
+  brandingService.removeLogo();
+  configService.emit('change');
+  logger.info('Logo reset to the default');
+  res.json(logoInfo());
 });
 
 router.put('/password', async (req, res, next) => {
@@ -57,7 +149,8 @@ router.put('/password', async (req, res, next) => {
 
     const match = await bcrypt.compare(current, configService.get('passwordHash'));
     if (!match) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
+      // 403, not 401: a 401 would send the admin panel to the login page
+      return res.status(403).json({ error: 'Current password is incorrect' });
     }
 
     await configService.set('passwordHash', await bcrypt.hash(newPassword, 10));

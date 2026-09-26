@@ -4,7 +4,8 @@ const macFilter = require('../middleware/macFilter');
 const adminAuth = require('../middleware/adminAuth');
 const displayRouter = require('./display');
 const adminRouter = require('./admin');
-const { ROOT, slideshowsDir, guidePath } = require('../utils/pathHelpers');
+const { ROOT, slideshowsDir, guidePath, logoPath } = require('../utils/pathHelpers');
+const { hasCustomLogo, placeholderLogo } = require('../services/brandingService');
 
 const DISPLAY_DIST = path.join(ROOT, 'client', 'display', 'dist');
 const ADMIN_DIST = path.join(ROOT, 'client', 'admin', 'dist');
@@ -31,6 +32,18 @@ function mountRoutes(app) {
     res.sendFile(guidePath(), (err) => {
       if (err && !res.headersSent) res.status(404).send('User guide not found');
     });
+  });
+
+  // The logo, for the displays and the admin sidebar — MAC filtered like the display.
+  // Its URL carries a version, so it can be cached for good.
+  app.get('/branding/logo', macFilter, async (req, res, next) => {
+    try {
+      res.set('Cache-Control', req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
+      if (hasCustomLogo()) return res.type('png').sendFile(logoPath());
+      res.type('png').send(await placeholderLogo());
+    } catch (err) {
+      next(err);
+    }
   });
 
   // 2. Admin static assets — MAC filtered; JWT is not required to download the SPA shell

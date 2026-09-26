@@ -22,6 +22,11 @@ function updateRequestPath() { return path.join(ROOT, 'tmp', 'update-request'); 
 function systemdDir() { return process.env.NOTICEBOARD_SYSTEMD_DIR || '/etc/systemd/system'; }
 function tmpDir() { return path.join(ROOT, 'tmp', 'noticeboard-uploads'); }
 function sampleDataDir() { return path.join(ROOT, 'sample-data'); }
+// The logo shown when nothing is published and in the admin sidebar: the admin's upload,
+// else the placeholder that ships with the app
+function brandingDir() { return path.join(dataDir(), 'branding'); }
+function logoPath() { return path.join(brandingDir(), 'logo.png'); }
+function defaultLogoPath() { return path.join(sampleDataDir(), 'sample-logo.png'); }
 
 function mediaUrl(folderName, filename) { return `/media/${folderName}/slides/${filename}`; }
 function audioUrl(folderName) { return `/media/${folderName}/audio.mp3`; }
@@ -46,6 +51,9 @@ module.exports = {
   systemdDir,
   tmpDir,
   sampleDataDir,
+  brandingDir,
+  logoPath,
+  defaultLogoPath,
   mediaUrl,
   audioUrl,
 };

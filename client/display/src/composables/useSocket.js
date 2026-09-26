@@ -7,6 +7,8 @@ export function useSocket() {
   const playlist = ref({ slides: [] });
   const connected = ref(false);
   const received = ref(false);   // true once the server has sent a playlist
+  // This display's look, set in the admin panel: the location pin and the logo
+  const settings = ref({ showDeviceInfo: true, logo: null });
 
   // Reconnects on its own after any outage, retrying every 2–10 s for as long as it takes
   const socket = io({
@@ -31,6 +33,10 @@ export function useSocket() {
     received.value = true;
   });
 
+  socket.on(SOCKET_EVENTS.DISPLAY_SETTINGS, (data) => {
+    settings.value = { showDeviceInfo: data?.showDeviceInfo !== false, logo: data?.logo ?? null };
+  });
+
   // The server sends its display build on every connect. If it changes (the Pi was
   // updated), reload so this screen runs the new version. reloadSoon only reloads once the
   // server answers, so the kiosk can't end up on the browser's error page.
@@ -42,5 +48,5 @@ export function useSocket() {
 
   onUnmounted(() => socket.disconnect());
 
-  return { playlist, connected, received };
+  return { playlist, connected, received, settings };
 }

@@ -15,6 +15,11 @@ const routes = [
 const router = createRouter({
   history: createWebHistory('/admin/'),
   routes,
+  // e.g. /settings#password (from the default-password warning) scrolls to that card
+  scrollBehavior(to) {
+    if (to.hash) return new Promise((resolve) => setTimeout(() => resolve({ el: to.hash, top: 16 }), 100));
+    return { top: 0 };
+  },
 });
 
 router.beforeEach(async (to) => {

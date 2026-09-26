@@ -2,9 +2,14 @@
 import { ref, onMounted } from 'vue';
 import { api } from '../composables/useApi.js';
 import SoftwareUpdates from '../components/SoftwareUpdates.vue';
+import LogoSettings from '../components/LogoSettings.vue';
+import { useSecurity } from '../composables/useSecurity.js';
+
+const { refreshSecurity } = useSecurity();
 
 // --- Display settings ---
 const defaultDuration = ref(10);
+const showDeviceInfo  = ref(true);
 const displayMsg      = ref('');
 const displaySaving   = ref(false);
 
@@ -26,6 +31,7 @@ const pwSaving   = ref(false);
 async function load() {
   const s = await api.get('/settings');
   defaultDuration.value = s.display?.defaultSlideDurationSeconds ?? 10;
+  showDeviceInfo.value  = s.display?.showDeviceInfo !== false;
   macEnabled.value      = s.macFiltering?.enabled ?? false;
   approved.value        = s.macFiltering?.approved ? JSON.parse(JSON.stringify(s.macFiltering.approved)) : [];
 }
@@ -34,7 +40,10 @@ async function saveDisplay() {
   displayMsg.value = '';
   displaySaving.value = true;
   try {
-    await api.put('/settings', { display: { defaultSlideDurationSeconds: Number(defaultDuration.value) } });
+    await api.put('/settings', { display: {
+      defaultSlideDurationSeconds: Number(defaultDuration.value),
+      showDeviceInfo: showDeviceInfo.value,
+    } });
     displayMsg.value = 'Saved.';
     setTimeout(() => { displayMsg.value = ''; }, 2000);
   } catch (e) {
@@ -81,6 +90,7 @@ async function changePassword() {
   try {
     await api.put('/settings/password', { current: currentPw.value, newPassword: newPw.value });
     pwMsg.value = 'Password changed.';
+    refreshSecurity();   // clears the default-password warning
     currentPw.value = ''; newPw.value = ''; confirmPw.value = '';
     setTimeout(() => { pwMsg.value = ''; }, 3000);
   } catch (e) {
@@ -104,6 +114,16 @@ onMounted(load);
         <div class="field" style="max-width:240px">
           <label>Default image duration (seconds)</label>
           <input v-model.number="defaultDuration" type="number" min="1" max="3600" />
+        </div>
+        <p style="color:var(--text-muted);font-size:12px;margin:-8px 0 14px">
+          Used by every slideshow that doesn't set its own duration. Videos always play to the end.
+        </p>
+        <div class="field" style="display:flex;align-items:flex-start;gap:8px">
+          <input id="show-pin" v-model="showDeviceInfo" type="checkbox" style="width:auto;margin-top:2px" />
+          <label for="show-pin" style="margin:0;font-size:13px;font-weight:400;color:var(--text)">
+            Show the location pin in the viewer's top-left corner. It shows the Noticeboard server's
+            address, so people can find the noticeboard from another device.
+          </label>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <button type="submit" class="btn-primary" :disabled="displaySaving">{{ displaySaving ? 'Saving…' : 'Save' }}</button>
@@ -144,8 +164,10 @@ onMounted(load);
       </div>
     </div>
 
+    <LogoSettings />
+
     <!-- Change password -->
-    <div class="card">
+    <div id="password" class="card">
       <h2>Change password</h2>
       <form @submit.prevent="changePassword" style="max-width:320px">
         <div class="field">

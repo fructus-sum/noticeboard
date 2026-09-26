@@ -5,6 +5,7 @@ const configService = require('./services/configService');
 const { slideshowJsonPath, mediaUrl } = require('./utils/pathHelpers');
 const logger = require('./utils/logger');
 const { displayBuildId } = require('./utils/displayBuildId');
+const { displaySettings } = require('./services/brandingService');
 
 const DEV_ORIGINS = [
   'http://localhost:3000',   // production build served by Express
@@ -38,6 +39,19 @@ function buildPlaylist(activeSlideshows) {
 }
 
 let io;
+let lastSettings = '';
+
+// The displays' own look (the location pin, the logo): sent on connect, and again whenever
+// the settings change
+function broadcastDisplaySettings() {
+  if (!io) return;
+  const settings = displaySettings();
+  const json = JSON.stringify(settings);
+  if (json === lastSettings) return;
+  lastSettings = json;
+  io.emit('display:settings', settings);
+  logger.info('Socket: display:settings broadcast', settings);
+}
 
 function broadcastPlaylist() {
   if (!io) return;
@@ -59,6 +73,7 @@ function initSocket(server) {
   io.on('connection', (socket) => {
     logger.info('Socket: display connected', { id: socket.id });
     socket.emit('display:build', buildId);
+    socket.emit('display:settings', displaySettings());
 
     socket.on('display:ready', () => {
       const playlist = buildPlaylist(schedulerService.getActive());
@@ -72,9 +87,11 @@ function initSocket(server) {
   });
 
   schedulerService.on('update', broadcastPlaylist);
+  lastSettings = JSON.stringify(displaySettings());
+  configService.on('change', broadcastDisplaySettings);
 
   logger.info('Socket.io initialised');
   return io;
 }
 
-module.exports = { initSocket, buildPlaylist, broadcastPlaylist };
+module.exports = { initSocket, buildPlaylist, broadcastPlaylist, broadcastDisplaySettings };

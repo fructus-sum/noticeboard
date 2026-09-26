@@ -2,6 +2,7 @@ export const SOCKET_EVENTS = {
   DISPLAY_READY: 'display:ready',
   PLAYLIST_UPDATE: 'playlist:update',
   DISPLAY_BUILD: 'display:build',
+  DISPLAY_SETTINGS: 'display:settings',
 };
 
 export const API_BASE = '/api';
