@@ -4,18 +4,13 @@ const path = require('path');
 const crypto = require('crypto');
 const { writeConfig } = require('../utils/configIO');
 const { slideshowJsonPath, slidesDir } = require('../utils/pathHelpers');
+const { readSlideshowJson } = require('../utils/slideshowIO');
 const { processImage, processVideo, getVideoDuration, typeFromMime } = require('./mediaService');
 const configService = require('./configService');
 const { broadcastPlaylist } = require('../socket');
 const logger = require('../utils/logger');
 
 const queue = new PQueue({ concurrency: 2 });
-
-function readSlideshowJson(folder) {
-  const p = slideshowJsonPath(folder);
-  if (!fs.existsSync(p)) return { slides: [] };
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return { slides: [] }; }
-}
 
 async function updateSlide(folder, slideId, patch) {
   const data = readSlideshowJson(folder);
@@ -50,7 +45,9 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
       logger.error('Slide processing failed', { folder, slideId, err: err.message });
     } finally {
       // Clean up the tmp file regardless of outcome
-      fs.unlink(tmpPath, () => {});
+      fs.unlink(tmpPath, (err) => {
+        if (err && err.code !== 'ENOENT') logger.warn('Failed to delete tmp upload file', { path: tmpPath, err: err.message });
+      });
     }
   });
 }

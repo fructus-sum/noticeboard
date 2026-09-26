@@ -334,7 +334,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
           <div class="field" style="grid-column:1/-1">
             <label>Active days</label>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-              <label v-for="(day, i) in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="i"
+              <label v-for="(day, i) in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="day"
                 style="display:flex;align-items:center;gap:4px;font-weight:400;color:var(--text);font-size:13px">
                 <input
                   type="checkbox"

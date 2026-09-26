@@ -56,7 +56,7 @@ class SchedulerService extends EventEmitter {
       const currentMins = now.getHours() * 60 + now.getMinutes();
       const [sh, sm] = (schedule.startTime || '00:00').split(':').map(Number);
       const [eh, em] = (schedule.endTime || '23:59').split(':').map(Number);
-      return currentMins >= sh * 60 + sm && currentMins < eh * 60 + em;
+      return currentMins >= sh * 60 + sm && currentMins <= eh * 60 + em;
     }
 
     // Unknown schedule type — show by default

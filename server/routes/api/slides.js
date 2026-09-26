@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const path = require('path');
 const { writeConfig } = require('../../utils/configIO');
 const { slideshowJsonPath, slidesDir, tmpDir } = require('../../utils/pathHelpers');
+const { readSlideshowJson } = require('../../utils/slideshowIO');
 const { typeFromMime, IMAGE_MIME, VIDEO_MIME } = require('../../services/mediaService');
 const { enqueueProcessing, queueSize } = require('../../services/uploadQueue');
 const configService = require('../../services/configService');
@@ -44,12 +45,6 @@ router.use((req, res, next) => {
   }
   next();
 });
-
-function readSlideshowJson(folder) {
-  const p = slideshowJsonPath(folder);
-  if (!fs.existsSync(p)) return { slides: [] };
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return { slides: [] }; }
-}
 
 // GET /api/slideshows/:folder/slides
 router.get('/', (req, res) => {
@@ -138,7 +133,9 @@ router.delete('/:id', async (req, res, next) => {
     // Delete the media file if it exists
     if (slide.filename) {
       const filePath = path.join(slidesDir(folder), slide.filename);
-      if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
+      if (fs.existsSync(filePath)) fs.unlink(filePath, (err) => {
+        if (err && err.code !== 'ENOENT') logger.warn('Failed to delete slide file', { path: filePath, err: err.message });
+      });
     }
 
     configService.emit('change');

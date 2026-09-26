@@ -22,6 +22,9 @@ const props = defineProps({
 
 const emit = defineEmits(['saved', 'created', 'close']);
 
+// Preview box is 1/4 of the actual slide size
+const PREVIEW_SCALE = 0.25;
+
 const FONTS = [
   { label: 'Sans-serif',    value: 'sans-serif' },
   { label: 'Serif',         value: 'serif' },
@@ -178,7 +181,7 @@ async function save() {
               left:       form.x + '%',
               top:        form.y + '%',
               fontFamily: form.fontFamily,
-              fontSize:   (form.fontSize * 0.25) + 'px',
+              fontSize:   (form.fontSize * PREVIEW_SCALE) + 'px',
               color:      form.color,
               textAlign:  form.align,
               background: form.overlayBg ? form.overlayBgColor : 'transparent',

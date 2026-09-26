@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const configService = require('../../services/configService');
 const { slideshowDir, slideshowJsonPath, slidesDir, watermarkDir, watermarkPath, watermarkUrl, tmpDir } = require('../../utils/pathHelpers');
 const { uniqueSlug } = require('../../utils/slugify');
+const { writeConfig } = require('../../utils/configIO');
+const { readSlideshowJson } = require('../../utils/slideshowIO');
 const logger = require('../../utils/logger');
 
 const WATERMARK_MIME = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml']);
@@ -33,16 +35,6 @@ const uploadWatermark = multer({
 
 const router = express.Router();
 
-function readSlideshowJson(folder) {
-  const p = slideshowJsonPath(folder);
-  if (!fs.existsSync(p)) return { slides: [] };
-  try {
-    return JSON.parse(fs.readFileSync(p, 'utf8'));
-  } catch {
-    return { slides: [] };
-  }
-}
-
 router.get('/', (req, res) => {
   const list = configService.get('slideshows') || [];
   res.json(list.map(ss => ({
@@ -62,7 +54,7 @@ router.post('/', async (req, res, next) => {
     const folder = uniqueSlug(name.trim());
 
     fs.mkdirSync(slidesDir(folder), { recursive: true });
-    fs.writeFileSync(slideshowJsonPath(folder), JSON.stringify({ slides: [] }, null, 2));
+    await writeConfig(slideshowJsonPath(folder), { slides: [] });
 
     const entry = {
       folder,
@@ -123,7 +115,9 @@ router.post('/:folder/watermark', uploadWatermark.single('file'), async (req, re
     const existing = list[idx].watermark;
     if (existing?.filename) {
       const old = watermarkPath(folder, existing.filename);
-      if (fs.existsSync(old)) fs.unlink(old, () => {});
+      if (fs.existsSync(old)) fs.unlink(old, (err) => {
+        if (err && err.code !== 'ENOENT') logger.warn('Failed to delete old watermark', { path: old, err: err.message });
+      });
     }
 
     // Move uploaded file to watermark dir
@@ -132,7 +126,7 @@ router.post('/:folder/watermark', uploadWatermark.single('file'), async (req, re
     const ext = path.extname(req.file.originalname).toLowerCase() || path.extname(req.file.filename);
     const filename = `watermark${ext}`;
     const dest = watermarkPath(folder, filename);
-    fs.renameSync(req.file.path, dest);
+    await fs.promises.rename(req.file.path, dest);
 
     // Merge with existing watermark config, preserving position/size/opacity if already set
     const prevConfig = existing ?? {};
@@ -166,7 +160,9 @@ router.delete('/:folder/watermark', async (req, res, next) => {
     const existing = list[idx].watermark;
     if (existing?.filename) {
       const filePath = watermarkPath(folder, existing.filename);
-      if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
+      if (fs.existsSync(filePath)) fs.unlink(filePath, (err) => {
+        if (err && err.code !== 'ENOENT') logger.warn('Failed to delete watermark file', { path: filePath, err: err.message });
+      });
     }
 
     const newList = [...list];

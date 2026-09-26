@@ -14,9 +14,4 @@ async function writeConfig(filePath, data) {
   await fs.promises.rename(tmpPath, filePath);
 }
 
-function readConfigSync(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf8');
-  return JSON5.parse(raw);
-}
-
-module.exports = { readConfig, writeConfig, readConfigSync };
+module.exports = { readConfig, writeConfig };

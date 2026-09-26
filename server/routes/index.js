@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
 const macFilter = require('../middleware/macFilter');
-const adminAuth = require('../middleware/adminAuth');
 const displayRouter = require('./display');
 const adminRouter = require('./admin');
 const { ROOT, slideshowsDir } = require('../utils/pathHelpers');

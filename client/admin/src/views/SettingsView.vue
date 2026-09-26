@@ -59,9 +59,12 @@ async function saveMac() {
   }
 }
 
+const MAC_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/;
+
 function addMac() {
   const mac = newMac.value.trim().toLowerCase();
   if (!mac) return;
+  if (!MAC_REGEX.test(mac)) { macMsg.value = 'Invalid MAC address format (expected aa:bb:cc:dd:ee:ff)'; return; }
   if (approved.value.find(a => a.mac === mac)) { macMsg.value = 'Already in list'; return; }
   approved.value.push({ mac, label: newLabel.value.trim() || mac, addedAt: new Date().toISOString() });
   newMac.value = '';
