@@ -744,7 +744,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">The display screen requires no interaction and is designed to run unattended. Once set up, the Pi running the display can be left alone indefinitely.</div>
+        <div class="callout-body">The display screen requires no interaction and is designed to run unattended. Once set up, the Pi running the display can be left alone indefinitely — it even installs new versions by itself (see <a href="#updates" style="color:var(--blue)">Automatic updates</a>). If anyone needs the noticeboard's address, the faint pin in the top-left corner of the screen shows its IP address and port.</div>
       </div>
     </div>
 
@@ -756,7 +756,7 @@
         <h2>Installation</h2>
       </div>
 
-      <p>There are two installer scripts depending on your setup. Both require a Raspberry Pi running Raspberry Pi OS (Bookworm or Bullseye recommended) with a desktop environment.</p>
+      <p>One installer sets up both kinds of Pi: when it starts, it asks what the Pi is for. It needs a Raspberry Pi running Raspberry Pi OS (Bookworm or Bullseye recommended) with a desktop environment.</p>
 
       <h3>Option A — Single Pi (server + display on the same Pi)</h3>
       <p>Use this if you have one Pi that will both run the server and show the display on its own screen.</p>
@@ -773,14 +773,21 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Download and run the installer</strong>
-            <p>Copy and paste this command, then press Enter. You will be asked for your password.</p>
+            <p>Copy and paste the command below, then press Enter. You may be asked for your password.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <strong>Answer the installer's questions</strong>
+            <p>When asked what the Pi is for, type <code>1</code> (<em>Server + display</em>). Then answer the sudo question — see the note below.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Wait for completion</strong>
-            <p>The installer will download Node.js, clone the project, build the web app, and set up a background service. This takes 3–8 minutes depending on your internet connection.</p>
+            <p>The installer will download Node.js, clone the project, build the web app, and set up a background service and automatic updates. This takes 3–8 minutes depending on your internet connection.</p>
           </div>
         </div>
         <div class="step">
@@ -792,11 +799,16 @@
         </div>
       </div>
 
-      <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/installer-server-local.sh | sudo bash</code></pre>
+      <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
         <div class="callout-body"><strong>Change your password after first login.</strong> The default admin password is <code>Admin@12345</code>. Anyone on your local network can reach the admin panel, so changing this immediately is important. See <a href="#first-login" style="color:var(--amber)">Section 3</a>.</div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">🔒</div>
+        <div class="callout-body"><strong>The sudo question.</strong> Raspberry Pi OS lets you run <code>sudo</code> commands without a password, so anything that takes over the Pi's user account can take over the whole Pi. The installer offers to make <code>sudo</code> ask for your password — we recommend answering <strong>y</strong>. It backs up the setting first and asks you to type your password once to prove it works, so you can't lock yourself out. If you answer <strong>n</strong>, nothing changes, and you can run the installer again later to change your mind.</div>
       </div>
 
       <h3>Option B — Separate display Pi (remote client)</h3>
@@ -807,21 +819,21 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Find the server Pi's IP address</strong>
-            <p>On the server Pi, open a terminal and run <code>hostname -I</code>. Note the first address shown (e.g. <code>192.168.1.42</code>).</p>
+            <p>Tap the faint pin in the top-left corner of the server Pi's screen: it shows the IP address and port. Or, on the server Pi, open a terminal and run <code>hostname -I</code> and note the first address shown (e.g. <code>192.168.1.42</code>).</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Run the remote installer on the display Pi</strong>
-            <p>On the new display Pi, open a terminal and run the command below. When prompted, enter the server URL.</p>
+            <strong>Run the installer on the display Pi</strong>
+            <p>On the new display Pi, open a terminal and run the command below. When asked what the Pi is for, type <code>2</code> (<em>Remote display</em>).</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Enter the server URL when prompted</strong>
-            <p>You will be asked: <em>"Noticeboard server URL"</em> — enter it in the format <code>http://192.168.1.42:3000</code> (use the IP from step 1).</p>
+            <p>You will be asked: <em>"Noticeboard server URL"</em> — enter it in the format <code>http://192.168.1.42:3000</code> (use the IP from step 1). Then answer the sudo question (see the note above).</p>
           </div>
         </div>
         <div class="step">
@@ -840,7 +852,10 @@
         </div>
       </div>
 
-      <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/installer-remote-client.sh | sudo bash</code></pre>
+      <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
+
+      <h3>Running the installer again</h3>
+      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them.</p>
 
       <h3>Accessing the admin panel after installation</h3>
       <p>Open any browser on your network and go to:</p>
@@ -855,6 +870,8 @@
           <strong style="color:var(--text)">On the Pi itself,</strong> you can always use <code>http://localhost:3000/admin</code>
         </div>
       </div>
+
+      <p>Not sure of the Pi's IP address? Tap the faint pin in the top-left corner of any display screen — it shows the server's IP address and port. The pop-up closes with its ✕, or by itself after 90 seconds.</p>
     </div>
 
     <!-- ── 03 First Login ── -->
@@ -894,6 +911,8 @@
         <div class="callout-icon">🔒</div>
         <div class="callout-body"><strong>Security notice:</strong> The admin panel is accessible to any device on your local network. Always change the default password. The display page (<code>/</code>) does not require a password and is intentionally public on the local network so that any screen can show it.</div>
       </div>
+
+      <p>Once you're logged in, the top of the <strong>Slideshows</strong> page shows this Pi's IP address and MAC address — handy if you need to reserve the Pi's address in your router or tell someone where to find it. It only appears after you log in.</p>
 
       <h3>Changing the admin password</h3>
       <div class="steps">
@@ -1361,6 +1380,33 @@
       <pre data-label="Terminal"><code>sudo journalctl -u noticeboard -f</code></pre>
 
       <p>Press <code>Ctrl+C</code> to stop following the log.</p>
+
+      <h3 id="updates" style="scroll-margin-top:80px">Automatic updates</h3>
+      <p>The server Pi keeps itself up to date with the latest version of Noticeboard on GitHub. Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it, rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens.</p>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body"><strong>Updates are careful.</strong> An update waits while an upload is being processed. If a new version fails to install or doesn't start, the Pi puts the previous version back, keeps running it, and skips that version until a newer one is published. The updater runs as the Pi's normal user, so it never needs <code>sudo</code>.</div>
+      </div>
+
+      <table>
+        <thead><tr><th>To…</th><th>Run this on the server Pi</th></tr></thead>
+        <tbody>
+          <tr><td>See what the updater did</td><td><code>sudo journalctl -u noticeboard-update</code></td></tr>
+          <tr><td>Check for an update now</td><td><code>bash /opt/noticeboard/installers/update.sh</code></td></tr>
+          <tr><td>Retry a version that was skipped</td><td><code>bash /opt/noticeboard/installers/update.sh --force</code></td></tr>
+          <tr><td>Turn automatic updates off</td><td><code>sudo systemctl disable --now noticeboard-update.timer</code></td></tr>
+          <tr><td>Turn them back on</td><td><code>sudo systemctl enable --now noticeboard-update.timer</code></td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Installed before automatic updates existed?</strong> Update once by hand, then reboot; after that the Pi updates itself. The first line discards a change npm makes to one file on the Pi, so the download isn't blocked.</p>
+
+      <pre data-label="Terminal"><code>cd /opt/noticeboard
+git checkout -- package-lock.json
+git pull --ff-only
+sudo bash installers/install.sh
+sudo reboot</code></pre>
     </div>
 
     <!-- ── 11 Troubleshooting ── -->
@@ -1433,6 +1479,18 @@
       <p>If the service is failed, check the logs for why:</p>
 
       <pre data-label="Terminal"><code>sudo journalctl -u noticeboard --no-pager -n 50</code></pre>
+
+      <h3>An update hasn't appeared on the screen</h3>
+      <p>The server Pi checks for updates every 15 minutes and waits while an upload is being processed, so allow about 20 minutes. To see what the updater did last:</p>
+
+      <pre data-label="Terminal"><code>sudo journalctl -u noticeboard-update --no-pager -n 30</code></pre>
+
+      <p>If it says it is <em>skipping</em> a version, that version failed to install or start, so the Pi went back to the previous one. It installs the next version automatically once one is published; to retry the skipped one anyway, run <code>bash /opt/noticeboard/installers/update.sh --force</code>. If the log is empty, the Pi was probably installed before automatic updates existed — see <a href="#updates" style="color:var(--amber)">Automatic updates</a>.</p>
+
+      <h3>sudo now asks for a password</h3>
+      <p>That's expected if you answered <strong>y</strong> to the installer's sudo question: commands that start with <code>sudo</code> now need your Pi user's password. To go back to no password, copy the saved setting back. The installer printed the exact command when it made the change; on most Pis it is:</p>
+
+      <pre data-label="Terminal"><code>sudo cp /root/noticeboard-sudoers-backup/010_pi-nopasswd /etc/sudoers.d/</code></pre>
 
       <h3>How to check everything is working</h3>
       <p>From the Pi's terminal, this one-liner confirms the server is up and accepting connections:</p>
