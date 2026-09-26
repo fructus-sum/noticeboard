@@ -174,7 +174,7 @@ Automatic updates cover the app itself. The kiosk start scripts, the systemd uni
 
 ## Development
 
-Requirements: Node.js 18+, FFmpeg (for video processing)
+Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software.
 
 ```bash
 npm install

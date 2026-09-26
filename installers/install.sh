@@ -323,16 +323,16 @@ install_server() {
   echo "▸ Installing system packages..."
   apt-get install -y -qq git ffmpeg "$(chromium_package)" curl
 
-  # ── Node.js 20 LTS via NodeSource ───────────────────────────────────────────
-  local node_major=0
-  if command -v node &>/dev/null; then
-    node_major=$(node -e "process.stdout.write(process.version.slice(1).split('.')[0])")
-  fi
-
-  if [ "$node_major" -lt 18 ]; then
+  # ── Node.js 20 LTS via NodeSource, when the Pi's is missing or too old ──────
+  if ! node_new_enough; then
     echo "▸ Installing Node.js 20 LTS..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null
     apt-get install -y -qq nodejs
+  fi
+  if ! node_new_enough; then
+    echo "ERROR: Node.js $(node -v 2>/dev/null || echo "isn't installed") is too old for Noticeboard,"
+    echo "which needs 20.19 or newer (see system-requirements.json). Update Node.js, then run the installer again."
+    exit 1
   fi
 
   echo "  Node.js $(node -v)  npm $(npm -v)"
@@ -447,6 +447,14 @@ save_branch_setting() {
   printf '{"state":"updated","branch":"%s","commit":"%s","message":"Installed %s from %s with the installer.","time":"%s"}\n' \
     "$INSTALL_BRANCH" "$commit" "${commit:0:7}" "$INSTALL_BRANCH" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     > "$INSTALL_DIR/data/update-status.json"
+}
+
+# The Node.js the server needs (system-requirements.json): 20.19 or newer on the 20 line, or
+# 22.12 or newer. Older versions can't load some of its modules.
+node_new_enough() {
+  command -v node >/dev/null 2>&1 && node -e "
+    const [major, minor] = process.versions.node.split('.').map(Number);
+    process.exit((major === 20 && minor >= 19) || (major === 22 && minor >= 12) || major >= 23 ? 0 : 1)" >/dev/null 2>&1
 }
 
 # Hold the updater's lock (see update.sh) while this installer changes the install

@@ -1,0 +1,61 @@
+{
+  "_comment": "The software this branch needs on the Noticeboard server Pi, besides the packages npm installs. Keep it up to date on every branch: when a change needs new software, or a newer version of something listed, update this file in the same commit. Before switching branch, the admin panel checks the Pi against the target branch's list (Settings → Software updates). versions: space-separated conditions must all hold; || separates alternatives; * means any version.",
+  "software": [
+    {
+      "name": "Node.js",
+      "commands": ["node"],
+      "versionArgs": ["--version"],
+      "versions": ">=20.19.0 <21.0.0 || >=22.12.0",
+      "neededFor": "Running the Noticeboard server. Some of its modules only load on Node.js 20.19 or newer (or 22.12 or newer).",
+      "install": "Run the Noticeboard installer again: it installs Node.js 20 when the Pi's version is too old."
+    },
+    {
+      "name": "npm",
+      "commands": ["npm"],
+      "versionArgs": ["--version"],
+      "versions": ">=7.0.0",
+      "neededFor": "Installing the Noticeboard's packages when it updates.",
+      "install": "It comes with Node.js: run the Noticeboard installer again."
+    },
+    {
+      "name": "Git",
+      "commands": ["git"],
+      "versionArgs": ["--version"],
+      "versions": ">=2.38.0",
+      "neededFor": "Downloading updates and switching branches.",
+      "install": "sudo apt install git"
+    },
+    {
+      "name": "FFmpeg",
+      "commands": ["ffmpeg"],
+      "versionArgs": ["-version"],
+      "versions": ">=4.0.0",
+      "neededFor": "Processing uploaded videos.",
+      "install": "sudo apt install ffmpeg"
+    },
+    {
+      "name": "FFprobe",
+      "commands": ["ffprobe"],
+      "versionArgs": ["-version"],
+      "versions": ">=4.0.0",
+      "neededFor": "Reading the length of uploaded videos.",
+      "install": "sudo apt install ffmpeg (FFprobe comes with it)"
+    },
+    {
+      "name": "curl",
+      "commands": ["curl"],
+      "versionArgs": ["--version"],
+      "versions": "*",
+      "neededFor": "The kiosk and the updater.",
+      "install": "sudo apt install curl"
+    },
+    {
+      "name": "Chromium",
+      "commands": ["chromium", "chromium-browser"],
+      "versionArgs": ["--version"],
+      "versions": "*",
+      "neededFor": "Showing the slideshow full screen on this Pi's own screen.",
+      "install": "sudo apt install chromium (on older Raspberry Pi OS: chromium-browser)"
+    }
+  ]
+}
