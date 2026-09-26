@@ -879,6 +879,46 @@
       <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub. It never touches your slideshows, slides or settings.</p>
       <p>On a server Pi that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it.</p>
 
+      <h3 id="firewall" style="scroll-margin-top:80px">Firewall (optional)</h3>
+      <p>Just before it offers to reboot, the installer asks <em>"Check this Pi's firewall?"</em>. Many Pis already have a firewall set up the way their owner wants, so it changes nothing unless you answer <strong>y</strong>.</p>
+
+      <table>
+        <thead><tr><th>You answer…</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td><strong>n</strong></td><td>Nothing is checked or changed. On a server Pi, the installer tells you the port to allow through your own firewall so other devices can reach the slideshow and admin panel: <strong>3000</strong>, unless you've changed it. A remote display Pi needs no incoming port.</td></tr>
+          <tr><td><strong>y</strong>, and a firewall is already on</td><td>With <em>ufw</em> or <em>firewalld</em>, the slideshow port is added and every existing rule is kept. Rules made some other way (your own nftables or iptables setup) are left exactly as they are, and the installer tells you which port to allow.</td></tr>
+          <tr><td><strong>y</strong>, and there's no firewall</td><td>It offers to set up <em>ufw</em>, the firewall Raspberry Pi recommends. It asks <em>"Set up a firewall now?"</em> first.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warning">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body"><strong>Let the installer set up the firewall only on a dedicated slideshow Pi running Raspberry Pi OS.</strong> It blocks every incoming connection except the ones you choose, which could stop other things the Pi does. If this Pi does other jobs, answer <strong>n</strong> and set up its firewall yourself.</div>
+      </div>
+
+      <p>If you let it set up the firewall, it asks what must stay reachable before it blocks anything:</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li><strong>SSH</strong> (logging in from another computer): <em>"Do you need SSH access to this Pi?"</em> Its port is opened only if you say yes, even if SSH is installed, because an SSH port nobody uses is safer closed. It shows the port SSH is set to, usually 22; press Enter to use it, or type another. If you're connected over SSH at the time and say no, it warns you and asks you to confirm.</li>
+        <li><strong>The slideshow port</strong> (server Pi): press Enter to keep 3000, or type another.</li>
+        <li><strong>Remote desktop (VNC)</strong>: asked only if VNC is running on the Pi.</li>
+      </ul>
+      <p>It then allows those ports, plus <code>5353/udp</code> so the Pi's <code>.local</code> name keeps working. Other incoming connections are blocked and outgoing ones allowed, and the firewall is turned on, starting with the Pi from then on. Any ufw rules you already had are kept.</p>
+
+      <div class="callout success">
+        <div class="callout-icon">🔓</div>
+        <div class="callout-body"><strong>You can't be locked out over SSH.</strong> If you run the installer over SSH and keep SSH, the installer turns the firewall on, then asks you to open a <em>new</em> SSH connection and answer <strong>y</strong>. If there's no yes within 3 minutes, or your connection drops, the firewall turns itself off again. Its rules are kept, so you can fix the port and turn it back on.</div>
+      </div>
+
+      <table>
+        <thead><tr><th>To…</th><th>Run this on the Pi</th></tr></thead>
+        <tbody>
+          <tr><td>See the firewall's rules</td><td><code>sudo ufw status</code></td></tr>
+          <tr><td>Open another port later (e.g. 8080)</td><td><code>sudo ufw allow 8080/tcp</code></td></tr>
+          <tr><td>Allow SSH later</td><td><code>sudo ufw allow 22/tcp</code></td></tr>
+          <tr><td>Turn the firewall off / back on</td><td><code>sudo ufw disable</code> / <code>sudo ufw enable</code></td></tr>
+        </tbody>
+      </table>
+
       <h3>Accessing the admin panel after installation</h3>
       <p>Open any browser on your network and go to:</p>
 
@@ -1612,6 +1652,9 @@
           <tr><td><span class="pill blue">Waiting to start</span> for a while</td><td>Another update, an upload or the installer is running. The switch starts at the next check, within 15 minutes.</td></tr>
         </tbody>
       </table>
+
+      <h3>Other devices can't reach the slideshow or admin panel</h3>
+      <p>If it works on the server Pi itself (<code>http://localhost:3000/</code>) but not from other devices, a firewall is probably blocking the port. On the server Pi, check with <code>sudo ufw status</code>. If ufw is on and port 3000 isn't listed, allow it with <code>sudo ufw allow 3000/tcp</code>, or run the installer again and let the firewall step do it (see <a href="#firewall" style="color:var(--amber)">Firewall</a>). If you use a different firewall, allow TCP port 3000 in it. Also check that both devices are on the same network.</p>
 
       <h3>sudo now asks for a password</h3>
       <p>That's expected if you answered <strong>y</strong> to the installer's sudo question: commands that start with <code>sudo</code> now need your Pi user's password. To go back to no password, copy the saved setting back. The installer printed the exact command when it made the change; on most Pis it is:</p>

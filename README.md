@@ -48,6 +48,7 @@ It asks:
 2. **The server URL** (remote displays only), e.g. `http://192.168.1.10:3000`. The pin in the top-left corner of the server's screen shows its address.
 3. **Whether to keep the branch** (server Pis that [follow a branch other than `main`](#switching-branch) only): keep it, or go back to `main`.
 4. **Whether `sudo` should ask for a password.** Raspberry Pi OS lets the desktop user run `sudo` without one. If you answer yes, the installer backs up the rule in `/etc/sudoers.d`, turns it off, and has you type your password once to prove it works before keeping the change. If the password doesn't work, the rule goes straight back, so you can't be locked out.
+5. **Firewall (optional):** at the end it offers to check or set up a firewall, and changes nothing unless you say yes. See the user guide for details.
 
 Running it again is safe: it offers your previous answers, so Enter keeps them. It never touches your slideshows, slides or settings.
 
