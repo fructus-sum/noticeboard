@@ -15,6 +15,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3000',
       '/media': 'http://localhost:3000',
+      '/admin/help': 'http://localhost:3000',   // user guide, served by the server
     },
   },
   build: {

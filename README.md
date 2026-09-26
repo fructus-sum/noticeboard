@@ -152,7 +152,7 @@ Environment variables (optional, set in `.env`):
 
 ## Documentation
 
-A full user guide covering installation, managing slideshows, scheduling, MAC filtering, and troubleshooting is included as `noticeboard-guide.html` in the project root. Open it in any browser — no server required.
+A full user guide covering installation, managing slideshows, scheduling, MAC filtering, and troubleshooting is included as `noticeboard-guide.html` in the project root. Open it in any browser — no server required — or click **Help** in the admin panel's sidebar, which opens it from the Pi at `/admin/help`.
 
 ## License
 

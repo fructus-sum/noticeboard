@@ -15,6 +15,8 @@ async function logout() {
     <div class="nav__brand">Noticeboard</div>
     <RouterLink to="/slideshows" class="nav__link">Slideshows</RouterLink>
     <RouterLink to="/settings"   class="nav__link">Settings</RouterLink>
+    <!-- The user guide is a separate page served by the server; open it beside the admin -->
+    <a href="/admin/help" target="_blank" rel="noopener" class="nav__link">Help ↗</a>
     <div class="nav__spacer" />
     <button class="nav__logout" @click="logout">Log out</button>
   </nav>

@@ -11,6 +11,7 @@ function slideshowJsonPath(folderName) { return path.join(slideshowDir(folderNam
 function configPath() { return path.join(dataDir(), 'config.json'); }
 function logsDir() { return path.join(ROOT, 'logs'); }
 function displayDistDir() { return path.join(ROOT, 'client', 'display', 'dist'); }
+function guidePath() { return path.join(ROOT, 'noticeboard-guide.html'); }
 function tmpDir() { return path.join(ROOT, 'tmp', 'noticeboard-uploads'); }
 function sampleDataDir() { return path.join(ROOT, 'sample-data'); }
 
@@ -28,6 +29,7 @@ module.exports = {
   configPath,
   logsDir,
   displayDistDir,
+  guidePath,
   tmpDir,
   sampleDataDir,
   mediaUrl,

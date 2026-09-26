@@ -4,7 +4,7 @@ const macFilter = require('../middleware/macFilter');
 const adminAuth = require('../middleware/adminAuth');
 const displayRouter = require('./display');
 const adminRouter = require('./admin');
-const { ROOT, slideshowsDir } = require('../utils/pathHelpers');
+const { ROOT, slideshowsDir, guidePath } = require('../utils/pathHelpers');
 
 const DISPLAY_DIST = path.join(ROOT, 'client', 'display', 'dist');
 const ADMIN_DIST = path.join(ROOT, 'client', 'admin', 'dist');
@@ -24,6 +24,14 @@ function mountRoutes(app) {
     },
     express.static(slideshowsDir())
   );
+
+  // User guide, opened from the admin sidebar's Help link — MAC filtered like the admin
+  // panel. It must come before the admin SPA catch-all below.
+  app.get('/admin/help', macFilter, (req, res) => {
+    res.sendFile(guidePath(), (err) => {
+      if (err && !res.headersSent) res.status(404).send('User guide not found');
+    });
+  });
 
   // 2. Admin static assets — MAC filtered; JWT is not required to download the SPA shell
   app.use('/admin', macFilter, express.static(ADMIN_DIST));
