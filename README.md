@@ -91,7 +91,7 @@ The server Pi checks GitHub every 15 minutes and installs new versions by itself
 
 ## Development
 
-Requirements: Node.js 18+, FFmpeg (for video processing and thumbnails).
+Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch.
 
 ```bash
 npm install
