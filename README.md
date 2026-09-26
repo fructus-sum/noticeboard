@@ -47,6 +47,8 @@ It asks:
 
 Running it again is safe: it offers your previous answers, so Enter keeps them.
 
+It always runs its newest version: whichever copy you start, it first downloads the installer from the latest commit on GitHub `main` and runs that. When it's done, it offers to reboot (Enter = yes). To run a local copy exactly as it is, e.g. to test changes to it: `sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh`.
+
 ### Server + display (hosts content, runs the server, acts as primary display)
 
 - Updates the Pi's software first (`apt-get update`, then a full upgrade), which can take a while on a Pi that hasn't been updated recently
@@ -54,9 +56,9 @@ Running it again is safe: it offers your previous answers, so Enter keeps them.
 - Clones the repo to `/opt/noticeboard` (or updates it) and builds the display and admin SPAs
 - Creates a `noticeboard` systemd service (starts on boot, restarts on crash)
 - Sets up [automatic updates](#updates)
-- Creates an XDG autostart entry to open Chromium in kiosk mode pointing to `http://localhost:3000/`
+- Creates an XDG autostart entry to open Chromium in kiosk mode pointing to `http://localhost:3000/` (works with `chromium` or `chromium-browser`; to see what it did at boot: `journalctl -t noticeboard-kiosk -b`)
 
-After installation, reboot the Pi. The display will appear automatically.
+After the installer's reboot, the display appears automatically.
 
 ### Remote display (connects to an existing server)
 
@@ -65,7 +67,7 @@ After installation, reboot the Pi. The display will appear automatically.
 - Creates a kiosk start script at `/usr/local/bin/noticeboard-kiosk.sh`
 - If the server's MAC filter is enabled and this device is not yet approved, the kiosk shows the device's MAC address on screen until an admin approves it — the page then redirects automatically
 
-After installation, reboot the Pi.
+After the installer's reboot, the kiosk starts automatically.
 
 ## Updates
 
@@ -84,17 +86,15 @@ The server Pi keeps itself up to date with the `main` branch on GitHub:
 | Try a branch before merging it | `NOTICEBOARD_BRANCH=my-branch bash /opt/noticeboard/installers/update.sh` (stop the timer first, or the next check goes back to `main`) |
 | Turn automatic updates off / on | `sudo systemctl disable --now noticeboard-update.timer` / `enable --now` |
 
-**Installed before automatic updates existed?** Update once by hand, then reboot so the display loads the new page; after that it's automatic:
+Automatic updates cover the app itself. The kiosk start scripts and system settings are written by the installer, so a fix to those (like the switch to newer Raspberry Pi OS's `chromium`) needs the installer run again (it offers to reboot at the end).
+
+**Installed before automatic updates existed?** Run the installer once; it updates everything and sets up automatic updates. Let it reboot so the display loads the new page. After that, updates are automatic:
 
 ```bash
-cd /opt/noticeboard
-git checkout -- package-lock.json   # drop npm's local edit so the pull isn't blocked
-git pull --ff-only
-sudo bash installers/install.sh
-sudo reboot
+curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash
 ```
 
-Reboot remote display Pis once too. To give them the `sudo` question as well, re-run the installer on them before rebooting.
+Do the same on remote display Pis (or just reboot them once).
 
 ## Development
 

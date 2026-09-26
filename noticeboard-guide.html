@@ -794,7 +794,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Reboot the Pi</strong>
-            <p>Run <code>sudo reboot</code>. After restarting, Chromium will open automatically in fullscreen kiosk mode showing the display.</p>
+            <p>When the installer finishes, it asks whether to reboot: press Enter. After restarting, Chromium will open automatically in fullscreen kiosk mode showing the display.</p>
           </div>
         </div>
       </div>
@@ -847,7 +847,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Reboot the display Pi</strong>
-            <p>Run <code>sudo reboot</code>. Chromium will open automatically and connect to the server.</p>
+            <p>When the installer finishes, it asks whether to reboot: press Enter. Chromium will open automatically and connect to the server.</p>
           </div>
         </div>
       </div>
@@ -855,7 +855,7 @@
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
       <h3>Running the installer again</h3>
-      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them.</p>
+      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub.</p>
 
       <h3>Accessing the admin panel after installation</h3>
       <p>Open any browser on your network and go to:</p>
@@ -1382,7 +1382,7 @@
       <p>Press <code>Ctrl+C</code> to stop following the log.</p>
 
       <h3 id="updates" style="scroll-margin-top:80px">Automatic updates</h3>
-      <p>The server Pi keeps itself up to date with the latest version of Noticeboard on GitHub. Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it, rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens.</p>
+      <p>The server Pi keeps itself up to date with the latest version of Noticeboard on GitHub. Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it, rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way the Pi starts its display (the kiosk) is set up by the installer, so a fix to that needs the installer run again.</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
@@ -1400,13 +1400,9 @@
         </tbody>
       </table>
 
-      <p><strong>Installed before automatic updates existed?</strong> Update once by hand, then reboot; after that the Pi updates itself. The first line discards a change npm makes to one file on the Pi, so the download isn't blocked.</p>
+      <p><strong>Installed before automatic updates existed?</strong> Run the installer once and let it reboot at the end; after that the Pi updates itself.</p>
 
-      <pre data-label="Terminal"><code>cd /opt/noticeboard
-git checkout -- package-lock.json
-git pull --ff-only
-sudo bash installers/install.sh
-sudo reboot</code></pre>
+      <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
     </div>
 
     <!-- ── 11 Troubleshooting ── -->
@@ -1479,6 +1475,12 @@ sudo reboot</code></pre>
       <p>If the service is failed, check the logs for why:</p>
 
       <pre data-label="Terminal"><code>sudo journalctl -u noticeboard --no-pager -n 50</code></pre>
+
+      <p>If the Pi reaches the desktop but the browser never opens, the kiosk's own log says what it did during this boot:</p>
+
+      <pre data-label="Terminal"><code>journalctl -t noticeboard-kiosk -b</code></pre>
+
+      <p><em>Waiting for the server</em> with nothing after it means the server isn't answering (check it as above). <em>Chromium isn't installed</em>, or an empty log, means the kiosk setup is from an older installer: run the installer again and reboot. Older installers didn't know that newer Raspberry Pi OS calls the browser <code>chromium</code> instead of <code>chromium-browser</code>.</p>
 
       <h3>An update hasn't appeared on the screen</h3>
       <p>The server Pi checks for updates every 15 minutes and waits while an upload is being processed, so allow about 20 minutes. To see what the updater did last:</p>
