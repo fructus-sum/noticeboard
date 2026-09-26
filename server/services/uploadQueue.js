@@ -8,6 +8,7 @@ const { processImage, processVideo, getVideoDuration, typeFromMime } = require('
 const configService = require('./configService');
 const { broadcastPlaylist } = require('../socket');
 const logger = require('../utils/logger');
+const { withSlideshowLock } = require('../utils/slideshowLock');
 
 const queue = new PQueue({ concurrency: 2 });
 
@@ -18,12 +19,15 @@ function readSlideshowJson(folder) {
 }
 
 async function updateSlide(folder, slideId, patch) {
-  const data = readSlideshowJson(folder);
-  const idx = data.slides.findIndex(s => s.id === slideId);
-  if (idx !== -1) {
-    data.slides[idx] = { ...data.slides[idx], ...patch };
-    await writeConfig(slideshowJsonPath(folder), data);
-  }
+  // Two slides can finish processing at once; the lock stops one save wiping out the other
+  await withSlideshowLock(folder, async () => {
+    const data = readSlideshowJson(folder);
+    const idx = data.slides.findIndex(s => s.id === slideId);
+    if (idx !== -1) {
+      data.slides[idx] = { ...data.slides[idx], ...patch };
+      await writeConfig(slideshowJsonPath(folder), data);
+    }
+  });
 }
 
 function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
