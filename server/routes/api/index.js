@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const macFilter = require('../../middleware/macFilter');
 const adminAuth = require('../../middleware/adminAuth');
 const authRouter = require('./auth');
+const deviceRouter = require('./device');
 const settingsRouter = require('./settings');
 const slideshowsRouter = require('./slideshows');
 const slidesRouter = require('./slides');
@@ -19,6 +20,9 @@ router.use(rateLimit({
 
 // Auth: MAC filter only — no JWT required to log in or check status
 router.use('/auth', macFilter, authRouter);
+
+// Display info pop-up: MAC filter only, like the display itself
+router.use('/device', macFilter, deviceRouter);
 
 // Protected: MAC + JWT
 router.use('/settings', adminAuth, settingsRouter);

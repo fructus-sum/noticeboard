@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useSocket } from './composables/useSocket.js';
 import SlideShow from './components/SlideShow.vue';
 import WaitingScreen from './components/WaitingScreen.vue';
+import DeviceInfo from './components/DeviceInfo.vue';
 
 const { playlist, connected } = useSocket();
 const hasSlides = computed(() => playlist.value.slides.length > 0);
@@ -12,6 +13,7 @@ const hasSlides = computed(() => playlist.value.slides.length > 0);
   <div class="app">
     <SlideShow v-if="hasSlides" :slides="playlist.slides" />
     <WaitingScreen v-else :connected="connected" />
+    <DeviceInfo />
   </div>
 </template>
 
