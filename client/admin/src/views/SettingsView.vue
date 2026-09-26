@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { api } from '../composables/useApi.js';
+import SoftwareUpdates from '../components/SoftwareUpdates.vue';
 
 // --- Display settings ---
 const defaultDuration = ref(10);
@@ -165,5 +166,7 @@ onMounted(load);
         </div>
       </form>
     </div>
+
+    <SoftwareUpdates />
   </div>
 </template>

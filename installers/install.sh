@@ -16,6 +16,8 @@ SERVICE_NAME="noticeboard"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 UPDATE_SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}-update.service"
 UPDATE_TIMER_FILE="/etc/systemd/system/${SERVICE_NAME}-update.timer"
+UPDATE_PATH_FILE="/etc/systemd/system/${SERVICE_NAME}-update.path"
+BRANCH_FILE="$INSTALL_DIR/data/update-branch.env"   # the branch chosen in the admin panel (see update.sh)
 KIOSK_SCRIPT="/usr/local/bin/noticeboard-kiosk.sh"
 AUTOSTART_FILE="/etc/xdg/autostart/noticeboard-kiosk.desktop"
 SUDOERS_BACKUP_DIR="/root/noticeboard-sudoers-backup"
@@ -49,6 +51,9 @@ main() {
   if [ "$MODE" = server ] && ! id "$DESKTOP_USER" >/dev/null 2>&1; then
     echo "ERROR: User '$DESKTOP_USER' not found. Run this with sudo from the Pi's desktop user."
     exit 1
+  fi
+  if [ "$MODE" = server ]; then
+    choose_branch
   fi
   if [ "$MODE" = display ]; then
     ask_server_url
@@ -140,6 +145,35 @@ ask_server_url() {
       return
     fi
     echo "The server URL is required."
+  done
+}
+
+# A server Pi follows main unless another branch was chosen in the admin panel
+# (Settings → Software updates). A re-run offers to keep that branch or go back to main.
+INSTALL_BRANCH=main
+
+choose_branch() {
+  local current
+  current=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true)
+  if [ -z "$current" ] || [ "$current" = main ]; then
+    return
+  fi
+  if [[ ! "$current" =~ ^[A-Za-z0-9._/-]{1,100}$ ]]; then
+    echo "The branch setting \"$current\" isn't valid, so this installs main."
+    return
+  fi
+
+  echo ""
+  echo "This noticeboard follows the branch \"$current\" (chosen in Settings → Software updates)."
+  echo "  1) Keep $current"
+  echo "  2) Go back to main, the stable version"
+  while true; do
+    ask "Choose 1 or 2 [1]: "
+    case "${REPLY:-1}" in
+      1) INSTALL_BRANCH=$current; return ;;
+      2) INSTALL_BRANCH=main; return ;;
+      *) echo "Please type 1 or 2." ;;
+    esac
   done
 }
 
@@ -303,14 +337,27 @@ install_server() {
 
   # ── Clone or update the repo ────────────────────────────────────────────────
   if [ -d "$INSTALL_DIR/.git" ]; then
-    echo "▸ Updating existing installation..."
+    echo "▸ Updating existing installation ($INSTALL_BRANCH)..."
     lock_install_dir
+    # This installs the branch the admin panel asked for, so its pending request is done
+    rm -f "$INSTALL_DIR/tmp/update-request"
     # Run git as the folder's owner (git refuses repos owned by someone else), and
     # force the checkout so npm's edits to package-lock.json can't block the update
     local owner
     owner=$(stat -c %U "$INSTALL_DIR")
-    runuser -u "$owner" -- git -C "$INSTALL_DIR" fetch --quiet origin main
-    runuser -u "$owner" -- git -C "$INSTALL_DIR" checkout --quiet --force -B main origin/main
+    if ! fetch_branch "$owner" "$INSTALL_BRANCH"; then
+      if [ "$INSTALL_BRANCH" = main ]; then
+        echo "ERROR: Couldn't download main from GitHub. Check the internet connection and run the installer again."
+        exit 1
+      fi
+      echo "  Couldn't download $INSTALL_BRANCH from GitHub, so this installs main instead."
+      INSTALL_BRANCH=main
+      if ! fetch_branch "$owner" main; then
+        echo "ERROR: Couldn't download main from GitHub. Check the internet connection and run the installer again."
+        exit 1
+      fi
+    fi
+    runuser -u "$owner" -- git -C "$INSTALL_DIR" checkout --quiet --force -B "$INSTALL_BRANCH" "origin/$INSTALL_BRANCH"
   else
     echo "▸ Cloning repository..."
     git clone "$REPO_URL" "$INSTALL_DIR"
@@ -348,6 +395,8 @@ SECURE_COOKIES=false
 ENV
   fi
 
+  save_branch_setting
+
   # ── Systemd service ─────────────────────────────────────────────────────────
   echo "▸ Installing systemd service..."
   write_service
@@ -374,7 +423,25 @@ ENV
   write_update_units
   systemctl daemon-reload
   systemctl enable --now "${SERVICE_NAME}-update.timer" --quiet
-  echo "  Checks GitHub for updates every 15 minutes."
+  systemctl enable --now "${SERVICE_NAME}-update.path" --quiet
+  echo "  Checks GitHub for updates every 15 minutes, and straight away after a branch switch."
+}
+
+# Download a branch from GitHub, as the install folder's owner
+fetch_branch() {   # fetch_branch <owner> <branch>
+  runuser -u "$1" -- git -C "$INSTALL_DIR" fetch --quiet --no-tags origin "+refs/heads/$2:refs/remotes/origin/$2"
+}
+
+# Record the branch this installed, for update.sh and the admin panel's Software updates card
+save_branch_setting() {
+  if [ "$INSTALL_BRANCH" != main ] || [ -f "$BRANCH_FILE" ]; then
+    printf 'NOTICEBOARD_BRANCH=%s\n' "$INSTALL_BRANCH" > "$BRANCH_FILE"
+  fi
+  local commit
+  commit=$(git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" rev-parse HEAD)
+  printf '{"state":"updated","branch":"%s","commit":"%s","message":"Installed %s from %s with the installer.","time":"%s"}\n' \
+    "$INSTALL_BRANCH" "$commit" "${commit:0:7}" "$INSTALL_BRANCH" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    > "$INSTALL_DIR/data/update-status.json"
 }
 
 # Hold the updater's lock (see update.sh) while this installer changes the install
@@ -460,7 +527,8 @@ done
 KIOSK
 }
 
-# Runs installers/update.sh every 15 minutes as the app's user (no root needed)
+# Runs installers/update.sh every 15 minutes as the app's user (no root needed), and
+# straight away when the admin panel asks for a branch switch (it writes tmp/update-request)
 write_update_units() {
   cat > "$UPDATE_SERVICE_FILE" <<SVC
 [Unit]
@@ -472,8 +540,20 @@ After=network-online.target
 Type=oneshot
 User=$DESKTOP_USER
 ExecStart=/bin/bash $INSTALL_DIR/installers/update.sh
-TimeoutStartSec=30min
+TimeoutStartSec=60min
 SVC
+
+  cat > "$UPDATE_PATH_FILE" <<PATHUNIT
+[Unit]
+Description=Start a Noticeboard update when the admin panel asks for one
+
+[Path]
+PathExists=$INSTALL_DIR/tmp/update-request
+Unit=${SERVICE_NAME}-update.service
+
+[Install]
+WantedBy=paths.target
+PATHUNIT
 
   cat > "$UPDATE_TIMER_FILE" <<TIMER
 [Unit]
@@ -508,6 +588,7 @@ summary_server() {
   echo ""
   echo "  Service logs : sudo journalctl -u noticeboard -f"
   echo "  Auto-update  : every 15 minutes (logs: journalctl -u noticeboard-update)"
+  echo "  Branch       : $INSTALL_BRANCH (change it in the admin panel: Settings → Software updates)"
 }
 
 # ── Remote display ────────────────────────────────────────────────────────────
