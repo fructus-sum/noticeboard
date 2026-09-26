@@ -436,7 +436,10 @@ fetch_branch() {   # fetch_branch <owner> <branch>
 
 # Record the branch this installed, for update.sh and the admin panel's Software updates card
 save_branch_setting() {
-  if [ "$INSTALL_BRANCH" != main ] || [ -f "$BRANCH_FILE" ]; then
+  # Only when the branch changed: the file also remembers where main was at the switch (update.sh)
+  local current
+  current=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true)
+  if [ "$INSTALL_BRANCH" != "${current:-main}" ]; then
     printf 'NOTICEBOARD_BRANCH=%s\n' "$INSTALL_BRANCH" > "$BRANCH_FILE"
   fi
   local commit

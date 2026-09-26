@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 const {
-  ROOT, updateBranchPath, updateStatusPath, updateCheckPath, updateRequestPath, systemdDir,
+  ROOT, updateBranchPath, updateStatusPath, updateCheckPath, updateNoticePath, updateRequestPath, systemdDir,
 } = require('../utils/pathHelpers');
 const logger = require('../utils/logger');
 
@@ -130,6 +130,18 @@ async function versionInfo() {
   }
 }
 
+// A notice for the admin home page (e.g. "your branch was merged into main, so this
+// noticeboard went back to main"), written by update.sh and kept until an admin closes it
+async function getNotice() {
+  return readJson(updateNoticePath());
+}
+
+async function dismissNotice(by) {
+  const notice = await getNotice();
+  await fs.rm(updateNoticePath(), { force: true });
+  if (notice) logger.info('Update notice closed', { type: notice.type, by });
+}
+
 // The branches on GitHub, main first
 async function listBranches() {
   let out;
@@ -237,6 +249,8 @@ async function requestSwitch(name, by) {
 module.exports = {
   getInfo,
   versionInfo,
+  getNotice,
+  dismissNotice,
   listBranches,
   checkBranch,
   validBranchName,

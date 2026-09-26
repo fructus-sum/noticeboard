@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
+import UpdateNotice from '../components/UpdateNotice.vue';
 
 const router = useRouter();
 const slideshows = ref([]);
@@ -86,6 +87,8 @@ onMounted(loadDevice);
 
 <template>
   <div>
+    <UpdateNotice />
+
     <div
       v-if="device?.interfaces?.length"
       class="card"

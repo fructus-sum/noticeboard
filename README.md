@@ -118,6 +118,8 @@ The server Pi keeps itself up to date with a branch on GitHub: `main`, unless an
 
 A switch starts within seconds because the installer sets up `noticeboard-update.path`, which runs the updater as soon as the admin panel asks. On a Pi whose installer ran before branch switching existed, a switch starts at the next check instead (within 15 minutes); the card says which. Run the installer once to fix that.
 
+**When the branch is merged into `main`, the Pi goes back to `main` by itself.** Once all of the branch's work is in `main` (merged, squashed or rebased in) and `main` has moved on since the switch, the next check switches back to `main`. The same happens if the branch is deleted after being merged. A branch deleted without being merged is left alone, because its features aren't in `main`. Going back uses the normal switch, including the rollback if it fails. When it's done, a notice on the admin home page says so and stays until someone closes it.
+
 Some branches can't be chosen, and the check says why:
 
 - branches that don't exist on GitHub, or names that aren't valid branch names

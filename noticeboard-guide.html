@@ -1511,6 +1511,11 @@
         </div>
       </div>
 
+      <div class="callout tip">
+        <div class="callout-icon">⤴</div>
+        <div class="callout-body"><strong>When the branch is merged into main, the noticeboard goes back to main by itself.</strong> A branch is usually temporary: once its features are finished, they're merged into <em>main</em>. When all of the branch's work is part of <em>main</em>, the next update check (within 15 minutes) switches the noticeboard back to <em>main</em>, so it gets <em>main</em>'s updates again. This happens whether the branch was merged, squashed or rebased, and also if it was deleted after being merged. A branch deleted <em>without</em> being merged is left alone, because its features aren't in <em>main</em>. When the noticeboard has gone back, a notice at the top of the admin panel's Slideshows page says so. It stays there until someone closes it with ✕. If going back fails, it's undone like any other switch, and tried again once <em>main</em> has a new version.</div>
+      </div>
+
       <p>Some branches can't be chosen, and the check says why: a branch that doesn't exist; one older than branch switching (the Pi couldn't be switched back from the admin panel afterwards); and one with files in the places the noticeboard keeps its content and settings (<code>data/</code>, <code>tmp/</code>, <code>logs/</code> or <code>.env</code>).</p>
 
       <div class="callout success">

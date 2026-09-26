@@ -97,6 +97,13 @@ const updatePasswordLimiter = rateLimit({
 
 router.get('/updates', updateRoute(() => updateService.getInfo()));
 
+// The home page's notice about an automatic change of branch, until an admin closes it
+router.get('/updates/notice', updateRoute(async () => ({ notice: await updateService.getNotice() })));
+router.delete('/updates/notice', updateRoute(async (req) => {
+  await updateService.dismissNotice(req.ip);
+  return { ok: true };
+}));
+
 // The installed version, for "Last updated" in the sidebar ({ version: null } without git)
 router.get('/version', updateRoute(async () => ({ version: await updateService.versionInfo() })));
 

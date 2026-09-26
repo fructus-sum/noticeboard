@@ -24,6 +24,7 @@ INSTALLER_URL="https://raw.githubusercontent.com/fructus-sum/noticeboard/main/in
 BRANCH_FILE="$INSTALL_DIR/data/update-branch.env"    # NOTICEBOARD_BRANCH=<branch>, written by the admin panel
 STATUS_FILE="$INSTALL_DIR/data/update-status.json"   # the last update or branch switch, shown in the admin panel
 CHECK_FILE="$INSTALL_DIR/data/update-check.json"     # the last check for updates, shown in the admin panel
+NOTICE_FILE="$INSTALL_DIR/data/update-notice.json"   # shown on the admin home page until someone closes it
 BACKUP_DIR="$INSTALL_DIR/data/backups"               # settings are copied here before a branch switch
 REQUEST_FILE="$INSTALL_DIR/tmp/update-request"       # written by the admin panel to update right now
 LOCK_FILE="$INSTALL_DIR/tmp/update.lock"             # install.sh holds this lock too
@@ -44,6 +45,9 @@ configured_branch() {
 }
 BRANCH="${NOTICEBOARD_BRANCH:-$(configured_branch)}"
 BRANCH="${BRANCH:-main}"
+# main's commit when this Pi switched to its branch (see branch_merged)
+MAIN_AT_SWITCH=$(sed -n 's/^NOTICEBOARD_MAIN_AT_SWITCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true)
+RETURNED_FROM=""     # the branch this run went back to main from, because it was merged
 PREVIOUS_BRANCH=""   # the branch and commit running before this update
 CURRENT=""
 TARGET=""            # the commit being installed
@@ -116,6 +120,15 @@ main() {
     exit 0
   fi
 
+  # A branch whose work is all in main now isn't needed any more: go back to main
+  if [ -z "$switching" ] && [ "$BRANCH" != main ] && [ "$(configured_branch)" = "$BRANCH" ] && branch_merged; then
+    echo "$BRANCH has been merged into main; going back to main."
+    RETURNED_FROM=$BRANCH
+    set_branch_setting main
+    BRANCH=main
+    switching=1
+  fi
+
   if ! git fetch --quiet --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"; then
     local code=0 reason
     git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1 || code=$?
@@ -141,7 +154,12 @@ main() {
     if [ -n "$switching" ]; then
       # The same version on another branch: nothing to install, just follow the new branch
       git checkout --quiet --force -B "$BRANCH" "$TARGET"
-      write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH. Both have the same version (${TARGET:0:7}), so nothing needed installing."
+      if [ -n "$RETURNED_FROM" ]; then
+        returned_to_main
+      else
+        write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH. Both have the same version (${TARGET:0:7}), so nothing needed installing."
+        remember_main
+      fi
       echo "Switched to $BRANCH (${TARGET:0:7})."
     else
       echo "Up to date (${CURRENT:0:7})."
@@ -217,8 +235,11 @@ main() {
   fi
 
   rm -f "$FAILED_FILE"
-  if [ -n "$switching" ]; then
+  if [ -n "$RETURNED_FROM" ]; then
+    returned_to_main
+  elif [ -n "$switching" ]; then
     write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH: now running ${TARGET:0:7}. The settings from before the switch are saved in ${backup#"$INSTALL_DIR"/}."
+    remember_main
   else
     write_status updated "Updated to ${TARGET:0:7} from $BRANCH."
   fi
@@ -255,9 +276,71 @@ refuse_reason() {   # refuse_reason <switching>
 # NOTICEBOARD_BRANCH test leaves the admin panel's setting alone.
 restore_branch_setting() {
   if [ "$BRANCH" != "$PREVIOUS_BRANCH" ] && [ "$(configured_branch)" = "$BRANCH" ]; then
-    printf 'NOTICEBOARD_BRANCH=%s\n' "$PREVIOUS_BRANCH" > "$BRANCH_FILE.tmp"
-    mv "$BRANCH_FILE.tmp" "$BRANCH_FILE"
+    if [ -n "$RETURNED_FROM" ]; then
+      set_branch_setting "$RETURNED_FROM" "$MAIN_AT_SWITCH"
+    else
+      set_branch_setting "$PREVIOUS_BRANCH"
+    fi
   fi
+}
+
+set_branch_setting() {   # set_branch_setting <branch> [main's commit when switching to it]
+  {
+    printf 'NOTICEBOARD_BRANCH=%s\n' "$1"
+    if [ -n "${2:-}" ]; then printf 'NOTICEBOARD_MAIN_AT_SWITCH=%s\n' "$2"; fi
+  } > "$BRANCH_FILE.tmp"
+  mv "$BRANCH_FILE.tmp" "$BRANCH_FILE"
+}
+
+# After switching to a branch other than main, remember where main was: a new branch can
+# start out identical to main, so it only counts as merged once main has moved on
+remember_main() {
+  local main=""
+  if [ "$BRANCH" = main ] || [ "$(configured_branch)" != "$BRANCH" ]; then
+    return 0
+  fi
+  if git fetch --quiet --no-tags origin "+refs/heads/main:refs/remotes/origin/main" 2>/dev/null; then
+    main=$(git rev-parse origin/main 2>/dev/null) || main=""
+  fi
+  set_branch_setting "$BRANCH" "$main"
+}
+
+# Is all of the followed branch's work in main now (merged, squashed or rebased in)? For a
+# branch still on GitHub, only once main has moved on since the switch; for one deleted from
+# GitHub, if what's installed is in main (a branch deleted unmerged is left alone). Fails
+# when unsure, e.g. GitHub can't be reached.
+branch_merged() {
+  local main tip code=0
+  git fetch --quiet --no-tags origin "+refs/heads/main:refs/remotes/origin/main" 2>/dev/null || return 1
+  main=$(git rev-parse origin/main 2>/dev/null) || return 1
+  git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1 || code=$?
+  if [ "$code" -eq 2 ]; then
+    tip=$CURRENT
+  elif [ "$code" -eq 0 ] && git fetch --quiet --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" 2>/dev/null; then
+    tip=$(git rev-parse "origin/$BRANCH" 2>/dev/null) || return 1
+    if [ "$main" = "${MAIN_AT_SWITCH:-$tip}" ]; then
+      return 1
+    fi
+  else
+    return 1
+  fi
+  git merge-base --is-ancestor "$tip" "$main" 2>/dev/null || contained_in "$tip" "$main"
+}
+
+# Would merging <commit> into <main> change nothing, i.e. was it squashed or rebased in?
+contained_in() {   # contained_in <commit> <main>
+  local merged=""
+  merged=$(git merge-tree --write-tree "$2" "$1" 2>/dev/null | head -n 1) || return 1
+  [ -n "$merged" ] && [ "$merged" = "$(git rev-parse "$2^{tree}")" ]
+}
+
+# Tell the admin panel: in the Software updates card, and with a notice on the home page
+# that stays until someone closes it
+returned_to_main() {
+  local message="The branch $RETURNED_FROM has been merged into main, so its features are now part of main. This noticeboard has gone back to following main and is running ${TARGET:0:7}. Future updates come from main."
+  write_status updated "$message"
+  write_json "$NOTICE_FILE" type branch-merged branch "$RETURNED_FROM" commit "$TARGET" \
+    message "$message" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 
 # Before a branch switch, copy the settings (the .json and .env files in data/: config.json,

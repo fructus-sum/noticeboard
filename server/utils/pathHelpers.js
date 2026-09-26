@@ -16,6 +16,7 @@ function guidePath() { return path.join(ROOT, 'noticeboard-guide.html'); }
 function updateBranchPath() { return path.join(dataDir(), 'update-branch.env'); }
 function updateStatusPath() { return path.join(dataDir(), 'update-status.json'); }
 function updateCheckPath() { return path.join(dataDir(), 'update-check.json'); }
+function updateNoticePath() { return path.join(dataDir(), 'update-notice.json'); }
 function updateRequestPath() { return path.join(ROOT, 'tmp', 'update-request'); }
 // Where install.sh puts the systemd units; NOTICEBOARD_SYSTEMD_DIR points elsewhere for tests
 function systemdDir() { return process.env.NOTICEBOARD_SYSTEMD_DIR || '/etc/systemd/system'; }
@@ -40,6 +41,7 @@ module.exports = {
   updateBranchPath,
   updateStatusPath,
   updateCheckPath,
+  updateNoticePath,
   updateRequestPath,
   systemdDir,
   tmpDir,
