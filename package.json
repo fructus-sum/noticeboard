@@ -11,6 +11,7 @@
     "dev": "concurrently -n server,display,admin -c cyan,green,yellow \"npm -w noticeboard-server run dev\" \"npm -w noticeboard-display run dev\" \"npm -w noticeboard-admin run dev\"",
     "build": "npm -w noticeboard-display run build && npm -w noticeboard-admin run build",
     "start": "node server/index.js",
+    "test": "node --test \"client/display/test/*.test.mjs\"",
     "install:all": "npm install"
   },
   "devDependencies": {

@@ -4,14 +4,17 @@ import { useSocket } from './composables/useSocket.js';
 import SlideShow from './components/SlideShow.vue';
 import WaitingScreen from './components/WaitingScreen.vue';
 import DeviceInfo from './components/DeviceInfo.vue';
+import { startDailyReload } from './recovery.js';
 
 const { playlist, connected, received } = useSocket();
 const hasSlides = computed(() => playlist.value.slides.length > 0);
+
+startDailyReload(() => connected.value);
 </script>
 
 <template>
   <div class="app">
-    <SlideShow v-if="hasSlides" :slides="playlist.slides" />
+    <SlideShow v-if="hasSlides" :slides="playlist.slides" :connected="connected" />
     <WaitingScreen v-else :connected="connected" :received="received" />
     <DeviceInfo />
   </div>
