@@ -10,6 +10,7 @@ function audioPath(folderName) { return path.join(slideshowDir(folderName), 'aud
 function slideshowJsonPath(folderName) { return path.join(slideshowDir(folderName), 'slideshow.json'); }
 function configPath() { return path.join(dataDir(), 'config.json'); }
 function logsDir() { return path.join(ROOT, 'logs'); }
+function displayDistDir() { return path.join(ROOT, 'client', 'display', 'dist'); }
 function tmpDir() { return path.join(ROOT, 'tmp', 'noticeboard-uploads'); }
 function sampleDataDir() { return path.join(ROOT, 'sample-data'); }
 
@@ -26,6 +27,7 @@ module.exports = {
   slideshowJsonPath,
   configPath,
   logsDir,
+  displayDistDir,
   tmpDir,
   sampleDataDir,
   mediaUrl,

@@ -12,7 +12,7 @@ async function main() {
   const app = createApp();
   const server = http.createServer(app);
 
-  initSocket(server);
+  const io = initSocket(server);
   schedulerService.init();
 
   server.listen(port, () => {
@@ -23,7 +23,9 @@ async function main() {
 
   function shutdown() {
     schedulerService.stop();
-    server.close(() => process.exit(0));
+    // io.close() disconnects the displays too; server.close() alone waits for them indefinitely
+    io.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
   }
 
   process.on('SIGTERM', () => { logger.info('SIGTERM received, shutting down gracefully'); shutdown(); });

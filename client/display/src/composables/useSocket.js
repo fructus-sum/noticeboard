@@ -24,6 +24,14 @@ export function useSocket() {
     playlist.value = data;
   });
 
+  // The server sends its display build on every connect. If it changes (the Pi was
+  // updated), reload so this screen runs the new version.
+  let buildId;
+  socket.on(SOCKET_EVENTS.DISPLAY_BUILD, (id) => {
+    if (buildId === undefined) buildId = id;
+    else if (id && id !== buildId) window.location.reload();
+  });
+
   onUnmounted(() => socket.disconnect());
 
   return { playlist, connected };

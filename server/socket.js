@@ -4,6 +4,7 @@ const schedulerService = require('./services/schedulerService');
 const configService = require('./services/configService');
 const { slideshowJsonPath, mediaUrl } = require('./utils/pathHelpers');
 const logger = require('./utils/logger');
+const { displayBuildId } = require('./utils/displayBuildId');
 
 const DEV_ORIGINS = [
   'http://localhost:3000',   // production build served by Express
@@ -52,8 +53,12 @@ function initSocket(server) {
       : undefined,
   });
 
+  // Sent on every connect: a display that sees it change reloads to pick up the new build
+  const buildId = displayBuildId();
+
   io.on('connection', (socket) => {
     logger.info('Socket: display connected', { id: socket.id });
+    socket.emit('display:build', buildId);
 
     socket.on('display:ready', () => {
       const playlist = buildPlaylist(schedulerService.getActive());
