@@ -5,14 +5,14 @@ import SlideShow from './components/SlideShow.vue';
 import WaitingScreen from './components/WaitingScreen.vue';
 import DeviceInfo from './components/DeviceInfo.vue';
 
-const { playlist, connected } = useSocket();
+const { playlist, connected, received } = useSocket();
 const hasSlides = computed(() => playlist.value.slides.length > 0);
 </script>
 
 <template>
   <div class="app">
     <SlideShow v-if="hasSlides" :slides="playlist.slides" />
-    <WaitingScreen v-else :connected="connected" />
+    <WaitingScreen v-else :connected="connected" :received="received" />
     <DeviceInfo />
   </div>
 </template>

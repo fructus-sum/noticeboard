@@ -1,12 +1,15 @@
 const http = require('http');
 const configService = require('./services/configService');
 const schedulerService = require('./services/schedulerService');
+const { addSampleSlideshow } = require('./services/sampleSlideshow');
 const createApp = require('./app');
 const { initSocket } = require('./socket');
 const logger = require('./utils/logger');
 
 async function main() {
   await configService.init();
+  // Optional extra: if it fails, log it and start anyway
+  await addSampleSlideshow().catch((err) => logger.error('Could not add the sample slideshow', { err: err.message }));
 
   const port = configService.get('port') || 3000;
   const app = createApp();

@@ -5,6 +5,7 @@ import { SOCKET_EVENTS } from '@shared/constants.js';
 export function useSocket() {
   const playlist = ref({ slides: [] });
   const connected = ref(false);
+  const received = ref(false);   // true once the server has sent a playlist
 
   const socket = io({
     reconnectionDelay: 2000,
@@ -22,6 +23,7 @@ export function useSocket() {
 
   socket.on(SOCKET_EVENTS.PLAYLIST_UPDATE, (data) => {
     playlist.value = data;
+    received.value = true;
   });
 
   // The server sends its display build on every connect. If it changes (the Pi was
@@ -34,5 +36,5 @@ export function useSocket() {
 
   onUnmounted(() => socket.disconnect());
 
-  return { playlist, connected };
+  return { playlist, connected, received };
 }

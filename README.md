@@ -4,7 +4,8 @@ A self-hosted digital notice board and slideshow system designed to run on a Ras
 
 ## Features
 
-- **Slideshow display** — full-screen, looped playback of images and videos
+- **Slideshow display** — full-screen, looped playback of images and videos; says "No slideshow published" when there's nothing to show
+- **Sample slideshow** — every install includes an unpublished three-slide sample (3 seconds per slide) to try the display with
 - **Multiple slideshows** — create named series, each with its own schedule and priority (max 5 active simultaneously)
 - **Scheduling** — set slideshows to run always, or only on specific days and times
 - **Media processing** — upload images and videos in any standard format; automatically converted to PNG and H.264 MP4 via Sharp and FFmpeg
@@ -138,6 +139,7 @@ Environment variables (optional, set in `.env`):
 ```
 
 - **No database** — config in `data/config.json`, slides in `data/slideshows/<folder>/`
+- **Sample slideshow** — the server builds it from `sample-data/sample-slideshow/` on first start, once per system (the `sampleSlideshowAdded` flag in `config.json`); file names set the slide order (`01-…`, `02-…`)
 - **Socket.io** — server pushes `playlist:update` to all connected displays when content or schedule changes, and sends `display:build` on connect so screens reload after an update
 - **Media processing** — uploads go to `tmp/`, converted by Sharp (images) or FFmpeg (videos), then moved to `data/slideshows/<folder>/slides/`
 
