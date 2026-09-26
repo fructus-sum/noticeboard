@@ -49,6 +49,7 @@ Running it again is safe: it offers your previous answers, so Enter keeps them.
 
 ### Server + display (hosts content, runs the server, acts as primary display)
 
+- Updates the Pi's software first (`apt-get update`, then a full upgrade), which can take a while on a Pi that hasn't been updated recently
 - Installs Node.js 20, FFmpeg, and Chromium
 - Clones the repo to `/opt/noticeboard` (or updates it) and builds the display and admin SPAs
 - Creates a `noticeboard` systemd service (starts on boot, restarts on crash)
@@ -59,6 +60,7 @@ After installation, reboot the Pi. The display will appear automatically.
 
 ### Remote display (connects to an existing server)
 
+- Updates the Pi's software first, the same way
 - Installs Chromium
 - Creates a kiosk start script at `/usr/local/bin/noticeboard-kiosk.sh`
 - If the server's MAC filter is enabled and this device is not yet approved, the kiosk shows the device's MAC address on screen until an admin approves it — the page then redirects automatically

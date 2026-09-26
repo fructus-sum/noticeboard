@@ -249,8 +249,8 @@ install_server() {
   echo ""
 
   # ── System packages ─────────────────────────────────────────────────────────
+  update_system
   echo "▸ Installing system packages..."
-  apt-get update -qq
   apt-get install -y -qq git ffmpeg chromium-browser curl
 
   # ── Node.js 20 LTS via NodeSource ───────────────────────────────────────────
@@ -461,8 +461,8 @@ install_display() {
   echo ""
 
   # ── System packages ─────────────────────────────────────────────────────────
+  update_system
   echo "▸ Installing packages..."
-  apt-get update -qq
   apt-get install -y -qq chromium-browser curl
   apt-get install -y -qq unclutter 2>/dev/null || true
 
@@ -592,6 +592,20 @@ summary_display() {
 }
 
 # ── Shared ────────────────────────────────────────────────────────────────────
+# Bring the Pi fully up to date before installing anything. dist-upgrade is apt-get's
+# name for Raspberry Pi's recommended `apt full-upgrade`, which a plain upgrade isn't:
+# that can hold back kernel and firmware updates. It keeps existing config files,
+# never stops to ask, and waits if another update (e.g. the desktop's) holds the lock.
+update_system() {
+  local apt_opts=(-o DPkg::Lock::Timeout=300)
+  echo "▸ Updating the package list..."
+  apt-get "${apt_opts[@]}" update
+  echo "▸ Upgrading installed packages (can take a while if the Pi hasn't been updated recently)..."
+  DEBIAN_FRONTEND=noninteractive apt-get "${apt_opts[@]}" -y \
+    -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+    dist-upgrade
+}
+
 # XDG autostart entry (works with LXDE, GNOME, and most Pi OS desktop environments)
 write_autostart() {
   cat > "$AUTOSTART_FILE" <<DESK
