@@ -34,6 +34,14 @@ router.get('/device', (req, res) => {
   res.json({ interfaces: lanInterfaces() });
 });
 
+// The MAC address of the device using the admin panel, as the server sees it, for the warning
+// when MAC filtering is turned on. null if it can't be found (e.g. across a router); local:
+// the admin panel is open on the server Pi itself, which is always allowed.
+router.get('/my-device', (req, res) => {
+  const local = req.clientMac === 'localhost';
+  res.json({ local, mac: local ? null : req.clientMac || null });
+});
+
 // Checks and merges a change to the display settings, so saving one of them never drops the
 // others (e.g. saving the slide duration keeps the location pin and logo settings)
 function mergeDisplay(current, change) {

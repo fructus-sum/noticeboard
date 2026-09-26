@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { api } from '../composables/useApi.js';
 import SoftwareUpdates from '../components/SoftwareUpdates.vue';
 import LogoSettings from '../components/LogoSettings.vue';
+import MacFilterWarning from '../components/MacFilterWarning.vue';
 import { useSecurity } from '../composables/useSecurity.js';
 
 const { refreshSecurity } = useSecurity();
@@ -15,6 +16,7 @@ const displaySaving   = ref(false);
 
 // --- MAC filtering ---
 const macEnabled = ref(false);
+const macWarning = ref(false);   // the pop-up shown when MAC filtering is switched on
 const approved   = ref([]);
 const macMsg     = ref('');
 const macSaving  = ref(false);
@@ -69,13 +71,35 @@ async function saveMac() {
   }
 }
 
+// Windows writes MAC addresses with dashes (1A-2B-…); the list uses colons
+const normaliseMac = (mac) => mac.trim().toLowerCase().replace(/-/g, ':');
+
 function addMac() {
-  const mac = newMac.value.trim().toLowerCase();
+  const mac = normaliseMac(newMac.value);
   if (!mac) return;
   if (approved.value.find(a => a.mac === mac)) { macMsg.value = 'Already in list'; return; }
   approved.value.push({ mac, label: newLabel.value.trim() || mac, addedAt: new Date().toISOString() });
   newMac.value = '';
   newLabel.value = '';
+}
+
+// Switching MAC filtering on: warn first, since a device that isn't on the list loses access
+function onMacToggle() {
+  if (macEnabled.value) macWarning.value = true;
+}
+function macWarningConfirmed() {
+  macWarning.value = false;
+  macMsg.value = 'MAC filtering starts once you click Save.';
+}
+function macWarningCancelled() {
+  macWarning.value = false;
+  macEnabled.value = false;
+}
+function addThisDevice(mac) {
+  const normalised = normaliseMac(mac);
+  if (!approved.value.find(a => a.mac === normalised)) {
+    approved.value.push({ mac: normalised, label: 'This device', addedAt: new Date().toISOString() });
+  }
 }
 
 function removeMac(mac) {
@@ -136,7 +160,7 @@ onMounted(load);
     <div class="card">
       <h2>MAC filtering</h2>
       <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-        <input id="mac-toggle" type="checkbox" v-model="macEnabled" style="width:auto" />
+        <input id="mac-toggle" type="checkbox" v-model="macEnabled" style="width:auto" @change="onMacToggle" />
         <label for="mac-toggle" style="margin:0;font-size:13px;font-weight:400;color:var(--text)">
           Enable MAC filter (only approved devices can connect)
         </label>
@@ -160,9 +184,17 @@ onMounted(load);
 
       <div style="display:flex;align-items:center;gap:10px">
         <button class="btn-primary" :disabled="macSaving" @click="saveMac">{{ macSaving ? 'Saving…' : 'Save' }}</button>
-        <span :class="macMsg.startsWith('Saved') ? 'success-msg' : 'error-msg'" v-if="macMsg">{{ macMsg }}</span>
+        <span :class="macMsg.startsWith('Saved') || macMsg.startsWith('MAC filtering starts') ? 'success-msg' : 'error-msg'" v-if="macMsg">{{ macMsg }}</span>
       </div>
     </div>
+
+    <MacFilterWarning
+      v-if="macWarning"
+      :approved="approved"
+      @confirm="macWarningConfirmed"
+      @cancel="macWarningCancelled"
+      @add="addThisDevice"
+    />
 
     <LogoSettings />
 

@@ -1452,6 +1452,8 @@
         <div class="callout-icon">⚠</div>
         <div class="callout-body"><strong>Add your own device to the approved list before enabling MAC filtering.</strong> If you enable it without adding the browser you're using, you will be locked out of the admin panel. If this happens, SSH into the Pi, edit <code>/opt/noticeboard/data/config.json</code>, and set <code>"enabled": false</code> in the <code>macFiltering</code> section, then restart the service.</div>
       </div>
+
+      <p>When you tick <strong>Enable MAC filter</strong>, a pop-up reminds you of this before anything changes. If the noticeboard can tell the MAC address of the device you're using, the pop-up shows it with an <strong>Add it to the list</strong> button. <strong>How to find your MAC address</strong> opens simple steps for Windows, Mac and Linux; its <strong>OK</strong> takes you back. <strong>Cancel</strong> unticks the box, and <strong>Turn on MAC filtering</strong> keeps it ticked: filtering starts when you click <strong>Save</strong>. Addresses copied from Windows, with dashes, are fine.</p>
     </div>
 
     <!-- ── 10 Settings ── -->
