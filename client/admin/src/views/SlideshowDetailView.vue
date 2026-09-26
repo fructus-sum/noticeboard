@@ -231,7 +231,7 @@ onUnmounted(() => {
   <div v-else-if="!meta" style="color:var(--text-muted)">Loading…</div>
   <div v-else>
     <!-- Header -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-bottom:20px">
       <button class="btn-ghost" style="font-size:12px;padding:5px 10px" @click="router.push('/slideshows')">← Back</button>
       <h1 style="margin:0">{{ meta.name }}</h1>
       <span v-if="meta.sample" class="tag" title="Shows what the noticeboard can do. It is updated with new examples when the software is updated, and can’t be deleted.">Sample</span>
@@ -301,7 +301,7 @@ onUnmounted(() => {
       </div>
 
       <form v-else @submit.prevent="saveMeta">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
           <div class="field">
             <label>Name</label>
             <input v-model="editName" type="text" required />
@@ -333,7 +333,7 @@ onUnmounted(() => {
             <option value="timed">Timed</option>
           </select>
         </div>
-        <div v-if="editSched.type === 'timed'" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div v-if="editSched.type === 'timed'" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
           <div class="field">
             <label>Start time</label>
             <input v-model="editSched.startTime" type="time" />
@@ -392,7 +392,7 @@ onUnmounted(() => {
 
     <!-- Slides card -->
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <h2 style="margin:0">Slides ({{ slides.length }})</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
@@ -466,7 +466,8 @@ onUnmounted(() => {
 .slide-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;   /* on a narrow screen the buttons go under, making the row taller */
+  gap: 8px 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }

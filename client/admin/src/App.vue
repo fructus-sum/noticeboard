@@ -3,13 +3,15 @@ import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import NavBar from './components/NavBar.vue';
 import DefaultPasswordWarning from './components/DefaultPasswordWarning.vue';
+import { useNav } from './composables/useNav.js';
 
 const route = useRoute();
+const { collapsed } = useNav();
 const showNav = computed(() => route.path !== '/login');
 </script>
 
 <template>
-  <div class="layout" :class="{ 'layout--with-nav': showNav }">
+  <div class="layout" :class="{ 'layout--with-nav': showNav, 'layout--nav-collapsed': showNav && collapsed }">
     <NavBar v-if="showNav" />
     <main class="main">
       <DefaultPasswordWarning v-if="showNav" />
@@ -50,15 +52,28 @@ body {
   min-height: 100vh;
 }
 
+/* minmax(0, …): the page column may shrink below its widest content, which then wraps, so
+   nothing runs off the side of a phone screen */
 .layout--with-nav {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+.layout--nav-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
 }
 
 .main {
   padding: 24px;
   min-height: 100vh;
+  min-width: 0;
   overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .main { padding: 14px 12px; }
+  .card { padding: 14px; }
+  h1 { font-size: 1.25rem; }
 }
 
 h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 20px; }

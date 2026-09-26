@@ -144,7 +144,7 @@ onMounted(load);
 
       <div style="margin-bottom:12px">
         <div v-for="a in approved" :key="a.mac"
-          style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+          style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
           <code style="font-size:12px;flex:0 0 140px">{{ a.mac }}</code>
           <span style="flex:1;font-size:13px;color:var(--text-muted)">{{ a.label }}</span>
           <button class="btn-ghost" style="padding:3px 8px;font-size:12px" :disabled="a.mac === 'localhost'" @click="removeMac(a.mac)">Remove</button>
@@ -152,9 +152,9 @@ onMounted(load);
         <p v-if="!approved.length" style="color:var(--text-muted);font-size:13px">No approved devices.</p>
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <input v-model="newMac" type="text" placeholder="aa:bb:cc:dd:ee:ff" style="flex:0 0 180px" />
-        <input v-model="newLabel" type="text" placeholder="Label (optional)" style="flex:1" />
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <input v-model="newMac" type="text" placeholder="aa:bb:cc:dd:ee:ff" style="flex:1 1 160px" />
+        <input v-model="newLabel" type="text" placeholder="Label (optional)" style="flex:1 1 160px" />
         <button type="button" class="btn-ghost" @click="addMac">Add</button>
       </div>
 

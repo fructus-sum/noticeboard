@@ -15,7 +15,7 @@ A self-hosted digital notice board and slideshow system for the Raspberry Pi. It
 - **Uploads processed for you** — images to PNG, videos to H.264 MP4 (large videos take a while; carry on meanwhile), with automatic video thumbnails and a larger preview of any slide
 - **Your logo** above "No slideshow published" and in the admin sidebar, or none
 - **The server's address on every screen** — a faint location pin shows the Noticeboard server's IP address and port; it can be turned off
-- **Admin panel** at `/admin`, with a link to open the viewer, a warning until the default password is changed, and the installed version's date
+- **Admin panel** at `/admin`, usable on a phone, with a sidebar that collapses to icons, a link to open the viewer, a warning until the default password is changed, and the installed version's date
 - **MAC filtering** to restrict which devices can show the slideshow
 - **Automatic updates** from GitHub, with branch switching in the admin panel and automatic rollback
 - **One installer** for server and remote display Pis, with an optional firewall set-up

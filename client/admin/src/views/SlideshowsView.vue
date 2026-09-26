@@ -122,15 +122,15 @@ onMounted(loadDevice);
       </span>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:20px">
       <h1 style="margin:0">Slideshows</h1>
       <button class="btn-primary" @click="showCreate = !showCreate">+ New slideshow</button>
     </div>
 
     <div v-if="showCreate" class="card" style="margin-bottom:16px">
       <h2>New slideshow</h2>
-      <form @submit.prevent="create" style="display:flex;gap:8px;align-items:flex-end">
-        <div class="field" style="flex:1;margin:0">
+      <form @submit.prevent="create" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="flex:1 1 200px;margin:0">
           <label for="ss-name">Name</label>
           <input id="ss-name" v-model="newName" type="text" placeholder="e.g. Main notices" autofocus />
         </div>
@@ -151,9 +151,9 @@ onMounted(loadDevice);
       Every slideshow is hidden. Use "Show hidden slideshows" below to see them.
     </p>
 
-    <div v-for="ss in visible" :key="ss.folder" class="card" :class="{ 'card--hidden': ss.hidden }" style="display:flex;align-items:center;gap:12px">
-      <div style="flex:1;cursor:pointer" @click="router.push(`/slideshows/${ss.folder}`)">
-        <div style="display:flex;align-items:center;gap:8px">
+    <div v-for="ss in visible" :key="ss.folder" class="card ss-row" :class="{ 'card--hidden': ss.hidden }">
+      <div class="ss-info" @click="router.push(`/slideshows/${ss.folder}`)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-weight:600">{{ ss.name }}</span>
           <span
             :style="{
@@ -178,6 +178,8 @@ onMounted(loadDevice);
         </div>
       </div>
 
+      <!-- Buttons wrap onto another line on a narrow screen, making the card taller -->
+      <div class="ss-actions">
       <!-- Publish / Disable toggle (a hidden slideshow is unhidden first) -->
       <button
         v-if="!ss.hidden"
@@ -223,6 +225,7 @@ onMounted(loadDevice);
         :title="ss.sample ? 'The sample slideshow can’t be deleted. You can hide it instead.' : ''"
         @click="remove(ss.folder)"
       >Delete</button>
+      </div>
     </div>
 
     <button v-if="hiddenCount" class="btn-ghost" style="font-size:12px;padding:5px 10px" @click="showHidden = !showHidden">
@@ -244,5 +247,8 @@ onMounted(loadDevice);
   text-transform: uppercase;
 }
 .card--hidden { opacity: 0.7; border-style: dashed; }
+.ss-row { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
+.ss-info { flex: 1 1 220px; min-width: 0; cursor: pointer; }
+.ss-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 </style>
