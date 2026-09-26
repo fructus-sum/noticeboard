@@ -210,7 +210,7 @@ onUnmounted(() => {
         <dt>Running</dt>
         <dd>
           <strong>{{ running }}</strong> <code>{{ short(info.commit) }}</code>
-          <span v-if="info.configuredBranch !== info.branch" class="muted">
+          <span v-if="canSwitch && info.configuredBranch !== info.branch" class="muted">
             · updates now come from <strong>{{ info.configuredBranch }}</strong>
           </span>
         </dd>
