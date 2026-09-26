@@ -1,5 +1,11 @@
 const BASE = '/api';
 
+// Not logged in (or the session expired): go to the login page, unless already there, so a
+// request made from the login page can never reload it over and over
+function toLogin() {
+  if (!window.location.pathname.startsWith('/admin/login')) window.location.href = '/admin/login';
+}
+
 async function request(method, path, body) {
   const opts = {
     method,
@@ -14,7 +20,7 @@ async function request(method, path, body) {
   const res = await fetch(`${BASE}${path}`, opts);
 
   if (res.status === 401) {
-    window.location.href = '/admin/login';
+    toLogin();
     return;
   }
   if (!res.ok) {
@@ -33,7 +39,7 @@ async function upload(path, formData) {
   });
 
   if (res.status === 401) {
-    window.location.href = '/admin/login';
+    toLogin();
     return;
   }
   if (!res.ok) {
