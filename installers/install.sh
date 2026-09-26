@@ -1152,7 +1152,7 @@ DESK
 # browser. Nothing needs logging in to read it.
 write_help_shortcut() {   # write_help_shortcut <url>
   local home desktop file
-  home=$(getent passwd "$DESKTOP_USER" | cut -d: -f6)
+  home=$(getent passwd "$DESKTOP_USER" 2>/dev/null | cut -d: -f6) || true
   if [ -z "$home" ] || [ ! -d "$home" ]; then
     return 0
   fi

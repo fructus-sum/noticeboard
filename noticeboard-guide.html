@@ -745,7 +745,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">The display screen requires no interaction and is designed to run unattended for months. Once set up, the Pi running the display can be left alone indefinitely: it recovers from outages and crashes by itself (see <a href="#unattended" style="color:var(--blue)">Running unattended</a>) and even installs new versions by itself (see <a href="#updates" style="color:var(--blue)">Automatic updates</a>). If anyone needs the noticeboard's address, the faint pin in the top-left corner of the screen shows its IP address and port.</div>
+        <div class="callout-body">The display screen requires no interaction and is designed to run unattended for months. Once set up, the Pi running the display can be left alone indefinitely: it recovers from outages and crashes by itself (see <a href="#unattended" style="color:var(--blue)">Running unattended</a>) and even installs new versions by itself (see <a href="#updates" style="color:var(--blue)">Automatic updates</a>). If anyone needs the noticeboard's address, the faint pin in the top-left corner of any screen shows the Noticeboard server's address (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</div>
       </div>
 
       <h3 id="unattended" style="scroll-margin-top:80px">Running unattended</h3>
@@ -762,11 +762,29 @@
           <tr><td>A new version is installed</td><td>Reloads itself onto the new version as soon as the server answers again.</td></tr>
           <tr><td>Every slide keeps failing</td><td>Reloads the page (at most once every 30 minutes).</td></tr>
           <tr><td>It has been running for a day</td><td>Reloads once between 2 and 5 am, to clear anything the browser has built up over a long run.</td></tr>
+          <tr><td>A slideshow is published, disabled, scheduled on or off, edited or reordered</td><td>Lets the slide on screen finish its full time (a video plays to its end), then starts the new running order from its first slide. A slide is never cut short.</td></tr>
           <tr><td>The browser closes or crashes</td><td>The Pi opens it again after a few seconds, once the server answers.</td></tr>
         </tbody>
       </table>
 
       <p>A display only ever reloads once it has checked that the server answers, so a screen is never left on a browser error page. The slide timing has been tested over a simulated 30 days of running, with outages, sleep and missed timers along the way.</p>
+
+      <h3 id="viewer" style="scroll-margin-top:80px">On the screen: the pin, the exit button and the cursor</h3>
+      <table>
+        <thead><tr><th>What</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Location pin</strong> (faint, top-left corner)</td><td>Tap or click it to see the <em>Noticeboard server's</em> address: the IP address and port to open on another device (add <code>/admin</code> for the admin panel). It's always the server's address, never the address of the screen or computer you're looking at. The pin can be turned off in <strong>Settings → Display</strong>. The pop-up closes with its ✕, or by itself after 90 seconds.</td></tr>
+          <tr><td><strong>Exit button</strong> (top-right corner)</td><td>Appears while the mouse moves (or on a tap or key press) and hides again after 3 seconds of stillness. It takes <em>this screen</em> out of full-screen kiosk mode: after you confirm, the full-screen browser closes and the slideshow opens again in a normal browser window, so you can use the browser, minimise or close it, or get to the Raspberry Pi desktop. Nothing else changes: the server keeps running, other screens carry on, and nothing is unpublished. The screen goes back to full screen the next time it starts up.</td></tr>
+          <tr><td><strong>Mouse cursor</strong></td><td>Hides over the slideshow after 3 seconds without movement; moving the mouse brings it back straight away, along with the exit button.</td></tr>
+        </tbody>
+      </table>
+
+      <p>Full-screen kiosk mode only ever applies to the slideshow viewer. The kiosk runs in a browser profile of its own, so a browser you open from the Pi's desktop, for example to use the admin panel at <code>/admin</code>, is an ordinary window that behaves like any other web page.</p>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body">The exit button needs the kiosk set up by a recent installer. On a Pi installed before the exit button existed, run the installer again once (it keeps your answers and your content) and reboot. On a browser the Noticeboard kiosk doesn't run, such as a laptop showing the slideshow in full screen, press F11 or Esc instead.</div>
+      </div>
     </div>
 
     <!-- ── 02 Installation ── -->
@@ -875,6 +893,14 @@
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
+      <h3 id="static-ip" style="scroll-margin-top:80px">Give the server Pi a fixed address</h3>
+      <p>Remote display Pis find the server by its IP address, so that address must not change. Most home and office networks hand out addresses automatically and can give a device a different one after a restart. If you use remote displays, fix the server Pi's address in one of two ways:</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li><strong>A reservation in your router</strong> (recommended): most routers can always give the same address to one device, often called a <em>DHCP reservation</em> or <em>static lease</em>. Your router's manual or its admin page explains how. You'll need the server Pi's MAC address, which the top of the admin panel's Slideshows page shows.</li>
+        <li><strong>A static address on the Pi itself</strong>: set it in Raspberry Pi OS's network settings. The official Raspberry Pi documentation's networking pages explain how for your version of Raspberry Pi OS. Choose an address outside the range your router hands out.</li>
+      </ul>
+      <p>If the server's address does change, run the installer again on each remote display Pi and give it the new address.</p>
+
       <h3>Running the installer again</h3>
       <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub. It never touches your slideshows, slides or settings.</p>
       <p>On a server Pi that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it.</p>
@@ -935,7 +961,9 @@
 
       <p>Not sure of the Pi's IP address? Tap the faint pin in the top-left corner of any display screen — it shows the server's IP address and port. The pop-up closes with its ✕, or by itself after 90 seconds.</p>
 
-      <p>This guide is built into the admin panel too: click <strong>Help</strong> in the sidebar to open it in a new tab.</p>
+      <p>The admin panel is only ever at <code>/admin</code>, on the same port as the slideshow (3000). There's no separate admin port.</p>
+
+      <p>This guide is always at hand, and reading it doesn't need a login: the installer puts a <strong>Noticeboard Help</strong> shortcut on the Pi's desktop, and in the admin panel <strong>Help</strong> in the sidebar opens it in a new tab. From any device, it's at <code>http://&lt;server-ip&gt;:3000/admin/help</code>.</p>
     </div>
 
     <!-- ── 03 First Login ── -->
@@ -966,7 +994,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Change the password immediately</strong>
-            <p>Go to <strong>Settings</strong> (top-right of the admin panel) and set a strong password before doing anything else.</p>
+            <p>Go to <strong>Settings</strong> in the sidebar and set a strong password before doing anything else. Until you do, a red warning at the top of every admin page reminds you.</p>
           </div>
         </div>
       </div>
@@ -978,9 +1006,11 @@
 
       <p>Once you're logged in, the top of the <strong>Slideshows</strong> page shows this Pi's IP address and MAC address — handy if you need to reserve the Pi's address in your router or tell someone where to find it. It only appears after you log in.</p>
 
+      <p>The sidebar has, from the top: the logo (see <a href="#logo" style="color:var(--blue)">Logo</a>), <strong>Slideshows</strong>, <strong>Settings</strong>, <strong>Help ↗</strong> (this guide) and <strong>Open viewer ↗</strong>, which opens the slideshow as the screens show it, in a new tab, while you stay logged in. At the bottom, <strong>Last updated</strong> shows when the installed version was made; it opens the project on GitHub.</p>
+
       <div class="callout tip">
         <div class="callout-icon">💡</div>
-        <div class="callout-body"><strong>A sample slideshow is ready to try.</strong> Every installation comes with a <em>Sample slideshow</em>: five slides, four images that show for 3 seconds each and a short video that plays to the end. It isn't published, so the display won't show it until you click <strong>Publish</strong>. Disable or delete it whenever you like; once deleted, it doesn't come back. It's only a demo: when a new version of Noticeboard comes with different sample slides, they replace the ones in it, so put your own content in a slideshow of your own.</div>
+        <div class="callout-body"><strong>A sample slideshow is ready to try.</strong> Every installation comes with a <em>Sample slideshow</em>, marked <em>Sample</em> in the list: five slides, four images that show for 3 seconds each and a short video that plays to the end. It isn't published, so the display won't show it until you click <strong>Publish</strong>. It shows off what the noticeboard can do, so software updates keep it current: when a new version comes with new or changed sample images, videos or settings, they're added to it. It can be hidden but not deleted. Put your own content in a slideshow of your own, since the sample's slides are replaced whenever its content changes.</div>
       </div>
 
       <h3>Changing the admin password</h3>
@@ -1066,15 +1096,26 @@
           <tr><td>Rename the slideshow</td><td>Click <strong>Edit</strong> in the Settings card, change the name, click Save</td></tr>
           <tr><td>Change the schedule</td><td>Click Edit, change Schedule type, click Save</td></tr>
           <tr><td>Change the priority</td><td>Click Edit, adjust the Priority number, click Save</td></tr>
+          <tr><td>Set how long its images show</td><td>Click Edit, then under <em>Image duration</em> choose <em>Use the default</em> or <em>Use its own</em> and a number of seconds, click Save</td></tr>
+          <tr><td>Hide or unhide it</td><td>Click <strong>Hide</strong> / <strong>Unhide</strong> in the Status field (only while it isn't published)</td></tr>
           <tr><td>Publish or disable</td><td>Click the <strong>Publish</strong> / <strong>Disable</strong> button in the Status field</td></tr>
           <tr><td>Upload slides</td><td>Click <strong>+ Upload</strong> in the Slides card</td></tr>
+          <tr><td>See a slide larger</td><td>Hover over its thumbnail, or click or tap it</td></tr>
           <tr><td>Reorder slides</td><td>Use the ↑ ↓ arrow buttons next to each slide</td></tr>
           <tr><td>Delete a slide</td><td>Click the ✕ button next to the slide</td></tr>
         </tbody>
       </table>
 
       <h3>Deleting a slideshow</h3>
-      <p>From the slideshow list, click <strong>Delete</strong> next to the slideshow. You will be asked to confirm. <strong>Deletion is permanent</strong> — all uploaded media files for that slideshow will also be removed from the server.</p>
+      <p>From the slideshow list, click <strong>Delete</strong> next to the slideshow. You will be asked to confirm. <strong>Deletion is permanent</strong> — all uploaded media files for that slideshow will also be removed from the server. The sample slideshow is the one exception: it can't be deleted, but you can hide it.</p>
+
+      <h3 id="hiding" style="scroll-margin-top:80px">Hiding a slideshow</h3>
+      <p>To tidy away an old or seasonal slideshow without deleting it, click <strong>Hide</strong> next to it. Hiding only takes it out of the list: its slides, settings, schedule and everything else stay exactly as they are.</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li>Only a slideshow that isn't published can be hidden. To hide a published one, click <strong>Disable</strong> first.</li>
+        <li>To see hidden slideshows, click <strong>Show hidden slideshows</strong> below the list. Click <strong>Unhide</strong> to bring one back; then you can publish it again.</li>
+        <li>The sample slideshow can be hidden and unhidden like any other.</li>
+      </ul>
     </div>
 
     <!-- ── 05 Uploading Media ── -->
@@ -1106,7 +1147,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.264 MP4 for reliable playback in Chromium. On a Raspberry Pi 4 this process takes 10–60 seconds per file depending on size. The slide will show <span class="pill amber">processing</span> during this time.</div>
+        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.264 MP4 for reliable playback in Chromium. Images take a few seconds. Videos take longer: a large or long video can take several minutes on a Raspberry Pi. The slide shows <span class="pill amber">processing</span> meanwhile. You don't need to wait: carry on uploading, arranging and setting up your slideshows, and the video appears by itself once it's ready.</div>
       </div>
 
       <h3>Uploading a slide</h3>
@@ -1129,7 +1170,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Wait for the slide to process</strong>
-            <p>You will see the slide appear in the list with a <span class="pill amber">processing</span> badge. This badge changes to <span class="pill green">ready</span> when processing is complete. The page updates automatically — no need to refresh.</p>
+            <p>You will see the slide appear in the list with a <span class="pill amber">processing</span> badge. This badge changes to <span class="pill green">ready</span> when processing is complete. The page updates automatically — no need to refresh, and no need to wait: large videos can take a while, and you can carry on setting up meanwhile.</p>
           </div>
         </div>
         <div class="step">
@@ -1151,14 +1192,21 @@
         </tbody>
       </table>
 
+      <h3>Previewing a slide</h3>
+      <p>Each slide in the list has a thumbnail. To see one larger, hover over it, or click or tap it (on a touchscreen). Hovering shows the preview while the pointer stays on the thumbnail; clicking keeps it open until you close it with ✕, Esc or a click outside it, and lets you play a video. The preview is up to 500 × 500 pixels, keeps the slide's shape, and never enlarges a smaller slide. It opens over the page, so the ↑ ↓ buttons work as usual.</p>
+
+      <h3>Video thumbnails</h3>
+      <p>While a video is processed, the noticeboard also makes a thumbnail for it from a typical frame near the start. The video itself isn't changed. Videos uploaded before thumbnails existed have none; the slideshow's page then says so and offers <strong>Create thumbnails</strong>, which makes them the same way.</p>
+
       <h3>How long each slide displays</h3>
-      <p><strong>Images</strong> display for a fixed number of seconds. The default is 10 seconds. You can change the global default in <strong>Settings → Default slide duration</strong>.</p>
-      <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide. The duration field is ignored for videos.</p>
+      <p><strong>Images</strong> display for a fixed number of seconds. The default is <strong>10 seconds</strong>, set in <strong>Settings → Display → Default image duration</strong>. A slideshow can use its own duration instead (click <strong>Edit</strong> on its page, then <em>Image duration → Use its own</em>); every slideshow without one uses the default. Changing the default never changes a slideshow that has its own.</p>
+      <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide.</p>
+      <p>When one slideshow follows another on screen, each slide keeps its own slideshow's duration. And when what's on air changes (a slideshow is published, disabled, scheduled on or off, edited or reordered), the slide on screen still gets its full time before the new running order starts.</p>
 
       <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If a slide hasn't appeared after 30 seconds (a file that won't download, a video that won't start), the display skips it, and a video that stops playing for 30 seconds is skipped too. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
 
       <h3>Reordering slides</h3>
-      <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The display picks up the new order the next time the server sends it the playlist: when an upload finishes, when a slideshow is published or disabled, or when the display reconnects (for example after the server restarts).</p>
+      <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The screens pick up the new order within seconds, once the slide they're showing has had its full time.</p>
     </div>
 
     <!-- ── 06 Publish & Disable ── -->
@@ -1316,7 +1364,7 @@
       </div>
 
       <h3>What happens when no slideshows are active</h3>
-      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows the words <em>No slideshow published</em> on a black screen. This is not an error: publish a slideshow, or check its schedule, and the display switches to it within seconds. A black screen with only a faint pulsing dot means something else: the display can't reach the server.</p>
+      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows the words <em>No slideshow published</em> on a black screen, with the logo above them (see <a href="#logo" style="color:var(--blue)">Logo</a>). This is not an error: publish a slideshow, or check its schedule, and the display switches to it within seconds. A black screen with only a faint pulsing dot means something else: the display can't reach the server.</p>
     </div>
 
     <!-- ── 08 Ordering & Priority ── -->
@@ -1357,7 +1405,7 @@
         <h2>Remote Displays</h2>
       </div>
 
-      <p>Any device on the same network as the server can open the display page at <code>http://&lt;server-ip&gt;:3000/</code> — including laptops, tablets, and additional Raspberry Pis. If you want to restrict which devices can see the display, use MAC filtering.</p>
+      <p>Any device on the same network as the server can open the display page at <code>http://&lt;server-ip&gt;:3000/</code> — including laptops, tablets, and additional Raspberry Pis. If you want to restrict which devices can see the display, use MAC filtering. Remote display Pis reach the server by its IP address, so give the server a fixed address (see <a href="#static-ip" style="color:var(--blue)">Give the server Pi a fixed address</a>).</p>
 
       <h3>MAC filtering</h3>
       <p>MAC filtering lets you create an approved list of devices. When enabled, only approved devices can access the display and admin panel. Unapproved devices see a "Not Found" error.</p>
@@ -1418,9 +1466,19 @@
         <thead><tr><th>Setting</th><th>What it controls</th><th>Default</th></tr></thead>
         <tbody>
           <tr>
-            <td><strong>Default slide duration</strong></td>
-            <td>How many seconds each image slide displays before advancing. This applies to all image slides that don't have a custom duration set. Videos always play their full length.</td>
+            <td><strong>Default image duration</strong> (Display)</td>
+            <td>How many seconds each image shows, in every slideshow that doesn't set its own duration. Videos always play their full length. Updating the software never changes this setting.</td>
             <td>10 seconds</td>
+          </tr>
+          <tr>
+            <td><strong>Location pin</strong> (Display)</td>
+            <td>Whether the faint pin in the viewer's top-left corner, which shows the Noticeboard server's address, is shown. Turning it off hides the pin and its pop-up on every screen; turning it on brings them back.</td>
+            <td>On</td>
+          </tr>
+          <tr>
+            <td><strong>Logo</strong></td>
+            <td>The logo on the <em>No slideshow published</em> screen and in the admin sidebar, and whether it's shown. See <a href="#logo" style="color:var(--blue)">Logo</a>.</td>
+            <td>On, the Noticeboard logo</td>
           </tr>
           <tr>
             <td><strong>Change password</strong></td>
@@ -1444,6 +1502,14 @@
           </tr>
         </tbody>
       </table>
+
+      <h3 id="logo" style="scroll-margin-top:80px">Logo</h3>
+      <p>The <strong>Logo</strong> card in Settings sets the logo shown above <em>No slideshow published</em> on every screen when nothing is on, and above the title in the admin sidebar.</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li><strong>Upload a logo…</strong> takes a PNG, JPEG, GIF or WebP image. If it's bigger than 500 × 500 pixels, it's scaled down, by its larger side, to fit. Its shape is kept, it's never stretched, and a smaller image is never enlarged.</li>
+        <li><strong>Use the default logo</strong> goes back to the Noticeboard logo.</li>
+        <li><strong>Show the logo</strong> turns it on or off, on the screens and in the sidebar together.</li>
+      </ul>
 
       <h3>Restarting the server service</h3>
       <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the server. Run this command on the Pi via SSH or a terminal:</p>
@@ -1601,7 +1667,7 @@
       <pre data-label="Terminal"><code>sudo systemctl restart noticeboard</code></pre>
 
       <h3>Uploaded image/video doesn't appear after processing</h3>
-      <p>Check that the slideshow is published and that the schedule is currently active. If the slide shows <span class="pill red">error</span>, delete it and try uploading again. For videos, check that <code>ffmpeg</code> is installed on the Pi:</p>
+      <p>Large videos can take several minutes to process: while a slide shows <span class="pill amber">processing</span>, just wait, and it appears by itself. Once it's <span class="pill green">ready</span>, check that the slideshow is published and that the schedule is currently active. If the slide shows <span class="pill red">error</span>, delete it and try uploading again. For videos, check that <code>ffmpeg</code> is installed on the Pi:</p>
 
       <pre data-label="Terminal"><code>ffmpeg -version</code></pre>
 
@@ -1613,7 +1679,19 @@
       <p>If the display Pi shows its MAC address and says it's <em>waiting for MAC address approval</em>, it can reach the server, but MAC filtering is blocking it. Add its MAC address to the approved list in Admin → Settings → MAC Filtering; the slideshow appears by itself within about 10 seconds. If it says it's <em>waiting for the Noticeboard server</em>, it can't reach the server at all: check the server Pi is on and running, and that the address on screen is right (to change it, run the installer on the display Pi again). A display Pi set up with an older installer may keep showing the MAC address screen after approval until it's rebooted; run the installer on it once to fix that.</p>
 
       <h3>Display is connected but slides seem slow to update after a change</h3>
-      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Uploads, publishing and disabling take effect within a few seconds. Reordering or deleting slides reaches the display the next time the playlist is sent: when an upload finishes, a slideshow is published or disabled, or the display reconnects. To send it straight away, restart the server with <code>sudo systemctl restart noticeboard</code>; the displays reconnect within seconds.</p>
+      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Uploads, publishing, disabling, reordering and deleting slides take effect within seconds, but always after the slide on screen has had its full time: with 10-second images, allow up to 10 seconds more (a video plays to its end first). A video that's still processing appears by itself once it's ready.</p>
+
+      <h3>Can't get out of full screen on a display</h3>
+      <p>Move the mouse (or tap the screen, or press a key): the exit button appears in the top-right corner. Click it and confirm, and that screen's browser becomes a normal window (see <a href="#viewer" style="color:var(--amber)">On the screen</a>). If no exit button appears, the Pi's kiosk was set up by an older installer: run the installer again on that Pi and reboot. Until then, from another computer you can log in to it over SSH and stop the kiosk with <code>pkill -f kiosk</code>; it comes back at the next reboot.</p>
+
+      <h3>The admin panel is hard to use on the Pi itself</h3>
+      <p>Leave full screen with the exit button first, then open the browser from the desktop and go to <code>http://localhost:3000/admin</code>. Since the kiosk runs in a browser profile of its own, that's an ordinary browser window. On a Pi set up by an older installer, a browser opened from the desktop could open inside the full-screen kiosk; run the installer again once to fix that.</p>
+
+      <h3>The location pin shows an unexpected address</h3>
+      <p>The pin always shows the Noticeboard <em>server's</em> address, even on a remote display or on a laptop, because that's the address other devices need. If the server has several network connections (e.g. wired and Wi-Fi), each is listed, the one this screen uses first. If the address keeps changing, give the server a fixed address (see <a href="#static-ip" style="color:var(--amber)">Give the server Pi a fixed address</a>).</p>
+
+      <h3>A video has no thumbnail</h3>
+      <p>Videos uploaded before thumbnails existed have none. Open the slideshow in the admin panel and click <strong>Create thumbnails</strong>. If it says the last try failed, check that <code>ffmpeg</code> is installed (see below).</p>
 
       <h3>The Pi display is blank or black on boot (kiosk doesn't start)</h3>
       <p>The kiosk waits for the server to be ready before launching Chromium, and opens Chromium again if it ever closes or crashes. If the server takes longer than usual to start (e.g. after a system update), the kiosk still launches — just more slowly. Check the server is running:</p>
