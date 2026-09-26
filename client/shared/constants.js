@@ -5,3 +5,6 @@ export const SOCKET_EVENTS = {
 };
 
 export const API_BASE = '/api';
+
+// The project on GitHub (the installers use the same repository)
+export const PROJECT_URL = 'https://github.com/fructus-sum/noticeboard';

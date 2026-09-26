@@ -97,6 +97,9 @@ const updatePasswordLimiter = rateLimit({
 
 router.get('/updates', updateRoute(() => updateService.getInfo()));
 
+// The installed version, for "Last updated" in the sidebar ({ version: null } without git)
+router.get('/version', updateRoute(async () => ({ version: await updateService.versionInfo() })));
+
 router.get('/updates/branches', updateRoute(async () => ({ branches: await updateService.listBranches() })));
 
 router.post('/updates/check', updateRoute(async (req) => {

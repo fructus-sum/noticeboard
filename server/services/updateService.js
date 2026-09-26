@@ -118,6 +118,18 @@ async function getInfo() {
   };
 }
 
+// The installed version, for the admin panel's "Last updated": its commit and when that commit
+// was made (the same on every Pi running it). null if this copy isn't a git clone.
+async function versionInfo() {
+  try {
+    const [commit, date] = (await git(['log', '-1', '--format=%H%x00%cI'])).split('\0');
+    const branch = await git(['symbolic-ref', '--short', '-q', 'HEAD']).catch(() => '');
+    return { commit, date, branch: branch || null };
+  } catch {
+    return null;
+  }
+}
+
 // The branches on GitHub, main first
 async function listBranches() {
   let out;
@@ -224,6 +236,7 @@ async function requestSwitch(name, by) {
 
 module.exports = {
   getInfo,
+  versionInfo,
   listBranches,
   checkBranch,
   validBranchName,

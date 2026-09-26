@@ -10,7 +10,7 @@ A self-hosted digital notice board and slideshow system designed to run on a Ras
 - **Multiple slideshows** — create named series, each with its own schedule and priority (max 5 active simultaneously)
 - **Scheduling** — set slideshows to run always, or only on specific days and times
 - **Media processing** — upload images and videos in any standard format; automatically converted to PNG and H.264 MP4 via Sharp and FFmpeg
-- **Admin panel** — browser-based control panel for managing content and settings; after login, the home page shows the Pi's IP and MAC address
+- **Admin panel** — browser-based control panel for managing content and settings; after login, the home page shows the Pi's IP and MAC address, and the sidebar shows when the installed version was last updated (the date of its commit on GitHub; click it to open the project)
 - **Device address button** — a faint pin in the top-left corner of every display shows the noticeboard's IP address and port
 - **MAC address filtering** — optionally restrict display access to approved devices
 - **Automatic updates** — the server Pi installs new versions from GitHub by itself, and every screen reloads to show them
