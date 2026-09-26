@@ -19,7 +19,8 @@ const message = ref('');           // the outcome of the last attempt, shown und
 const messageIsError = ref(false);
 
 // The two confirmations
-const step = ref('');              // '' | 'password' | 'final'
+const step = ref('');              // '' | 'software' | 'password' | 'final'
+const acceptMissing = ref(false);  // the extra confirmation when software the branch needs is missing
 const password = ref('');
 const verifying = ref(false);
 const token = ref('');
@@ -36,6 +37,10 @@ const short = (sha) => (sha ? sha.slice(0, 7) : '');
 const when = (iso) => (iso ? new Date(iso).toLocaleString() : '');
 
 const canSwitch = computed(() => info.value?.available && (info.value.autoUpdates || info.value.instant));
+// The branch's system-requirements.json, checked against this noticeboard by the server
+const missingSoftware = computed(() => (checked.value?.requirements?.listed
+  ? checked.value.requirements.results.filter((r) => !r.ok) : []));
+
 const isCurrent = computed(() => checked.value
   && checked.value.branch === info.value?.branch
   && checked.value.branch === info.value?.configuredBranch);
@@ -120,10 +125,16 @@ async function checkBranch() {
   }
 }
 
-// First confirmation: warnings and the admin password
+// First confirmation: software the branch needs that this noticeboard lacks, if any; then the
+// warnings and the admin password
 async function openPassword() {
   message.value = '';
   password.value = '';
+  if (missingSoftware.value.length && step.value !== 'software') {
+    acceptMissing.value = false;
+    step.value = 'software';
+    return;
+  }
   step.value = 'password';
   await nextTick();
   passwordInput.value?.focus();
@@ -165,7 +176,11 @@ async function verifyPassword() {
 async function confirmSwitch() {
   switching.value = true;
   try {
-    info.value = await api.post('/settings/updates/switch', { branch: checked.value.branch, token: token.value });
+    info.value = await api.post('/settings/updates/switch', {
+      branch: checked.value.branch,
+      token: token.value,
+      acceptMissing: missingSoftware.value.length > 0 && acceptMissing.value,
+    });
     step.value = '';
     token.value = '';
     checked.value = null;
@@ -292,6 +307,25 @@ onUnmounted(() => {
               <strong>{{ checked.branch }}</strong> <code>{{ short(checked.commit) }}</code>
             </p>
             <p class="muted">Latest commit: “{{ checked.subject }}”, {{ when(checked.date) }}</p>
+
+            <div v-if="!checked.requirements?.listed" class="software software--unknown">
+              {{ checked.branch }} doesn’t list the software it needs, so this noticeboard can’t be checked against it.
+            </div>
+            <div v-else-if="!missingSoftware.length" class="software software--ok">
+              ✓ This noticeboard has the software {{ checked.branch }} needs:
+              <span v-for="(r, i) in checked.requirements.results" :key="r.name">{{ i ? ', ' : ' ' }}{{ r.name }} {{ r.found }}</span>.
+            </div>
+            <div v-else class="software software--missing">
+              <strong>⚠ This noticeboard is missing software {{ checked.branch }} needs.</strong>
+              Install it yourself before switching, or the branch may not work:
+              <ul>
+                <li v-for="r in missingSoftware" :key="r.name">
+                  <strong>{{ r.name }}</strong>: needs {{ r.required }}; this noticeboard has {{ r.installed ? r.found : 'none' }}.
+                  {{ r.neededFor }} <span class="install">To install: {{ r.install }}</span>
+                </li>
+              </ul>
+            </div>
+
             <button class="btn-danger" @click="openPassword">Switch to {{ checked.branch }}…</button>
           </template>
         </div>
@@ -299,6 +333,31 @@ onUnmounted(() => {
 
       <p v-if="message" :class="messageIsError ? 'error-msg' : 'muted'">{{ message }}</p>
     </template>
+
+    <!-- Extra confirmation: software the branch needs is missing -->
+    <div v-if="step === 'software'" class="overlay" @click.self="cancel('Cancelled. Nothing was changed.')">
+      <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="software-title" @submit.prevent="openPassword">
+        <h2 id="software-title">Missing software</h2>
+        <p>
+          <strong>{{ checked.branch }}</strong> needs software this noticeboard doesn’t have, or has in a version that’s too old.
+          Install it yourself before switching: until you do, the branch may not work.
+        </p>
+        <ul class="warnings">
+          <li v-for="r in missingSoftware" :key="r.name">
+            <strong>{{ r.name }}</strong> {{ r.required }} (this noticeboard has {{ r.installed ? r.found : 'none' }}).
+            {{ r.neededFor }} To install: <code>{{ r.install }}</code>
+          </li>
+        </ul>
+        <label class="accept">
+          <input v-model="acceptMissing" type="checkbox" />
+          I’ve installed it myself, or I accept that {{ checked.branch }} may not work until I do.
+        </label>
+        <div class="actions">
+          <button type="button" class="btn-ghost" @click="cancel('Cancelled. Nothing was changed.')">Cancel</button>
+          <button type="submit" class="btn-primary" :disabled="!acceptMissing">Continue</button>
+        </div>
+      </form>
+    </div>
 
     <!-- First confirmation: warnings and the admin password -->
     <div v-if="step === 'password'" class="overlay" @click.self="cancel('Cancelled. Nothing was changed.')">
@@ -337,6 +396,9 @@ onUnmounted(() => {
           <p>
             Your password checked out, so the only thing between this noticeboard and <strong>{{ checked.branch }}</strong>
             is you and this button.
+          </p>
+          <p v-if="missingSoftware.length" class="tone-warn">
+            Remember: this noticeboard is still missing {{ missingSoftware.map((r) => r.name).join(', ') }}.
           </p>
           <p>This is your last chance to back out:</p>
           <ul class="choices">
@@ -391,6 +453,17 @@ code { font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-r
 .checked { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; }
 .checked p { margin-bottom: 8px; }
 .change { font-size: 14px; }
+
+.software { margin: 4px 0 10px; padding: 10px 12px; border-radius: var(--radius); font-size: 13px; line-height: 1.5; }
+.software ul { margin: 6px 0 0 18px; }
+.software li + li { margin-top: 4px; }
+.software .install { color: var(--text-muted); }
+.software--ok { background: #f0fdf4; color: #166534; }
+.software--missing { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.software--unknown { background: var(--surface-2); color: var(--text-muted); }
+.accept { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 16px; }
+.accept input { width: auto; margin-top: 2px; }
+.dialog button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; }
 .dialog { background: var(--surface); border-radius: 8px; padding: 22px; width: 100%; max-width: 540px; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); font-size: 13px; }

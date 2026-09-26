@@ -6,6 +6,7 @@ const {
   ROOT, updateBranchPath, updateStatusPath, updateCheckPath, updateNoticePath, updateRequestPath, systemdDir,
 } = require('../utils/pathHelpers');
 const logger = require('../utils/logger');
+const { checkRequirements } = require('../utils/systemCheck');
 
 // Software updates: which GitHub branch this noticeboard follows, and switching to another.
 // installers/update.sh does the updating (a systemd service, set up by install.sh). This side
@@ -183,7 +184,19 @@ async function checkBranch(name) {
     throw userError(422, `"${name}" can't be used: it's older than branch switching, so this noticeboard couldn't be switched back from the admin panel.`);
   }
   const [subject = '', date = ''] = (await git(['log', '-1', '--format=%s%x00%cI', commit])).split('\0');
-  return { branch: name, commit, subject, date };
+  return { branch: name, commit, subject, date, requirements: await requirementsOf(commit) };
+}
+
+// Checks this noticeboard's software against the branch's system-requirements.json.
+// { listed: false } for a branch without one: it can't be checked.
+async function requirementsOf(commit) {
+  const text = await git(['show', `${commit}:system-requirements.json`]).catch(() => null);
+  if (!text) return { listed: false };
+  try {
+    return { listed: true, ...(await checkRequirements(JSON.parse(text))) };
+  } catch {
+    return { listed: false, unreadable: true };
+  }
 }
 
 // One-time proof that the admin password was checked, for the final confirmation
@@ -206,7 +219,7 @@ function takeToken(token, branch) {
 
 // Save the new branch for this and all future updates, and ask update.sh to install it now.
 // If anything can't be saved, everything is put back as it was.
-async function requestSwitch(name, by) {
+async function requestSwitch(name, by, { acceptMissing = false } = {}) {
   const info = await getInfo();
   if (!info.available) throw userError(409, info.reason);
   if (!info.autoUpdates && !info.instant) {
@@ -217,6 +230,11 @@ async function requestSwitch(name, by) {
     throw userError(409, `This noticeboard already uses ${name}.`);
   }
   const target = await checkBranch(name);   // again: the branch may have changed since it was checked
+  // Software the branch needs but this noticeboard lacks: only with the admin's extra confirmation
+  const missing = target.requirements.listed ? target.requirements.results.filter((r) => !r.ok) : [];
+  if (missing.length && !acceptMissing) {
+    throw userError(409, `This noticeboard is missing software ${name} needs: ${missing.map((r) => r.name).join(', ')}. Install it first, or confirm that you want to switch anyway.`);
+  }
 
   const when = info.instant ? 'It starts within a few seconds.' : 'It starts at the next update check, within 15 minutes.';
   const status = {
@@ -242,7 +260,7 @@ async function requestSwitch(name, by) {
     logger.error('Could not save a branch switch', { err: err.message });
     throw userError(500, "Couldn't save the new branch, so nothing was changed.");
   }
-  logger.warn('Branch switch requested', { from: info.branch, to: name, target: target.commit, by });
+  logger.warn('Branch switch requested', { from: info.branch, to: name, target: target.commit, by, missingSoftware: missing.map((r) => r.name) });
   return getInfo();
 }
 

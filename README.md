@@ -81,7 +81,7 @@ After the installer's reboot, the kiosk starts automatically.
 
 ## Updates
 
-The server Pi checks GitHub every 15 minutes and installs new versions by itself; every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Pi to another branch (with checks, the admin password and a final confirmation); a Pi whose branch is merged into `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. The user guide has the details and the commands.
+The server Pi checks GitHub every 15 minutes and installs new versions by itself; every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Pi to another branch (with checks, the admin password and a final confirmation); a Pi whose branch is merged into `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. Before a switch, the Pi checks its software against the branch's list of what it needs (`system-requirements.json`) and warns about anything missing, with an extra confirmation to switch anyway. The user guide has the details and the commands.
 
 ## Status
 

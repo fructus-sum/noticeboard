@@ -1551,7 +1551,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Choose and check the branch</strong>
-            <p>In <strong>Settings → Software updates</strong>, type the branch name or pick it from the list, then click <strong>Check branch</strong>. The noticeboard checks that the branch exists on GitHub and can be used, and shows the change: the branch and version running now → the new branch and its version, with its latest change. Nothing has changed yet.</p>
+            <p>In <strong>Settings → Software updates</strong>, type the branch name or pick it from the list, then click <strong>Check branch</strong>. The noticeboard checks that the branch exists on GitHub and can be used, and shows the change: the branch and version running now → the new branch and its version, with its latest change. It also checks the software on this Pi against the list the branch keeps of what it needs (see below). Nothing has changed yet.</p>
           </div>
         </div>
         <div class="step">
@@ -1581,6 +1581,14 @@
         <div class="callout-icon">⤴</div>
         <div class="callout-body"><strong>When the branch is merged into main, the noticeboard goes back to main by itself.</strong> A branch is usually temporary: once its features are finished, they're merged into <em>main</em>. When all of the branch's work is part of <em>main</em>, the next update check (within 15 minutes) switches the noticeboard back to <em>main</em>, so it gets <em>main</em>'s updates again. This happens whether the branch was merged, squashed or rebased, and also if it was deleted after being merged. A branch deleted <em>without</em> being merged is left alone, because its features aren't in <em>main</em>. When the noticeboard has gone back, a notice at the top of the admin panel's Slideshows page says so. It stays there until someone closes it with ✕. If going back fails, it's undone like any other switch, and tried again once <em>main</em> has a new version.</div>
       </div>
+
+      <h3 id="branch-software" style="scroll-margin-top:80px">Software a branch needs</h3>
+      <p>Besides the parts it installs by itself, the noticeboard needs some programs on the Pi: Node.js, npm, Git, FFmpeg, curl and Chromium. A branch can need newer versions, or programs <em>main</em> doesn't, so every branch keeps a list of what it needs (<code>system-requirements.json</code>). When you check a branch, the Pi compares its own software with that list:</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li><strong>Everything's there:</strong> a green line lists the versions found.</li>
+        <li><strong>Something is missing or too old:</strong> an amber box names each program, the version the branch needs, what this Pi has, what it's for, and how to install it. <strong>Install it yourself before switching</strong>: the switch doesn't install system software. If you switch anyway, an extra <em>Missing software</em> confirmation comes first, which you have to tick to continue, and the final warning reminds you what's missing.</li>
+        <li><strong>The branch keeps no list</strong> (it's older than these checks): the card says it can't be checked.</li>
+      </ul>
 
       <p>Some branches can't be chosen, and the check says why: a branch that doesn't exist; one older than branch switching (the Pi couldn't be switched back from the admin panel afterwards); and one with files in the places the noticeboard keeps its content and settings (<code>data/</code>, <code>tmp/</code>, <code>logs/</code> or <code>.env</code>).</p>
 

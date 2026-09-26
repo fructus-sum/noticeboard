@@ -231,7 +231,7 @@ router.post('/updates/switch', updateRoute(async (req) => {
   if (!updateService.takeToken(token, branch)) {
     throw Object.assign(new Error('The password check has expired. Nothing was changed; start the switch again.'), { status: 403, expose: true });
   }
-  return updateService.requestSwitch(branch, req.ip);
+  return updateService.requestSwitch(branch, req.ip, { acceptMissing: req.body.acceptMissing === true });
 }));
 
 module.exports = router;
