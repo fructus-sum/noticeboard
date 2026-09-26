@@ -93,6 +93,8 @@ Every reload first checks that the server answers, so a screen is never left on 
 
 The slide timing is covered by automated tests (`npm test`), including a simulated 30 days (over 600,000 slide changes, with outages, sleep and missed timers). The display was also tested in a real browser with pages frozen, downloads that never finish, server crashes, the network dropping and the CPU slowed down 20 times.
 
+**Leaving full screen.** Moving the mouse over a screen shows an exit button in its top-right corner. After a confirmation, that screen's full-screen browser closes and the slideshow opens in a normal browser window, so you can use the browser or get to the desktop; nothing else changes, and the screen goes back to full screen at its next start-up. Kiosk mode only ever applies to the slideshow: the kiosk browser has a profile of its own, so a browser opened from the Pi's desktop, e.g. for the admin panel, is an ordinary window. (Pis installed before this need the installer run again once.)
+
 To see what a display is doing: `journalctl -t noticeboard-kiosk -b` on its Pi shows the kiosk script's log, and `noticeboard.slideshow()` in the browser's DevTools console shows the slideshow's current state.
 
 ## Updates

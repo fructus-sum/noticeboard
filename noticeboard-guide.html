@@ -767,6 +767,15 @@
       </table>
 
       <p>A display only ever reloads once it has checked that the server answers, so a screen is never left on a browser error page. The slide timing has been tested over a simulated 30 days of running, with outages, sleep and missed timers along the way.</p>
+
+      <h3 id="leave-kiosk" style="scroll-margin-top:80px">Leaving full screen</h3>
+      <p>Move the mouse over a screen (or tap it, or press a key) and an exit button appears in its top-right corner; it hides again after 3 seconds of stillness. Click it and confirm, and <em>that screen's</em> full-screen browser closes and the slideshow opens again in a normal browser window, so you can use the browser, minimise or close it, or get to the Raspberry Pi desktop. Nothing else changes: the server keeps running, other screens carry on, and nothing is unpublished. The screen goes back to full screen the next time it starts up.</p>
+      <p>Full-screen kiosk mode only ever applies to the slideshow. The kiosk runs in a browser profile of its own, so a browser you open from the Pi's desktop, for example for the admin panel at <code>/admin</code>, is an ordinary window.</p>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body">The exit button needs the kiosk set up by a recent installer. On a Pi installed before it existed, run the installer again once (it keeps your answers and your content) and reboot. On a browser the Noticeboard kiosk doesn't run, such as a laptop showing the slideshow in full screen, press F11 or Esc instead.</div>
+      </div>
     </div>
 
     <!-- ── 02 Installation ── -->
@@ -1614,6 +1623,12 @@
 
       <h3>Display is connected but slides seem slow to update after a change</h3>
       <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Uploads, publishing and disabling take effect within a few seconds. Reordering or deleting slides reaches the display the next time the playlist is sent: when an upload finishes, a slideshow is published or disabled, or the display reconnects. To send it straight away, restart the server with <code>sudo systemctl restart noticeboard</code>; the displays reconnect within seconds.</p>
+
+      <h3>Can't get out of full screen on a display</h3>
+      <p>Move the mouse (or tap the screen, or press a key): the exit button appears in the top-right corner. Click it and confirm, and that screen's browser becomes a normal window (see <a href="#leave-kiosk" style="color:var(--amber)">Leaving full screen</a>). If no exit button appears, the Pi's kiosk was set up by an older installer: run the installer again on that Pi and reboot. Until then, you can log in to it over SSH from another computer and stop the kiosk with <code>pkill -f kiosk</code>; it comes back at the next reboot.</p>
+
+      <h3>The admin panel is hard to use on the Pi itself (it keeps going back to the slideshow)</h3>
+      <p>On a Pi set up by an older installer, a browser opened from the desktop joins the full-screen kiosk, and the kiosk brings the slideshow back whenever its window closes. Run the installer again once and reboot: the kiosk then has a browser profile of its own, so a browser you open from the desktop is an ordinary window. After that, leave full screen with the exit button, open the browser and go to <code>http://localhost:3000/admin</code>. Meanwhile, the admin panel works normally from any other computer or phone on the network, at <code>http://&lt;pi-ip&gt;:3000/admin</code>.</p>
 
       <h3>The Pi display is blank or black on boot (kiosk doesn't start)</h3>
       <p>The kiosk waits for the server to be ready before launching Chromium, and opens Chromium again if it ever closes or crashes. If the server takes longer than usual to start (e.g. after a system update), the kiosk still launches — just more slowly. Check the server is running:</p>

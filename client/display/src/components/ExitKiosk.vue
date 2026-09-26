@@ -1,0 +1,144 @@
+<script setup>
+import { ref, onUnmounted } from 'vue';
+
+// Leaves full-screen kiosk mode on this screen only. The kiosk script on this device (see
+// installers/install.sh) collects the request within a few seconds, closes its full-screen
+// browser and opens a normal browser window instead. The server, the other displays and the
+// published slideshows are not affected. The screen returns to kiosk mode when it restarts.
+defineProps({
+  visible: Boolean,   // shown while the mouse (or keyboard, or touchscreen) is being used
+});
+
+const AUTO_CLOSE_MS = 60 * 1000;
+const step = ref('');   // '' | 'confirm' | 'leaving'
+const failed = ref(false);
+let closeTimer = null;
+
+function open() {
+  step.value = 'confirm';
+  failed.value = false;
+  clearTimeout(closeTimer);
+  closeTimer = setTimeout(close, AUTO_CLOSE_MS);
+}
+
+function close() {
+  step.value = '';
+  clearTimeout(closeTimer);
+}
+
+async function leave() {
+  step.value = 'leaving';
+  clearTimeout(closeTimer);
+  closeTimer = setTimeout(close, AUTO_CLOSE_MS);
+  try {
+    const res = await fetch('/api/device/kiosk-exit', { method: 'POST' });
+    if (!res.ok) throw new Error();
+  } catch {
+    failed.value = true;
+  }
+  // A browser in ordinary full screen (e.g. F11 or a fullscreen request) can leave it itself
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
+onUnmounted(() => clearTimeout(closeTimer));
+</script>
+
+<template>
+  <button
+    v-show="visible || step"
+    type="button"
+    class="exit-button"
+    aria-label="Leave full screen on this screen"
+    title="Leave full screen on this screen"
+    @click="open"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 4v5H4v2h7V4H9zm6 0h-2v7h7V9h-5V4zM4 13v2h5v5h2v-7H4zm9 0v7h2v-5h5v-2h-7z" />
+    </svg>
+  </button>
+
+  <div v-if="step" class="exit-popup" role="dialog" aria-labelledby="exit-title">
+    <template v-if="step === 'confirm'">
+      <h2 id="exit-title" class="exit-title">Leave full screen on this screen?</h2>
+      <p>This screen's browser becomes a normal window, so you can use it, minimise or close it, or get back to the desktop.</p>
+      <p>Nothing else changes: the slideshow keeps running on every other screen, and nothing is unpublished. This screen goes back to full screen the next time it starts up.</p>
+      <div class="exit-actions">
+        <button type="button" class="exit-cancel" @click="close">Cancel</button>
+        <button type="button" class="exit-confirm" @click="leave">Leave full screen</button>
+      </div>
+    </template>
+    <template v-else>
+      <h2 id="exit-title" class="exit-title">Leaving full screen…</h2>
+      <p v-if="failed">Couldn't reach the Noticeboard server to ask. Try again in a moment.</p>
+      <template v-else>
+        <p>Within a few seconds, this screen's browser closes and opens again as a normal window.</p>
+        <p class="exit-hint">If nothing happens, this browser isn't run by the Noticeboard kiosk: press F11 or Esc to leave full screen, or Alt+F4 to close it.</p>
+      </template>
+      <div class="exit-actions">
+        <button type="button" class="exit-cancel" @click="close">Close</button>
+      </div>
+    </template>
+  </div>
+</template>
+
+<style scoped>
+/* Matches the location pin, in the opposite corner */
+.exit-button {
+  position: fixed;
+  top: 5px;
+  right: 5px;
+  z-index: 1000;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  opacity: 0.5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+.exit-button:hover,
+.exit-button:focus-visible { opacity: 0.9; }
+.exit-button svg { width: 14px; height: 14px; fill: currentColor; }
+
+.exit-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+  width: min(560px, 90vw);
+  padding: clamp(20px, 3vw, 36px);
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: clamp(15px, 1.6vw, 19px);
+  line-height: 1.5;
+}
+.exit-popup p { margin-bottom: 12px; }
+.exit-title {
+  font-size: clamp(18px, 2.2vw, 26px);
+  font-weight: 600;
+  color: #f9fafb;
+  margin-bottom: 14px;
+}
+.exit-hint { color: #9ca3af; }
+.exit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.exit-actions button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: clamp(14px, 1.5vw, 17px);
+  cursor: pointer;
+}
+.exit-cancel { background: #374151; color: #f9fafb; }
+.exit-confirm { background: #2563eb; color: #fff; }
+</style>
