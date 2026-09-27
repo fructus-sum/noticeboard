@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted } from 'vue';
+import { usePageWake } from '../composables/usePageWake.js';
 
 defineProps({
   src: { type: String, required: true },
@@ -19,16 +20,11 @@ function play() {
 
 // A hidden, frozen or sleeping page can pause the video: start it again when the page wakes.
 // If it still won't play, the slide clock's stall deadline skips it.
-function wake() {
+usePageWake(() => {
   if (video.value?.paused && !video.value.ended) video.value.play()?.catch?.(() => {});
-}
-const PAGE_EVENTS = [[document, 'visibilitychange'], [document, 'resume'], [window, 'pageshow'], [window, 'focus']];
-
-onMounted(() => {
-  PAGE_EVENTS.forEach(([target, name]) => target.addEventListener(name, wake));
-  play();
 });
-onUnmounted(() => PAGE_EVENTS.forEach(([target, name]) => target.removeEventListener(name, wake)));
+
+onMounted(play);
 </script>
 
 <template>

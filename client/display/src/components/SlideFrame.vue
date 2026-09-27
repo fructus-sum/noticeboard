@@ -15,7 +15,6 @@ const emit = defineEmits(['ready', 'progress', 'ended', 'failed']);
   <ImageSlide
     v-if="slide.type === 'image'"
     :src="slide.url"
-    :duration="slide.duration"
     @ready="emit('ready', generation)"
     @error="emit('failed', generation)"
   />

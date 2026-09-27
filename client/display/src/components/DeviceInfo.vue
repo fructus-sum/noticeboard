@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import CornerButton from './CornerButton.vue';
+import ScreenDialog from './ScreenDialog.vue';
 
 const AUTO_CLOSE_MS = 90 * 1000;
 
@@ -46,8 +48,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <button
-    type="button"
+  <CornerButton
+    corner="left"
+    :opacity="0.3"
+    :hover-opacity="0.8"
     class="info-button"
     aria-label="Show the Noticeboard server's address"
     title="Show the Noticeboard server's address"
@@ -56,9 +60,9 @@ onUnmounted(() => {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
     </svg>
-  </button>
+  </CornerButton>
 
-  <div v-if="open" class="info-popup" role="dialog" aria-labelledby="info-title">
+  <ScreenDialog v-if="open" class="info-popup" aria-labelledby="info-title">
     <button type="button" class="info-close" aria-label="Close" @click="close">×</button>
     <h2 id="info-title" class="info-title">Noticeboard server</h2>
 
@@ -79,50 +83,16 @@ onUnmounted(() => {
         (add <strong>/admin</strong> for the admin panel).
       </p>
     </template>
-  </div>
+  </ScreenDialog>
 </template>
 
 <style scoped>
-/* Faint pin fixed 5px in from the top-left corner, above every slide */
-.info-button {
-  position: fixed;
-  top: 5px;
-  left: 5px;
-  z-index: 1000;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-  opacity: 0.3;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s;
-}
-.info-button:hover,
-.info-button:focus-visible { opacity: 0.8; }
-.info-button svg { width: 14px; height: 14px; fill: currentColor; }
-
-/* Solid card so it stays readable whatever slide is behind it */
+/* The pin itself: CornerButton (top left, faint). The pop-up: ScreenDialog, with its size here */
 .info-popup {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1001;
   min-width: min(420px, 90vw);
   max-width: 90vw;
   padding: clamp(20px, 3vw, 40px) clamp(24px, 4vw, 56px);
-  background: #111827;
   color: #f9fafb;
-  border: 1px solid #374151;
-  border-radius: 12px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
-  font-family: system-ui, -apple-system, sans-serif;
 }
 
 .info-close {

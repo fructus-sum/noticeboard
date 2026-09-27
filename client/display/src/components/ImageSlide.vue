@@ -1,7 +1,7 @@
 <script setup>
-const props = defineProps({
+// How long it shows is the slide clock's business (slideshowClock.js), not this component's
+defineProps({
   src: { type: String, required: true },
-  duration: { type: Number, default: null },
 });
 
 const emit = defineEmits(['ready', 'error']);
