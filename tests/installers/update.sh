@@ -37,7 +37,7 @@ export PATH="$BIN:$PATH"
 git init -q --bare -b main "$T/origin.git"
 git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 cd "$T/work" && git checkout -q -b main
-mkdir -p installers && cp "$REPO/installers/update.sh" installers/
+mkdir -p installers && cp -r "$REPO/installers/update.sh" "$REPO/installers/lib" installers/
 commit() { git -c commit.gpgsign=false commit -qm "$1" && git push -q origin main; }
 echo v1 > VERSION && git add -A && commit v1
 git clone -q "$T/origin.git" "$T/install"

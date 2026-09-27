@@ -6,13 +6,13 @@
 # them (GOAL_SYSTEM_DESIGN §8.1). NB_UPDATE_SNAPSHOT=1 records them again (only for a deliberate,
 # reviewed change, together with INSTALLER_VERSION).
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/tests/helpers/installer.sh"
 GOLDEN="$REPO/tests/fixtures/installer-golden"
 T=$(mktemp -d); OUT="$T/out"; mkdir -p "$OUT" "$T/opt" "$T/home/pi"
 pass=0; fail=0
 
 (
-  # shellcheck source=/dev/null
-  source <(sed '$d' "$REPO/installers/install.sh")
+  load_installer
   getent()  { echo "pi:x:1000:1000::$T/home/pi:/bin/bash"; }
   runuser() { return 1; }                 # no xdg-user-dir: the shortcut goes in ~/Desktop
   chown()   { :; }

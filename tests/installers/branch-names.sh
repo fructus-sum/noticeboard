@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
-# The branch-name rule exists twice: in bash for the updater and in JavaScript for the server's
+# The branch-name rule exists twice: in bash (installers/lib/branch.sh, for update.sh and
+# install.sh) and in JavaScript for the server's
 # branch switch (see GOAL_SYSTEM_DESIGN §8.6). Both must accept and refuse exactly the same names:
 # tests/fixtures/branch-names.txt.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FIXTURE="$REPO/tests/fixtures/branch-names.txt"
 pass=0; fail=0
 # shellcheck source=/dev/null
-source <(sed '$d' "$REPO/installers/update.sh")
+source "$REPO/installers/lib/branch.sh"
 js=$(cd "$REPO" && node -e "
   const { validBranchName } = require('./server/services/updates/branchName');
   const lines = require('fs').readFileSync(process.argv[1], 'utf8').split('\n').filter((l) => /^(valid|invalid) /.test(l));
@@ -22,9 +23,9 @@ while IFS= read -r line; do
   if [ "$sh" = "$want" ] && [ "${js_answers[$i]}" = "$want" ]; then
     pass=$((pass+1))
   else
-    fail=$((fail+1)); echo "FAIL  '$name': want $want, update.sh says $sh, the server says ${js_answers[$i]}"
+    fail=$((fail+1)); echo "FAIL  '$name': want $want, branch.sh says $sh, the server says ${js_answers[$i]}"
   fi
   i=$((i+1))
 done < "$FIXTURE"
-echo "PASS  $pass names give the same answer in update.sh and the server"
+echo "PASS  $pass names give the same answer in installers/lib/branch.sh and the server"
 echo "passed=$pass failed=$fail"; [ "$fail" -eq 0 ]

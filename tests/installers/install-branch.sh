@@ -3,6 +3,7 @@
 # install.sh on a server Pi that follows another branch: keep it, go back to main, or fall back
 # to main when the branch is gone. Real git against a local origin; system commands are stand-ins.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/tests/helpers/installer.sh"
 T=$(mktemp -d); export T
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
@@ -35,7 +36,7 @@ scenario() {   # scenario <name> <branch setting or ""> <answers...>
   [ -n "$setting" ] && echo "NOTICEBOARD_BRANCH=$setting" > "$T/opt/data/update-branch.env"
   : > "$T/calls.log"
   (
-    source <(sed '$d' "$REPO/installers/install.sh"); stubs; set -euo pipefail
+    load_installer; stubs; set -euo pipefail
     INSTALL_DIR="$T/opt"; BRANCH_FILE="$T/opt/data/update-branch.env"; SERVICE_FILE="$T/svc"
     UPDATE_SERVICE_FILE="$T/upd.service"; UPDATE_TIMER_FILE="$T/upd.timer"; UPDATE_PATH_FILE="$T/upd.path"
     AUTOSTART_FILE="$T/autostart.desktop"; KIOSK_SCRIPT="$T/none.sh"; DESKTOP_USER=$(id -un); ANSWERS=("$@")

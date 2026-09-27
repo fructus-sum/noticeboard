@@ -3,6 +3,7 @@
 # install.sh's optional firewall step, with ufw, firewalld, nft, iptables, systemctl,
 # systemd-run, sshd, ss, ps and apt-get replaced by stand-ins that record every call.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/tests/helpers/installer.sh"
 T=$(mktemp -d); export T
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
@@ -13,7 +14,7 @@ run() {
   local name=$1 mode=$2 setup=$3; shift 3
   : > "$T/calls.log"
   (
-    source <(sed '$d' "$REPO/installers/install.sh")
+    load_installer
     set -euo pipefail
     MODE=$mode; INSTALL_DIR="$T/opt"
     MOCK_UFW_STATE=""; MOCK_ACTIVE=""; MOCK_SSHD_PORT=22; MOCK_SOCKET_PORT=""; MOCK_SSH_ANCESTOR=""; MOCK_SSH_CONN=""; MOCK_VNC=""; MOCK_PORT=3000
@@ -150,8 +151,8 @@ grep -h "reset" "$T"/*.out > /dev/null 2>&1; ! grep -q "^ufw reset" "$T"/calls.l
 mkdir -p "$T/app/server/utils" "$T/app/data"
 cp "$REPO/server/utils/configIO.js" "$T/app/server/utils/"
 echo '{ port: 8080 }' > "$T/app/data/config.json"
-port=$( source <(sed '$d' "$REPO/installers/install.sh"); INSTALL_DIR="$T/app"; NODE_PATH="$REPO/node_modules" slideshow_port )
-missing=$( source <(sed '$d' "$REPO/installers/install.sh"); INSTALL_DIR="$T/nothing"; slideshow_port )
+port=$( load_installer; INSTALL_DIR="$T/app"; NODE_PATH="$REPO/node_modules" slideshow_port )
+missing=$( load_installer; INSTALL_DIR="$T/nothing"; slideshow_port )
 [ "$port" = 8080 ] && [ "$missing" = 3000 ] && ok "slideshow_port reads config.json (8080), else 3000" || bad "slideshow_port ($port, $missing)"
 
 rm -rf "$T"; echo "passed=$pass failed=$fail"; [ $fail -eq 0 ]

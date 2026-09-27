@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
-# Exercise install.sh's check_sudo_password() with a temporary sudoers.d folder and a
+# Exercise the installer's check_sudo_password() (installers/lib/sudo.sh) with a temporary sudoers.d folder and a
 # simulated sudo: a NOPASSWD rule means no password is needed; otherwise the password
 # must be GOOD_PW. Password prompts are fed from fd 7 instead of /dev/tty.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/tests/helpers/installer.sh"
 U=$(id -un); GOOD_PW="correct-horse"
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
@@ -12,8 +13,9 @@ bad() { fail=$((fail+1)); echo "FAIL  $1"; [ -n "${2:-}" ] && sed 's/^/        /
 scenario() {   # scenario <dir> <passwords, one per line> <answers...>
   local dir="$1" pwfile="$1/passwords"; printf '%b' "$2" > "$pwfile"; shift 2
   (
-    source <(sed -e '$d' -e "s#/etc/sudoers.d/#$dir/sudoers.d/#g" -e 's#</dev/tty || break#<\&7 || break#' "$REPO/installers/install.sh")
-    # set -euo pipefail comes from install.sh itself, as in the real installer
+    load_installer   # set -euo pipefail comes from install.sh itself, as in the real installer
+    # sudo.sh again, with its sudoers folder and password prompt pointed at this test's
+    source <(sed -e "s#/etc/sudoers.d/#$dir/sudoers.d/#g" -e 's#</dev/tty || break#<\&7 || break#' "$REPO/installers/lib/sudo.sh")
     SUDOERS_BACKUP_DIR="$dir/backup"; DESKTOP_USER="$U"; ANSWERS=("$@")
     sudo()    { :; }
     passwd()  { echo "$U ${PASSWD_STATUS:-P} 01/01/2024 0 99999 7 -1"; }

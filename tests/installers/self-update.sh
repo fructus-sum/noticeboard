@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/tests/helpers/installer.sh"
 T=$(mktemp -d); export T
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
@@ -10,7 +11,7 @@ GOOD_SHA=0123456789abcdef0123456789abcdef01234567
 # run_case <name>: load install.sh's functions, stub curl per $API/$DL, call use_latest_installer
 run_case() {
   (
-    source <(sed '$d' "$REPO/installers/install.sh")
+    load_installer
     curl() {
       echo "curl $*" >> "$T/curl.log"
       case "$*" in
@@ -45,7 +46,7 @@ grep -q "Couldn't download the latest installer" "$T/out" && grep -q CONTINUED "
 # Against the real GitHub only when asked (NB_TEST_NETWORK=1), so the suite runs offline
 if [ "${NB_TEST_NETWORK:-}" = 1 ]; then
   echo "=== real GitHub: fetch main's commit, download that installer, switch to it ==="
-  ( source <(sed '$d' "$REPO/installers/install.sh"); use_latest_installer ) > "$T/real.out" 2>&1
+  ( load_installer; use_latest_installer ) > "$T/real.out" 2>&1
   sed 's/^/      /' "$T/real.out"
   grep -q "Running the latest installer" "$T/real.out" && grep -q "ERROR: Run this script with sudo." "$T/real.out" \
     && ok "real run: downloaded main's installer and handed over to it" || bad "real run"
@@ -55,7 +56,7 @@ fi
 
 echo "=== reboot offer ==="
 for answer in "" "Y" "n"; do
-  ( source <(sed '$d' "$REPO/installers/install.sh")
+  ( load_installer
     ask() { REPLY="$ANS"; }; systemctl() { echo "systemctl $*"; }
     ANS="$answer" offer_reboot ) > "$T/rb.out" 2>&1
   if [ "$answer" = n ]; then grep -q "Reboot later with: sudo reboot" "$T/rb.out" && ! grep -q "systemctl reboot" "$T/rb.out" && ok "answer 'n': no reboot, says how" || bad "reboot n" "$T/rb.out"

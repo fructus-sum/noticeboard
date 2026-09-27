@@ -16,7 +16,7 @@
 // Used by
 //   configService (config.json), services/slideshowStore (slideshow.json),
 //   services/updates/updateFiles (the files shared with update.sh), and the shell scripts:
-//   installers/update.sh and install.sh run `node -e "require('./server/utils/configIO').readConfig(…)"`
+//   installers/update.sh and the installer (lib/system.sh) run `node -e "require('./server/utils/configIO').readConfig(…)"`
 //   to find the port. That file path and readConfig must not change (OLD_SYSTEM_DESIGN §15).
 const fs = require('fs');
 const path = require('path');

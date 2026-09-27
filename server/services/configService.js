@@ -14,7 +14,7 @@
 //                        display settings if they differ
 //
 // Used by
-//   nearly every server module, and installers/install.sh, which runs
+//   nearly every server module, and the installer (installers/lib/server.sh), which runs
 //   `node -e "require('./server/services/configService').init()"` on a first install. That path
 //   and init() must not change (OLD_SYSTEM_DESIGN §15).
 //

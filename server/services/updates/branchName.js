@@ -7,9 +7,9 @@
 //   services/updates/index.js, routes/api/settings/updates.js
 //
 // Change impact
-//   The same rule exists in bash for the updater (installers/update.sh valid_branch): both must
-//   accept and refuse exactly the same names (tests/installers/branch-names.sh checks them against
-//   tests/fixtures/branch-names.txt).
+//   The same rule exists in bash (installers/lib/branch.sh valid_branch, used by update.sh and
+//   install.sh): both must accept and refuse exactly the same names (tests/installers/
+//   branch-names.sh checks them against tests/fixtures/branch-names.txt).
 function validBranchName(name) {
   return typeof name === 'string'
     && /^[A-Za-z0-9._/-]{1,100}$/.test(name)

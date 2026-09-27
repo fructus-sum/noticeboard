@@ -3,6 +3,7 @@
 # Run install.sh's real functions end to end for both modes, with system commands
 # (apt-get, npm, systemctl, chown, ...) replaced by stand-ins that record their calls.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/tests/helpers/installer.sh"
 T=$(mktemp -d); export T
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
@@ -31,7 +32,7 @@ stubs() {
 # ── Server + display, re-run on an existing install (Enter accepts the default) ──
 git clone -q "$REPO" "$T/opt-noticeboard" 2>/dev/null
 (
-  source <(sed '$d' "$REPO/installers/install.sh")
+  load_installer
   stubs
   INSTALL_DIR="$T/opt-noticeboard"; SERVICE_FILE="$T/noticeboard.service"
   UPDATE_SERVICE_FILE="$T/noticeboard-update.service"; UPDATE_TIMER_FILE="$T/noticeboard-update.timer"; UPDATE_PATH_FILE="$T/noticeboard-update.path"; BRANCH_FILE="$T/opt-noticeboard/data/update-branch.env"
@@ -59,7 +60,7 @@ grep -q "Auto-update  : every 15 minutes" "$T/server.out" && ok "summary shows t
 # ── Remote display, fresh Pi: Enter (no default) and '3' are refused, then 2; empty URL, then one with a slash ──
 : > "$T/calls.log"
 (
-  source <(sed '$d' "$REPO/installers/install.sh")
+  load_installer
   stubs
   INSTALL_DIR="$T/nothing-here"; KIOSK_SCRIPT="$T/noticeboard-kiosk.sh"; AUTOSTART_FILE="$T/autostart-display.desktop"
   DESKTOP_USER=$(id -un); ANSWERS=("" "3" "2" "" "http://10.0.0.5:3000/")
@@ -77,7 +78,7 @@ first_two_are_update_then_upgrade && ok "display mode also updates, then upgrade
 
 # ── Re-run on that display Pi: Enter, Enter keeps mode and URL ──
 (
-  source <(sed '$d' "$REPO/installers/install.sh"); stubs
+  load_installer; stubs
   INSTALL_DIR="$T/nothing-here"; KIOSK_SCRIPT="$T/noticeboard-kiosk.sh"; ANSWERS=("" "")
   choose_mode && ask_server_url && echo "MODE=$MODE SERVER_URL=$SERVER_URL"
 ) > "$T/rerun.out" 2>&1

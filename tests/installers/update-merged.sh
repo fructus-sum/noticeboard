@@ -28,7 +28,7 @@ git init -q --bare -b main "$T/origin.git"
 git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 W="$T/work"; cd "$W" && git checkout -q -b main
 g() { git -c commit.gpgsign=false -c user.name=t -c user.email=t@t "$@"; }
-mkdir -p installers && cp "$REPO/installers/update.sh" installers/ && printf 'data/\ntmp/\n' > .gitignore
+mkdir -p installers && cp -r "$REPO/installers/update.sh" "$REPO/installers/lib" installers/ && printf 'data/\ntmp/\n' > .gitignore
 echo main-1 > VERSION && git add -A && g commit -qm main-1 && git push -q origin main
 git clone -q "$T/origin.git" "$I"
 mkdir -p "$I/data" "$I/tmp"; echo '{"port":3000}' > "$I/data/config.json"

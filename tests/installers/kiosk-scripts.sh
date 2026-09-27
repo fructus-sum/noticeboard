@@ -4,12 +4,13 @@
 # wait for the server, restart a crashed browser, and leave kiosk mode when this screen's exit
 # button asks (the claim endpoint answers {"exit":true}).
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO/tests/helpers/installer.sh"
 T=$(mktemp -d); export T
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
 bad() { fail=$((fail+1)); echo "FAIL  $1"; }
 
-( source <(sed '$d' "$REPO/installers/install.sh")
+( load_installer
   INSTALL_DIR="$T"; write_server_kiosk
   KIOSK_SCRIPT="$T/noticeboard-kiosk.sh"; SERVER_URL="http://192.168.1.10:3000"
   MACS_HTML="<tr><td>eth0</td><td>dc:a6:32:01:02:03</td></tr>"; write_display_kiosk )
