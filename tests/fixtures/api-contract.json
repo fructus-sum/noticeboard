@@ -615,6 +615,7 @@
   },
   "socket: display:settings": {
     "content": {
+      "background": "string",
       "logo": {
         "url": "string"
       },

@@ -26,7 +26,7 @@ defineProps({
 .waiting {
   width: 100%;
   height: 100%;
-  background: #000;
+  background: var(--nb-background, #000);
   display: flex;
   flex-direction: column;
   gap: clamp(20px, 4vh, 48px);

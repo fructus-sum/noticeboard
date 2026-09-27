@@ -1,7 +1,7 @@
 <script setup>
 // client/admin/src/views/SettingsView.vue — the Settings page (/admin/settings)
 //
-// One card per area, in this order: Display, MAC filtering, Logo, Change password (#password),
+// One card per area, in this order: Display, MAC filtering, Branding, Change password (#password),
 // Software updates. The settings the first two show are loaded once here (GET /settings); the
 // other cards load what they need themselves.
 //
@@ -11,7 +11,7 @@ import { ref, onMounted } from 'vue';
 import { api } from '../composables/useApi.js';
 import DisplaySettingsCard from '../components/settings/DisplaySettingsCard.vue';
 import MacFilterCard from '../components/settings/MacFilterCard.vue';
-import LogoSettings from '../components/settings/LogoSettings.vue';
+import BrandingSettings from '../components/settings/BrandingSettings.vue';
 import PasswordCard from '../components/settings/PasswordCard.vue';
 import SoftwareUpdates from '../components/updates/SoftwareUpdates.vue';
 
@@ -27,7 +27,7 @@ onMounted(async () => {
     <h1>Settings</h1>
     <DisplaySettingsCard :settings="settings" />
     <MacFilterCard :settings="settings" />
-    <LogoSettings />
+    <BrandingSettings :settings="settings" />
     <PasswordCard />
     <SoftwareUpdates />
   </div>

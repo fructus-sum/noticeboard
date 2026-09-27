@@ -742,6 +742,7 @@
       </table>
 
       <p>When you make a change in the admin panel, the display screens update automatically within seconds — no page refresh required.</p>
+      <p>Every image and video is shown whole, as large as fits the screen, in its own shape: never cut off and never stretched, whether the screen is landscape or portrait. Any space left around it (for example, at the sides of a portrait picture on a landscape screen) is filled with the background colour, black unless you choose another (see <a href="#logo" style="color:var(--blue)">Branding</a>).</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
@@ -1366,7 +1367,7 @@
       </div>
 
       <h3>What happens when no slideshows are active</h3>
-      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows the words <em>No slideshow published</em> on a black screen, with the logo above them (see <a href="#logo" style="color:var(--blue)">Logo</a>). This is not an error: publish a slideshow, or check its schedule, and the display switches to it within seconds. A black screen with only a faint pulsing dot means something else: the display can't reach the server.</p>
+      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows the words <em>No slideshow published</em> on the background colour (black unless you choose another), with the logo above them (see <a href="#logo" style="color:var(--blue)">Branding</a>). This is not an error: publish a slideshow, or check its schedule, and the display switches to it within seconds. A black screen with only a faint pulsing dot means something else: the display can't reach the server.</p>
     </div>
 
     <!-- ── 08 Ordering & Priority ── -->
@@ -1480,9 +1481,9 @@
             <td>On</td>
           </tr>
           <tr>
-            <td><strong>Logo</strong></td>
-            <td>The logo on the <em>No slideshow published</em> screen and in the admin sidebar, and whether it's shown. See <a href="#logo" style="color:var(--blue)">Logo</a>.</td>
-            <td>On, the Noticeboard logo</td>
+            <td><strong>Branding</strong></td>
+            <td>The logo on the <em>No slideshow published</em> screen and in the admin sidebar, and whether it's shown; and the background colour around slides that don't fill the screen. See <a href="#logo" style="color:var(--blue)">Branding</a>.</td>
+            <td>On, the Noticeboard logo; black</td>
           </tr>
           <tr>
             <td><strong>Change password</strong></td>
@@ -1507,13 +1508,15 @@
         </tbody>
       </table>
 
-      <h3 id="logo" style="scroll-margin-top:80px">Logo</h3>
-      <p>The <strong>Logo</strong> card in Settings sets the logo shown above <em>No slideshow published</em> on every screen when nothing is on, and above the title in the admin sidebar.</p>
+      <h3 id="logo" style="scroll-margin-top:80px">Branding</h3>
+      <p>The <strong>Branding</strong> card in Settings sets the logo and the background colour of the screens.</p>
+      <p>The <strong>logo</strong> is shown above <em>No slideshow published</em> on every screen when nothing is on, and above the title in the admin sidebar.</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
         <li><strong>Upload a logo…</strong> takes a PNG, JPEG, GIF or WebP image. If it's bigger than 500 × 500 pixels, it's scaled down, by its larger side, to fit. Its shape is kept, it's never stretched, and a smaller image is never enlarged.</li>
         <li><strong>Use the default logo</strong> goes back to the Noticeboard logo.</li>
         <li><strong>Show the logo</strong> turns it on or off, on the screens and in the sidebar together.</li>
       </ul>
+      <p>The <strong>background colour</strong> fills the screen around a slide that doesn't fill it, and behind the logo when nothing is published. Pick a colour, or type its code (<code>#</code> and six digits or letters a–f, for example <code>#000000</code> for black or <code>#ffffff</code> for white), then <strong>Save</strong>. Every screen changes within a few seconds; the logo preview shows it on the chosen colour.</p>
 
       <h3>Restarting the server service</h3>
       <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the server. Run this command on the Pi via SSH or a terminal:</p>

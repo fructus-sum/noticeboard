@@ -3,8 +3,8 @@
 // Responsibilities
 //   What GET /api/settings shows (config.json without its secrets) and what PUT /api/settings may
 //   change. Only port, macFiltering and display can be changed here; the display settings are
-//   merged, so saving one of them never drops the others. port and macFiltering are saved as sent
-//   (not validated), as they always have been.
+//   merged, so saving one of them never drops the others, and each is checked (the duration's
+//   range, the background colour's form). port and macFiltering are saved as sent (§16 #4).
 //
 // Provides
 //   publicSettings()  → config.json without passwordHash, jwtSecret and _comment
@@ -16,9 +16,12 @@
 //   routes/api/settings/general.js
 //
 // Uses
-//   configService, slideshowRules (the duration rule)
+//   configService, slideshowRules (the duration rule), shared/contract.json (the colour's form)
 const configService = require('./configService');
 const { parseSlideSeconds } = require('./slideshowRules');
+const { display: DISPLAY } = require('../../shared/contract.json');
+
+const COLOUR = new RegExp(DISPLAY.colourPattern);
 
 const HIDDEN = new Set(['passwordHash', 'jwtSecret', '_comment']);
 const CHANGEABLE = ['port', 'macFiltering', 'display'];
@@ -42,6 +45,12 @@ function mergeDisplay(current, change) {
     merged.defaultSlideDurationSeconds = seconds.value;
   }
   if (change.showDeviceInfo !== undefined) merged.showDeviceInfo = change.showDeviceInfo === true;
+  if (change.backgroundColor !== undefined) {
+    if (typeof change.backgroundColor !== 'string' || !COLOUR.test(change.backgroundColor)) {
+      return { error: 'backgroundColor must be a colour code: # and six hex digits, e.g. #000000' };
+    }
+    merged.backgroundColor = change.backgroundColor.toLowerCase();
+  }
   if (change.logo !== undefined) merged.logo = { ...current.logo, enabled: change.logo?.enabled !== false };
   return { merged };
 }

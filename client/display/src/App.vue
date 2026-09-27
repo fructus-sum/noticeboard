@@ -2,7 +2,8 @@
 // client/display/src/App.vue — the viewer: the slideshow, or the waiting screen, with the corner controls
 //
 // Responsibilities
-//   Shows SlideShow while there are slides, else WaitingScreen (the logo, or why nothing shows);
+//   Shows SlideShow while there are slides, else WaitingScreen (the logo, or why nothing shows),
+//   on the background colour chosen in Settings (the CSS variable --nb-background);
 //   the location pin (when turned on in Settings) and the exit button (kiosk only, while someone
 //   uses the mouse, keyboard or touchscreen); the nightly reload. ?kiosk=off (a screen that left
 //   kiosk mode) makes it an ordinary page: no exit button, no nightly reload.
@@ -33,7 +34,7 @@ if (kiosk) startDailyReload(() => connected.value);
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--idle': !active }">
+  <div class="app" :class="{ 'app--idle': !active }" :style="{ '--nb-background': settings.background }">
     <SlideShow v-if="hasSlides" :slides="playlist.slides" :connected="connected" />
     <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
     <DeviceInfo v-if="settings.showDeviceInfo" />
@@ -44,6 +45,7 @@ if (kiosk) startDailyReload(() => connected.value);
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html, body, #app, .app { width: 100%; height: 100%; overflow: hidden; background: #000; }
+.app { background: var(--nb-background, #000); }
 
 /* No cursor over the slideshow once the mouse has been still for a few seconds */
 .app--idle, .app--idle * { cursor: none !important; }

@@ -2,7 +2,7 @@
 //
 // A change in Settings shows in the sidebar straight away.
 // Provides: useBranding() → { logo ({ enabled, custom, url, maxSize }, or null), refreshLogo() }
-// Used by: NavBar, settings/LogoSettings
+// Used by: NavBar, settings/BrandingSettings
 // Uses: useApi (GET /settings/logo)
 import { ref } from 'vue';
 import { api } from './useApi.js';

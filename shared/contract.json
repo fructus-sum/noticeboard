@@ -9,5 +9,9 @@
   "limits": {
     "passwordMinLength": 8,
     "slideSeconds": { "min": 1, "max": 3600 }
+  },
+  "display": {
+    "defaultBackground": "#000000",
+    "colourPattern": "^#[0-9a-fA-F]{6}$"
   }
 }

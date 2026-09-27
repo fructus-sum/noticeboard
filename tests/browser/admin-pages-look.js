@@ -102,7 +102,7 @@ async function capture(c, map, prefix) {
   await c.until(`!!document.querySelector('.facts')`, 8000);
   await sleep(700);
   Object.assign(look, await capture(c, {
-    'display card': '.card', 'pin checkbox label': 'label[for=show-pin]', 'mac row': 'code', 'mac add input': 'input[placeholder="aa:bb:cc:dd:ee:ff"]',
+    'display card': '.card', 'pin checkbox label': 'label[for=show-pin]', 'updates commit code': '.facts code', 'mac add input': 'input[placeholder="aa:bb:cc:dd:ee:ff"]',
     'mac add button': 'text:button:Add', 'logo preview': '.preview', 'logo upload': '.upload', 'password card': '#password',
     'password input': '#password input', 'updates facts': '.facts', 'updates term': '.facts dt', 'updates pill': '.pill',
     'branch form input': '.row input', 'check button': 'text:button:Check branch',

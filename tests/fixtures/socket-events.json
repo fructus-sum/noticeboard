@@ -1,7 +1,7 @@
 {
   "01 connect": [
     "display:build string",
-    "display:settings {\"showDeviceInfo\":true,\"logo\":{\"url\":\"/branding/logo?v=V\"}}",
+    "display:settings {\"showDeviceInfo\":true,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\"}",
     "playlist:update (empty)"
   ],
   "02 create a slideshow": [],
@@ -25,14 +25,14 @@
     "playlist:update events:image:6"
   ],
   "09 hide the location pin": [
-    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"}}"
+    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\"}"
   ],
   "10 change the default duration": [],
   "11 upload a logo": [
-    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"}}"
+    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\"}"
   ],
   "12 turn the logo off": [
-    "display:settings {\"showDeviceInfo\":false,\"logo\":null}"
+    "display:settings {\"showDeviceInfo\":false,\"logo\":null,\"background\":\"#000000\"}"
   ],
   "13 back to the default logo": [],
   "14 unpublish": [

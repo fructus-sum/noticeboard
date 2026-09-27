@@ -1,6 +1,9 @@
 <script setup>
 // client/display/src/components/VideoSlide.vue — a video slide, played muted to the end
 //
+// As large as fits the screen, whole and in its own shape (object-fit: contain), with the viewer's
+// background colour around it.
+//
 // Props: src. Emits: ready (playback started), progress (it moved forward), ended, error (it
 // can't play: refused by the autoplay policy, or unplayable).
 // Used by: SlideFrame
@@ -55,7 +58,8 @@ onMounted(play);
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: transparent;
   display: block;
 }
 </style>

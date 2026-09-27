@@ -7,13 +7,13 @@
 //   reloads onto a new build when display:build changes (once the server answers).
 //
 // Used by: App.vue
-// Uses: socket.io-client, SOCKET_EVENTS from @shared, recovery.js (reloadSoon)
+// Uses: socket.io-client, SOCKET_EVENTS and DEFAULT_BACKGROUND from @shared, recovery.js (reloadSoon)
 //
 // Change impact
 //   The event names and payloads are a contract with the server (SYSTEM_DESIGN §3.4, §15).
 import { ref, onUnmounted } from 'vue';
 import { io } from 'socket.io-client';
-import { SOCKET_EVENTS } from '@shared/index.js';
+import { SOCKET_EVENTS, DEFAULT_BACKGROUND } from '@shared/index.js';
 import { reloadSoon } from '../recovery.js';
 
 export function useSocket() {
@@ -21,7 +21,7 @@ export function useSocket() {
   const connected = ref(false);
   const received = ref(false);   // true once the server has sent a playlist
   // This display's look, set in the admin panel: the location pin and the logo
-  const settings = ref({ showDeviceInfo: true, logo: null });
+  const settings = ref({ showDeviceInfo: true, logo: null, background: DEFAULT_BACKGROUND });
 
   // Reconnects on its own after any outage, retrying every 2–10 s for as long as it takes
   const socket = io({
@@ -47,7 +47,11 @@ export function useSocket() {
   });
 
   socket.on(SOCKET_EVENTS.DISPLAY_SETTINGS, (data) => {
-    settings.value = { showDeviceInfo: data?.showDeviceInfo !== false, logo: data?.logo ?? null };
+    settings.value = {
+      showDeviceInfo: data?.showDeviceInfo !== false,
+      logo: data?.logo ?? null,
+      background: data?.background || DEFAULT_BACKGROUND,
+    };
   });
 
   // The server sends its display build on every connect. If it changes (the Pi was
