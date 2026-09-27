@@ -609,9 +609,9 @@ noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
 | socket.io / socket.io-client | realtime/displaySocket.js / useSocket.js | real-time channel |
 | winston | logger | logging |
 | vue, vue-router | client apps | UI |
-| **cors** | **nothing** | unused (to be removed: §18.3) |
+| **cors** | **nothing** | unused (to be removed: §18.2) |
 
-Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the build): `vite`, `@vitejs/plugin-vue` (the client builds). **Unused:** `nodemon` (server) and `concurrently` (root), to be removed (§18.3).
+Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the build): `vite`, `@vitejs/plugin-vue` (the client builds). **Unused:** `nodemon` (server) and `concurrently` (root), to be removed (§18.2).
 
 ### 11.2 System programs
 
@@ -1080,7 +1080,7 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 2. **The server kiosk URL is hard-coded to port 3000.** Changing `config.port` would break the server Pi's own screen until the kiosk script is edited.
 3. **An empty client IP counts as this Pi itself** in the MAC filter (D6).
 4. **`PUT /api/settings` does not validate `port` or the `macFiltering` shape.** A bad value is saved as it is. A port change takes effect only after a restart.
-5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.3).
+5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.2).
 6. The media route allows audio extensions (`.mp3 .wav .ogg`) that nothing produces.
 7. The admin panel ignores reorder errors (`.catch(() => {})`), so the order shown can differ from what was saved.
 8. `configService.init` **regenerates the defaults when `config.json` doesn't parse**. The admin password, the MAC list and the slideshow list are then lost from the config, although their folders remain.
@@ -1125,17 +1125,12 @@ Every planned change starts here, before any code: what changes and why, the par
 
 | # | Change | Status |
 |---|---|---|
-| 18.1 | Merge `refactor/architecture` into `main` | Waiting: the server Pi follows the branch for about a day first |
-| 18.2 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
-| 18.3 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
+| 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
+| 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
 
-### 18.1 Merge `refactor/architecture` into `main`
+### 18.1 The viewer's black screen that only a power cycle cleared
 
-A pull request, merged with a merge commit. Each Pi's update.sh then sees the branch's work in `main` and goes back to following `main` by itself (§9.1, the merged-branch return), with the "merged into main" notice; the code it runs doesn't change. The branch is deleted on GitHub afterwards, with the owner's OK. This entry is removed from `main` once merged.
-
-### 18.2 The viewer's black screen that only a power cycle cleared
-
-**What was seen (on `main`):** the slides went black while the location pin still showed; slideshow changes no longer reached that screen; the Pi's own keyboard and mouse stopped responding, even unplugged and plugged back in; the server and the viewer still worked from other devices; only a power cycle brought the screen back. The code involved is the same on this branch, so it has to be assumed to be present here too.
+**What was seen (on an earlier version):** the slides went black while the location pin still showed; slideshow changes no longer reached that screen; the Pi's own keyboard and mouse stopped responding, even unplugged and plugged back in; the server and the viewer still worked from other devices; only a power cycle brought the screen back. The code involved hasn't changed since, so it has to be assumed to be still present.
 
 **What that points to:** the page's own recovery can't be the whole story: a slide that stops is skipped within 30 seconds (the slide clock, §3.5), and a stuck page reloads itself (`recovery.js`). Dead input devices mean something below the page stopped: the desktop compositor (labwc) or the graphics driver, which Chromium (and its hardware video decoding) depends on. Screen blanking is less likely, because the pin was still visible.
 
@@ -1158,6 +1153,6 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 **Step 3, prevention:** chosen from what the logs show (e.g. Chromium's graphics or video-decoding flags, or a driver setting). The exact design of steps 2 and 3 is written here, and reviewed, before any code.
 
-### 18.3 Remove the unused npm packages
+### 18.2 Remove the unused npm packages
 
 Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Pi's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
