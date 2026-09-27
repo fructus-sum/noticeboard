@@ -8,7 +8,7 @@ import DeviceInfo from './components/DeviceInfo.vue';
 import ExitKiosk from './components/ExitKiosk.vue';
 import { startDailyReload } from './recovery.js';
 
-const { playlist, connected, received } = useSocket();
+const { playlist, connected, received, settings } = useSocket();
 const { active } = useActivity();
 const hasSlides = computed(() => playlist.value.slides.length > 0);
 
@@ -19,10 +19,10 @@ if (kiosk) startDailyReload(() => connected.value);
 </script>
 
 <template>
-  <div class="app">
+  <div class="app" :class="{ 'app--idle': !active }">
     <SlideShow v-if="hasSlides" :slides="playlist.slides" :connected="connected" />
-    <WaitingScreen v-else :connected="connected" :received="received" />
-    <DeviceInfo />
+    <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
+    <DeviceInfo v-if="settings.showDeviceInfo" />
     <ExitKiosk v-if="kiosk" :visible="active" />
   </div>
 </template>
@@ -30,4 +30,7 @@ if (kiosk) startDailyReload(() => connected.value);
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html, body, #app, .app { width: 100%; height: 100%; overflow: hidden; background: #000; }
+
+/* No cursor over the slideshow once the mouse has been still for a few seconds */
+.app--idle, .app--idle * { cursor: none !important; }
 </style>

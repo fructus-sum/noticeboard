@@ -3,12 +3,23 @@ const { lanInterfaces } = require('../../utils/networkInfo');
 
 const router = express.Router();
 
-// IP addresses and port for the display's info pop-up. MAC addresses are admin-only (see settings).
+const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
+
+// The address a request came from or arrived at, without IPv4-in-IPv6 wrapping
+function plainAddress(address = '') {
+  return address.replace(/^::ffff:/, '');
+}
+
+// This server's IP addresses and port, for the display's location pin: how to reach the
+// Noticeboard server from another device. They're the server's own addresses (never the
+// viewing device's), and the one this display used to reach the server comes first.
+// MAC addresses are admin-only (see settings).
 router.get('/', (req, res) => {
-  res.json({
-    port: req.socket.localPort,
-    addresses: lanInterfaces().map(({ name, ip }) => ({ name, ip })),
-  });
+  const used = plainAddress(req.socket.localAddress);
+  const addresses = lanInterfaces()
+    .map(({ name, ip }) => ({ name, ip }))
+    .sort((a, b) => (b.ip === used) - (a.ip === used));
+  res.json({ port: req.socket.localPort, addresses });
 });
 
 // ── Leaving kiosk mode on one screen ──────────────────────────────────────────
@@ -16,13 +27,12 @@ router.get('/', (req, res) => {
 // request (it checks every few seconds) and closes its full-screen browser. Requests are kept
 // per device (by IP address, with every loopback address counting as the server itself), so a
 // screen can only ever affect itself, never the server or other displays.
-const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
 const EXIT_REQUEST_MS = 60 * 1000;
 const exitRequests = new Map();   // device -> expiry time
 
 function deviceOf(req) {
   const address = req.socket.remoteAddress || '';
-  return LOOPBACK.test(address) ? 'this-server' : address.replace(/^::ffff:/, '');
+  return LOOPBACK.test(address) ? 'this-server' : plainAddress(address);
 }
 
 router.post('/kiosk-exit', (req, res) => {

@@ -18,10 +18,19 @@ function updateStatusPath() { return path.join(dataDir(), 'update-status.json');
 function updateCheckPath() { return path.join(dataDir(), 'update-check.json'); }
 function updateNoticePath() { return path.join(dataDir(), 'update-notice.json'); }
 function updateRequestPath() { return path.join(ROOT, 'tmp', 'update-request'); }
+// What install.sh set up: the version of its last run, and the server Pi's kiosk script
+function installerRecordPath() { return path.join(dataDir(), 'installer.json'); }
+function serverKioskPath() { return path.join(ROOT, 'start-kiosk.sh'); }
+function requirementsPath() { return path.join(ROOT, 'system-requirements.json'); }
 // Where install.sh puts the systemd units; NOTICEBOARD_SYSTEMD_DIR points elsewhere for tests
 function systemdDir() { return process.env.NOTICEBOARD_SYSTEMD_DIR || '/etc/systemd/system'; }
 function tmpDir() { return path.join(ROOT, 'tmp', 'noticeboard-uploads'); }
 function sampleDataDir() { return path.join(ROOT, 'sample-data'); }
+// The logo shown when nothing is published and in the admin sidebar: the admin's upload,
+// else the placeholder that ships with the app
+function brandingDir() { return path.join(dataDir(), 'branding'); }
+function logoPath() { return path.join(brandingDir(), 'logo.png'); }
+function defaultLogoPath() { return path.join(sampleDataDir(), 'sample-logo.png'); }
 
 function mediaUrl(folderName, filename) { return `/media/${folderName}/slides/${filename}`; }
 function audioUrl(folderName) { return `/media/${folderName}/audio.mp3`; }
@@ -43,9 +52,15 @@ module.exports = {
   updateCheckPath,
   updateNoticePath,
   updateRequestPath,
+  installerRecordPath,
+  serverKioskPath,
+  requirementsPath,
   systemdDir,
   tmpDir,
   sampleDataDir,
+  brandingDir,
+  logoPath,
+  defaultLogoPath,
   mediaUrl,
   audioUrl,
 };

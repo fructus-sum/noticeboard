@@ -21,6 +21,10 @@ BRANCH_FILE="$INSTALL_DIR/data/update-branch.env"   # the branch chosen in the a
 KIOSK_SCRIPT="/usr/local/bin/noticeboard-kiosk.sh"
 AUTOSTART_FILE="/etc/xdg/autostart/noticeboard-kiosk.desktop"
 SUDOERS_BACKUP_DIR="/root/noticeboard-sudoers-backup"
+# Raise this, and "installer" in system-requirements.json, whenever this script changes what
+# updates can't: kiosk scripts, system services, desktop shortcuts or system packages. A server
+# Pi whose last installer run (data/installer.json) is older is told to run it again.
+INSTALLER_VERSION=2
 
 # Everything runs from main(), called on the last line, so a half-downloaded
 # script (curl | bash) runs nothing.
@@ -54,6 +58,7 @@ main() {
   fi
   if [ "$MODE" = server ]; then
     choose_branch
+    use_branch_installer "$@"
   fi
   if [ "$MODE" = display ]; then
     ask_server_url
@@ -75,33 +80,83 @@ main() {
 }
 
 # ── Latest installer ──────────────────────────────────────────────────────────
-# Whatever copy was started (an old one on the Pi, or GitHub's main/ link, which can
-# serve a stale copy for a few minutes after a push), switch to the installer from
-# main's latest commit. A link pinned to a commit is never stale. If GitHub can't be
-# reached, carry on with this copy. To run a local copy as it is (e.g. to test changes):
+# Whatever copy was started (an old one on the Pi, or a GitHub link, which can serve a
+# stale copy for a few minutes after a push), switch to the latest installer of the
+# branch this Pi follows (Settings → Software updates), else main's, so what it sets up
+# matches the version it installs. A branch whose installer is older than this falls back
+# to main's. A link pinned to a commit is never stale. If GitHub can't be reached, carry
+# on with this copy. To run a local copy as it is (e.g. to test changes):
 #   sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh
 use_latest_installer() {
   if [ -n "${NOTICEBOARD_INSTALLER_SHA:-}" ]; then
     return 0
   fi
-  local sha file
+  local branch
+  branch=$(followed_branch)
+  if [ "$branch" != main ]; then
+    run_installer_from "$branch" "$@" \
+      || echo "The installer from $branch can't be used ($INSTALLER_PROBLEM), so this uses main's."
+  fi
+  run_installer_from main "$@" || echo "${INSTALLER_PROBLEM^}; carrying on with this one."
+}
+
+# Download <branch>'s latest installer and run it instead of this one. Only returns if it
+# can't, with the reason in INSTALLER_PROBLEM.
+INSTALLER_PROBLEM=""
+run_installer_from() {   # run_installer_from <branch> <arguments...>
+  local branch=$1 sha file
+  shift
   if ! sha=$(curl -fsSL --max-time 20 -H 'Accept: application/vnd.github.sha' \
-               "https://api.github.com/repos/$GITHUB_REPO/commits/main") \
+               "https://api.github.com/repos/$GITHUB_REPO/commits/$branch") \
      || [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "Couldn't check GitHub for a newer installer; carrying on with this one."
-    return 0
+    INSTALLER_PROBLEM="couldn't check GitHub for a newer installer"
+    return 1
   fi
   file=$(mktemp /tmp/noticeboard-install.XXXXXX)
   if ! curl -fsSL --max-time 60 -o "$file" \
          "https://raw.githubusercontent.com/$GITHUB_REPO/$sha/installers/install.sh" \
      || ! bash -n "$file"; then
     rm -f "$file"
-    echo "Couldn't download the latest installer; carrying on with this one."
+    INSTALLER_PROBLEM="couldn't download the latest installer"
+    return 1
+  fi
+  # A branch's own installer only if it knows to follow branches (else it would hand back to main's)
+  if [ "$branch" != main ] && ! grep -q '^INSTALLER_VERSION=' "$file"; then
+    rm -f "$file"
+    INSTALLER_PROBLEM="it's too old"
+    return 1
+  fi
+  if [ "$branch" = main ]; then
+    echo "Running the latest installer (${sha:0:7})..."
+  else
+    echo "Running the latest installer from $branch (${sha:0:7})..."
+  fi
+  export NOTICEBOARD_INSTALLER_SHA="$sha" NOTICEBOARD_INSTALLER_BRANCH="$branch"
+  exec bash "$file" "$@"
+}
+
+# The installer came from the branch this Pi followed. If the answer to the branch question
+# was another branch, hand over to that branch's installer, with the answers so far.
+use_branch_installer() {
+  local from=${NOTICEBOARD_INSTALLER_BRANCH:-}
+  if [ -z "$from" ] || [ "$from" = "$INSTALL_BRANCH" ] || [ "${NOTICEBOARD_INSTALLER_SHA:-}" = local ]; then
     return 0
   fi
-  echo "Running the latest installer (${sha:0:7})..."
-  export NOTICEBOARD_INSTALLER_SHA="$sha"
-  exec bash "$file" "$@"
+  export NOTICEBOARD_MODE="$MODE" NOTICEBOARD_INSTALL_BRANCH="$INSTALL_BRANCH"
+  run_installer_from "$INSTALL_BRANCH" "$@" \
+    || echo "The installer from $INSTALL_BRANCH can't be used ($INSTALLER_PROBLEM), so this one carries on."
+  unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH
+}
+
+# The branch this Pi follows (Settings → Software updates), or main
+followed_branch() {
+  local branch
+  branch=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true)
+  if [[ "$branch" =~ ^[A-Za-z0-9._/-]{1,100}$ ]]; then
+    echo "$branch"
+  else
+    echo main
+  fi
 }
 
 # ── Questions ─────────────────────────────────────────────────────────────────
@@ -110,6 +165,10 @@ has_tty() { { true </dev/tty; } 2>/dev/null; }
 ask() { read -rp "$1" REPLY </dev/tty; }
 
 choose_mode() {
+  # Already answered, when the installer handed over to another branch's (use_branch_installer)
+  case "${NOTICEBOARD_MODE:-}" in
+    server|display) MODE=$NOTICEBOARD_MODE; return ;;
+  esac
   # Default to whatever this Pi already runs, so a re-run only needs Enter
   local default=""
   if [ -d "$INSTALL_DIR/.git" ]; then
@@ -155,6 +214,11 @@ ask_server_url() {
 INSTALL_BRANCH=main
 
 choose_branch() {
+  # Already answered (use_branch_installer)
+  if [[ "${NOTICEBOARD_INSTALL_BRANCH:-}" =~ ^[A-Za-z0-9._/-]{1,100}$ ]]; then
+    INSTALL_BRANCH=$NOTICEBOARD_INSTALL_BRANCH
+    return
+  fi
   local current
   current=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true)
   if [ -z "$current" ] || [ "$current" = main ]; then
@@ -413,12 +477,11 @@ ENV
   write_server_kiosk
   chmod +x "$INSTALL_DIR/start-kiosk.sh"
   write_autostart "$INSTALL_DIR/start-kiosk.sh"
+  # The guide ships with the app, so the shortcut works even while the server is down
+  write_help_shortcut "file://$INSTALL_DIR/noticeboard-guide.html"
 
   # Fix ownership
   chown -R "$DESKTOP_USER:$DESKTOP_USER" "$INSTALL_DIR"
-
-  # ── Optional: hide mouse cursor ─────────────────────────────────────────────
-  apt-get install -y -qq unclutter 2>/dev/null || true
 
   # ── Auto-update ─────────────────────────────────────────────────────────────
   echo "▸ Installing auto-update timer..."
@@ -427,6 +490,20 @@ ENV
   systemctl enable --now "${SERVICE_NAME}-update.timer" --quiet
   systemctl enable --now "${SERVICE_NAME}-update.path" --quiet
   echo "  Checks GitHub for updates every 15 minutes, and straight away after a branch switch."
+
+  write_installer_record
+}
+
+# What this installer run set up, so the admin panel can tell when a newer version needs the
+# installer run again (see "installer" in system-requirements.json). Written last: a run that
+# stopped part way doesn't count.
+write_installer_record() {
+  local commit
+  commit=$(git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
+  printf '{"version":%s,"branch":"%s","commit":"%s","time":"%s"}\n' \
+    "$INSTALLER_VERSION" "$INSTALL_BRANCH" "$commit" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    > "$INSTALL_DIR/data/installer.json"
+  chown "$DESKTOP_USER:$DESKTOP_USER" "$INSTALL_DIR/data/installer.json" 2>/dev/null || true
 }
 
 # Download a branch from GitHub, as the install folder's owner
@@ -523,9 +600,6 @@ wait_for_server
 xset s off    2>/dev/null || true
 xset -dpms    2>/dev/null || true
 xset s noblank 2>/dev/null || true
-
-# Hide the mouse cursor after 1 second of inactivity (requires unclutter)
-command -v unclutter >/dev/null 2>&1 && unclutter -idle 1 -root &
 
 # The exit button in the viewer's top-right corner asks the server; the answer is for this
 # device only, so other screens are never affected
@@ -638,7 +712,6 @@ install_display() {
   update_system
   echo "▸ Installing packages..."
   apt-get install -y -qq "$(chromium_package)" curl
-  apt-get install -y -qq unclutter 2>/dev/null || true
 
   # ── Kiosk wrapper script ────────────────────────────────────────────────────
   echo "▸ Installing kiosk script..."
@@ -659,6 +732,8 @@ install_display() {
   # ── XDG autostart ───────────────────────────────────────────────────────────
   echo "▸ Installing autostart entry..."
   write_autostart "$KIOSK_SCRIPT"
+  # The server serves the guide at /admin/help, with no login
+  write_help_shortcut "$SERVER_URL/admin/help"
 }
 
 write_display_kiosk() {
@@ -689,7 +764,6 @@ FLAGS=(--noerrdialogs --disable-infobars --disable-session-crashed-bubble
 xset s off    2>/dev/null || true
 xset -dpms    2>/dev/null || true
 xset s noblank 2>/dev/null || true
-command -v unclutter >/dev/null 2>&1 && unclutter -idle 1 -root &
 
 # The local page shown until the server answers: this Pi's MAC address and why it's waiting.
 # It reloads itself every 10 s, so rewriting the file changes what's on screen.
@@ -1158,6 +1232,33 @@ Exec=$1
 Type=Application
 X-GNOME-Autostart-enabled=true
 DESK
+}
+
+# A "Noticeboard Help" shortcut on the desktop user's desktop, opening the user guide in the
+# browser. Nothing needs logging in to read it.
+write_help_shortcut() {   # write_help_shortcut <url>
+  local home desktop file
+  home=$(getent passwd "$DESKTOP_USER" 2>/dev/null | cut -d: -f6) || true
+  if [ -z "$home" ] || [ ! -d "$home" ]; then
+    return 0
+  fi
+  desktop=$(runuser -u "$DESKTOP_USER" -- xdg-user-dir DESKTOP 2>/dev/null || true)
+  if [ -z "$desktop" ] || [ "$desktop" = "$home" ]; then
+    desktop="$home/Desktop"
+  fi
+  mkdir -p "$desktop"
+  file="$desktop/noticeboard-help.desktop"
+  cat > "$file" <<DESK
+[Desktop Entry]
+Type=Link
+Name=Noticeboard Help
+Comment=The Noticeboard user guide
+Icon=help-browser
+URL=$1
+DESK
+  chown "$DESKTOP_USER:" "$desktop" "$file" 2>/dev/null || true
+  chmod 755 "$file"
+  echo "  Added a Noticeboard Help shortcut to the desktop."
 }
 
 main "$@"; exit

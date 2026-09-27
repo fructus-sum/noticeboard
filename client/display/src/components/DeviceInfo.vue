@@ -49,8 +49,8 @@ onUnmounted(() => {
   <button
     type="button"
     class="info-button"
-    aria-label="Show device address"
-    title="Show device address"
+    aria-label="Show the Noticeboard server's address"
+    title="Show the Noticeboard server's address"
     @click="toggle"
   >
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -60,7 +60,7 @@ onUnmounted(() => {
 
   <div v-if="open" class="info-popup" role="dialog" aria-labelledby="info-title">
     <button type="button" class="info-close" aria-label="Close" @click="close">×</button>
-    <h2 id="info-title" class="info-title">Device address</h2>
+    <h2 id="info-title" class="info-title">Noticeboard server</h2>
 
     <p v-if="error" class="info-message">{{ error }}</p>
     <p v-else-if="!info" class="info-message">Loading…</p>
@@ -74,6 +74,10 @@ onUnmounted(() => {
         <dt>Port</dt>
         <dd>{{ info.port }}</dd>
       </dl>
+      <p v-if="info.addresses.length" class="info-hint">
+        From another device on this network, open <strong>http://{{ info.addresses[0].ip }}:{{ info.port }}</strong>
+        (add <strong>/admin</strong> for the admin panel).
+      </p>
     </template>
   </div>
 </template>
@@ -156,6 +160,14 @@ onUnmounted(() => {
   margin-bottom: clamp(10px, 1.6vw, 20px);
 }
 .info-list dd:last-child { margin-bottom: 0; }
+
+.info-hint {
+  margin-top: clamp(12px, 2vw, 24px);
+  font-size: clamp(14px, 1.6vw, 20px);
+  color: #d1d5db;
+  line-height: 1.5;
+}
+.info-hint strong { color: #fff; font-weight: 600; }
 
 .info-message {
   font-size: clamp(16px, 2vw, 24px);

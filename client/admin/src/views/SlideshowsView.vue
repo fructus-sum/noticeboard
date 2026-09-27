@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
 import UpdateNotice from '../components/UpdateNotice.vue';
+import InstallerNotice from '../components/InstallerNotice.vue';
 
 const router = useRouter();
 const slideshows = ref([]);
@@ -19,6 +20,26 @@ const deletingFolder = ref(null);
 
 // Publish / disable toggle
 const togglingFolder = ref(null);
+
+// Hidden slideshows: kept exactly as they are, just out of the list until shown
+const showHidden = ref(false);
+const hiddenCount = computed(() => slideshows.value.filter(s => s.hidden).length);
+const visible = computed(() => slideshows.value.filter(s => !s.hidden || showHidden.value));
+const hidingFolder = ref(null);
+
+async function setHidden(ss, hidden) {
+  hidingFolder.value = ss.folder;
+  try {
+    const updated = await api.put(`/slideshows/${ss.folder}`, { hidden });
+    const idx = slideshows.value.findIndex(s => s.folder === ss.folder);
+    if (idx !== -1) slideshows.value[idx] = { ...slideshows.value[idx], hidden: updated.hidden === true };
+    if (!hiddenCount.value) showHidden.value = false;
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    hidingFolder.value = null;
+  }
+}
 
 // This Pi's IP and MAC addresses, shown above the list
 const device = ref(null);
@@ -88,6 +109,7 @@ onMounted(loadDevice);
 <template>
   <div>
     <UpdateNotice />
+    <InstallerNotice />
 
     <div
       v-if="device?.interfaces?.length"
@@ -102,15 +124,15 @@ onMounted(loadDevice);
       </span>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:20px">
       <h1 style="margin:0">Slideshows</h1>
       <button class="btn-primary" @click="showCreate = !showCreate">+ New slideshow</button>
     </div>
 
     <div v-if="showCreate" class="card" style="margin-bottom:16px">
       <h2>New slideshow</h2>
-      <form @submit.prevent="create" style="display:flex;gap:8px;align-items:flex-end">
-        <div class="field" style="flex:1;margin:0">
+      <form @submit.prevent="create" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="flex:1 1 200px;margin:0">
           <label for="ss-name">Name</label>
           <input id="ss-name" v-model="newName" type="text" placeholder="e.g. Main notices" autofocus />
         </div>
@@ -127,10 +149,13 @@ onMounted(loadDevice);
     <p v-if="!slideshows.length && !error" style="color:var(--text-muted)">
       No slideshows yet. Create one above.
     </p>
+    <p v-else-if="!visible.length && !error" style="color:var(--text-muted)">
+      Every slideshow is hidden. Use "Show hidden slideshows" below to see them.
+    </p>
 
-    <div v-for="ss in slideshows" :key="ss.folder" class="card" style="display:flex;align-items:center;gap:12px">
-      <div style="flex:1;cursor:pointer" @click="router.push(`/slideshows/${ss.folder}`)">
-        <div style="display:flex;align-items:center;gap:8px">
+    <div v-for="ss in visible" :key="ss.folder" class="card ss-row" :class="{ 'card--hidden': ss.hidden }">
+      <div class="ss-info" @click="router.push(`/slideshows/${ss.folder}`)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-weight:600">{{ ss.name }}</span>
           <span
             :style="{
@@ -145,6 +170,8 @@ onMounted(loadDevice);
               textTransform: 'uppercase',
             }"
           >{{ ss.enabled !== false ? 'Published' : 'Disabled' }}</span>
+          <span v-if="ss.hidden" class="tag">Hidden</span>
+          <span v-if="ss.sample" class="tag" title="Shows what the noticeboard can do. It's updated with new examples when the software is updated.">Sample</span>
         </div>
         <div style="color:var(--text-muted);font-size:12px;margin-top:2px">
           {{ ss.slideCount }} slide{{ ss.slideCount !== 1 ? 's' : '' }} &nbsp;·&nbsp;
@@ -153,8 +180,11 @@ onMounted(loadDevice);
         </div>
       </div>
 
-      <!-- Publish / Disable toggle -->
+      <!-- Buttons wrap onto another line on a narrow screen, making the card taller -->
+      <div class="ss-actions">
+      <!-- Publish / Disable toggle (a hidden slideshow is unhidden first) -->
       <button
+        v-if="!ss.hidden"
         :style="{
           fontSize: '12px',
           padding: '5px 12px',
@@ -176,11 +206,51 @@ onMounted(loadDevice);
         @click="router.push(`/slideshows/${ss.folder}`)"
       >Manage</button>
       <button
+        v-if="ss.hidden"
+        class="btn-ghost"
+        style="font-size:12px;padding:5px 10px"
+        :disabled="hidingFolder === ss.folder"
+        @click="setHidden(ss, false)"
+      >Unhide</button>
+      <button
+        v-else
+        class="btn-ghost"
+        style="font-size:12px;padding:5px 10px"
+        :disabled="hidingFolder === ss.folder || ss.enabled !== false"
+        :title="ss.enabled !== false ? 'Only unpublished slideshows can be hidden: disable it first' : 'Hide it from this list, keeping it exactly as it is'"
+        @click="setHidden(ss, true)"
+      >Hide</button>
+      <button
         class="btn-danger"
         style="font-size:12px;padding:5px 10px"
-        :disabled="deletingFolder === ss.folder"
+        :disabled="deletingFolder === ss.folder || ss.sample"
+        :title="ss.sample ? 'The sample slideshow can’t be deleted. You can hide it instead.' : ''"
         @click="remove(ss.folder)"
       >Delete</button>
+      </div>
     </div>
+
+    <button v-if="hiddenCount" class="btn-ghost" style="font-size:12px;padding:5px 10px" @click="showHidden = !showHidden">
+      {{ showHidden ? 'Hide hidden slideshows' : `Show hidden slideshows (${hiddenCount})` }}
+    </button>
   </div>
 </template>
+
+<style scoped>
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.card--hidden { opacity: 0.7; border-style: dashed; }
+.ss-row { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
+.ss-info { flex: 1 1 220px; min-width: 0; cursor: pointer; }
+.ss-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+</style>

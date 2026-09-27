@@ -1,0 +1,4 @@
+{
+  "_comment": "Settings of the Sample slideshow. Changes here, like changes to the sample files, reach installed noticeboards at their next update (see server/services/sampleSlideshow.js).",
+  "slideDurationSeconds": 3
+}

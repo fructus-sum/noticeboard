@@ -4,8 +4,10 @@ const fs = require('fs/promises');
 const path = require('path');
 const {
   ROOT, updateBranchPath, updateStatusPath, updateCheckPath, updateNoticePath, updateRequestPath, systemdDir,
+  installerRecordPath, serverKioskPath, requirementsPath,
 } = require('../utils/pathHelpers');
 const logger = require('../utils/logger');
+const { checkRequirements } = require('../utils/systemCheck');
 
 // Software updates: which GitHub branch this noticeboard follows, and switching to another.
 // installers/update.sh does the updating (a systemd service, set up by install.sh). This side
@@ -183,7 +185,63 @@ async function checkBranch(name) {
     throw userError(422, `"${name}" can't be used: it's older than branch switching, so this noticeboard couldn't be switched back from the admin panel.`);
   }
   const [subject = '', date = ''] = (await git(['log', '-1', '--format=%s%x00%cI', commit])).split('\0');
-  return { branch: name, commit, subject, date };
+  return { branch: name, commit, subject, date, ...(await requirementsOf(commit)) };
+}
+
+// Checks this noticeboard's software against the branch's system-requirements.json
+// (requirements: { listed: false } for a branch without one: it can't be checked), and
+// whether the branch needs the installer run again here
+async function requirementsOf(commit) {
+  const text = await git(['show', `${commit}:system-requirements.json`]).catch(() => null);
+  if (!text) return { requirements: { listed: false }, installer: installerNeeds(null, null) };
+  try {
+    const list = JSON.parse(text);
+    const [checked, installed] = await Promise.all([checkRequirements(list), installedInstallerVersion()]);
+    return { requirements: { listed: true, ...checked }, installer: installerNeeds(list, installed) };
+  } catch {
+    return { requirements: { listed: false, unreadable: true }, installer: installerNeeds(null, null) };
+  }
+}
+
+// ── The installer ─────────────────────────────────────────────────────────────
+// Updates can't change what only install.sh sets up: kiosk scripts, system services, desktop
+// shortcuts, system packages. A version's system-requirements.json says which installer
+// version it needs; install.sh records the version of each run in data/installer.json.
+
+// The version of the installer that last ran on this noticeboard. Installers from before the
+// record are told apart by the kiosk script they wrote (version 1 added the exit button).
+// null: not set up by the installer (e.g. a development copy), so there's nothing to say.
+async function installedInstallerVersion() {
+  const record = await readJson(installerRecordPath());
+  if (Number.isInteger(record?.version)) return record.version;
+  const kiosk = await fs.readFile(serverKioskPath(), 'utf8').catch(() => null);
+  if (kiosk === null) return null;
+  return kiosk.includes('kiosk-exit') ? 1 : 0;
+}
+
+// What running the installer again brings, for a version with system-requirements.json <list>:
+// needed when the last run here is older than the version it asks for
+function installerNeeds(list, installed) {
+  const required = Number.isInteger(list?.installer?.version) ? list.installer.version : 0;
+  const needed = installed !== null && installed < required;
+  const changes = !needed ? [] : (Array.isArray(list.installer.changes) ? list.installer.changes : [])
+    .filter((c) => Number.isInteger(c?.version) && c.version > installed && c.version <= required);
+  return {
+    required,
+    installed,
+    needed,
+    changes: changes.map((c) => String(c.change || '')).filter(Boolean),
+    displays: changes.some((c) => c.displays === true),   // remote display Pis need it too
+  };
+}
+
+// For the admin home page: whether this noticeboard's version needs the installer run again,
+// and the branch to run it from (the one this noticeboard follows)
+async function installerStatus() {
+  const [list, installed, branch] = await Promise.all([
+    readJson(requirementsPath()), installedInstallerVersion(), configuredBranch(),
+  ]);
+  return { ...installerNeeds(list, installed), branch };
 }
 
 // One-time proof that the admin password was checked, for the final confirmation
@@ -206,7 +264,7 @@ function takeToken(token, branch) {
 
 // Save the new branch for this and all future updates, and ask update.sh to install it now.
 // If anything can't be saved, everything is put back as it was.
-async function requestSwitch(name, by) {
+async function requestSwitch(name, by, { acceptMissing = false } = {}) {
   const info = await getInfo();
   if (!info.available) throw userError(409, info.reason);
   if (!info.autoUpdates && !info.instant) {
@@ -217,6 +275,11 @@ async function requestSwitch(name, by) {
     throw userError(409, `This noticeboard already uses ${name}.`);
   }
   const target = await checkBranch(name);   // again: the branch may have changed since it was checked
+  // Software the branch needs but this noticeboard lacks: only with the admin's extra confirmation
+  const missing = target.requirements.listed ? target.requirements.results.filter((r) => !r.ok) : [];
+  if (missing.length && !acceptMissing) {
+    throw userError(409, `This noticeboard is missing software ${name} needs: ${missing.map((r) => r.name).join(', ')}. Install it first, or confirm that you want to switch anyway.`);
+  }
 
   const when = info.instant ? 'It starts within a few seconds.' : 'It starts at the next update check, within 15 minutes.';
   const status = {
@@ -242,7 +305,7 @@ async function requestSwitch(name, by) {
     logger.error('Could not save a branch switch', { err: err.message });
     throw userError(500, "Couldn't save the new branch, so nothing was changed.");
   }
-  logger.warn('Branch switch requested', { from: info.branch, to: name, target: target.commit, by });
+  logger.warn('Branch switch requested', { from: info.branch, to: name, target: target.commit, by, missingSoftware: missing.map((r) => r.name) });
   return getInfo();
 }
 
@@ -251,6 +314,8 @@ module.exports = {
   versionInfo,
   getNotice,
   dismissNotice,
+  installerStatus,
+  installerNeeds,
   listBranches,
   checkBranch,
   validBranchName,

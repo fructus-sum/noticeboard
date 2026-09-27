@@ -6,10 +6,11 @@ const path = require('path');
 const { writeConfig } = require('../../utils/configIO');
 const { slideshowJsonPath, slidesDir, tmpDir } = require('../../utils/pathHelpers');
 const { typeFromMime, IMAGE_MIME, VIDEO_MIME } = require('../../services/mediaService');
-const { enqueueProcessing, queueSize } = require('../../services/uploadQueue');
+const { enqueueProcessing, enqueueThumbnail, queueSize } = require('../../services/uploadQueue');
 const configService = require('../../services/configService');
 const logger = require('../../utils/logger');
 const { withSlideshowLock } = require('../../utils/slideshowLock');
+const { broadcastPlaylist } = require('../../socket');
 
 const router = express.Router({ mergeParams: true });
 
@@ -110,15 +111,42 @@ router.delete('/:id', async (req, res, next) => {
     });
     if (!slide) return res.status(404).json({ error: 'Slide not found' });
 
-    // Delete the media file if it exists
-    if (slide.filename) {
-      const filePath = path.join(slidesDir(folder), slide.filename);
+    // Delete the media file (and a video's thumbnail) if they exist
+    for (const name of [slide.filename, slide.thumbnail]) {
+      if (!name) continue;
+      const filePath = path.join(slidesDir(folder), name);
       if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
     }
 
     configService.emit('change');
+    broadcastPlaylist();   // displays drop it once the slide on screen has had its time
     logger.info('Slide deleted', { folder, id });
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/slideshows/:folder/slides/thumbnails
+// Creates the missing thumbnails of this slideshow's videos, from a frame the server picks
+router.post('/thumbnails', async (req, res, next) => {
+  try {
+    const { folder } = req.params;
+    const missing = await withSlideshowLock(folder, async () => {
+      const data = readSlideshowJson(folder);
+      const videos = data.slides.filter((s) => s.type === 'video' && s.status === 'ready' && s.filename
+        && !s.thumbnailPending && !(s.thumbnail && fs.existsSync(path.join(slidesDir(folder), s.thumbnail))));
+      for (const s of videos) {
+        s.thumbnailPending = true;
+        delete s.thumbnail;
+        delete s.thumbnailError;
+      }
+      if (videos.length) await writeConfig(slideshowJsonPath(folder), data);
+      return videos;
+    });
+    for (const s of missing) enqueueThumbnail({ folder, slideId: s.id, filename: s.filename });
+    logger.info('Missing video thumbnails queued', { folder, count: missing.length });
+    res.status(202).json({ queued: missing.length });
   } catch (err) {
     next(err);
   }
@@ -146,6 +174,7 @@ router.put('/reorder', async (req, res, next) => {
       return slides;
     });
     configService.emit('change');
+    broadcastPlaylist();   // the new order starts once the slide on screen has had its time
     logger.info('Slides reordered', { folder });
     res.json(reordered);
   } catch (err) {

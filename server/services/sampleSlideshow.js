@@ -6,16 +6,20 @@ const { writeConfig } = require('../utils/configIO');
 const { sampleDataDir, slidesDir, slideshowJsonPath } = require('../utils/pathHelpers');
 const { uniqueSlug } = require('../utils/slugify');
 const { withSlideshowLock } = require('../utils/slideshowLock');
+const { enqueueThumbnail } = require('./uploadQueue');
 const logger = require('../utils/logger');
 
 const NAME = 'Sample slideshow';
-const IMAGE_SECONDS = 3;
+// Slideshow settings the sample demonstrates, e.g. its own slide duration. Only these are
+// taken from sample.json; the admin's own choices (published, hidden, schedule...) are kept.
+const MANIFEST = 'sample.json';
+const MANIFEST_SETTINGS = ['slideDurationSeconds'];
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i;
 const VIDEO_EXT = /\.(mp4|webm)$/i;
 
 // The files in sample-data/sample-slideshow/, in name order (01-…, 02-…)
 function sampleFiles() {
-  const dir = path.join(sampleDataDir(), 'sample-slideshow');
+  const dir = sampleDir();
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir)
     .filter((f) => IMAGE_EXT.test(f) || VIDEO_EXT.test(f))
@@ -23,9 +27,23 @@ function sampleFiles() {
     .map((f) => path.join(dir, f));
 }
 
-// Changes whenever a sample file is added, removed, renamed or edited
+function sampleDir() {
+  return path.join(sampleDataDir(), 'sample-slideshow');
+}
+
+function readManifest() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(sampleDir(), MANIFEST), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+// Changes whenever a sample file is added, removed, renamed or edited, or sample.json changes
 function signatureOf(files) {
   const hash = crypto.createHash('sha1');
+  const manifest = path.join(sampleDir(), MANIFEST);
+  if (fs.existsSync(manifest)) hash.update(fs.readFileSync(manifest));
   for (const file of files) {
     hash.update(path.basename(file));
     hash.update(crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex'));
@@ -46,7 +64,8 @@ function copyAsSlides(files, folder) {
       type: isVideo ? 'video' : 'image',
       filename,
       status: 'ready',
-      duration: isVideo ? null : IMAGE_SECONDS,   // videos play to the end
+      duration: null,   // the slideshow's own duration (sample.json); videos play to the end
+      ...(isVideo ? { thumbnailPending: true } : {}),
       addedAt: new Date().toISOString(),
     };
   });
@@ -61,14 +80,32 @@ async function replaceSlides(folder, files) {
     const slides = copyAsSlides(files, folder);
     await writeConfig(slideshowJsonPath(folder), { ...old, slides });
     for (const slide of old.slides || []) {
-      if (slide.filename) fs.rmSync(path.join(slidesDir(folder), slide.filename), { force: true });
+      for (const name of [slide.filename, slide.thumbnail]) {
+        if (name) fs.rmSync(path.join(slidesDir(folder), name), { force: true });
+      }
+    }
+    // Thumbnails for the sample's videos, made in the background like an upload's
+    for (const slide of slides.filter((s) => s.type === 'video')) {
+      enqueueThumbnail({ folder, slideId: slide.id, filename: slide.filename });
     }
   });
 }
 
-// Keeps an unpublished "Sample slideshow" in step with sample-data/sample-slideshow/:
-// created on first start, its slides replaced whenever a software update ships different
-// sample files, and never recreated once someone deletes it. Images show for 3 seconds.
+// The sample.json settings, applied to the sample's entry in config.json
+function withManifest(entry) {
+  const manifest = readManifest();
+  const updated = { ...entry };
+  for (const key of MANIFEST_SETTINGS) {
+    if (manifest[key] !== undefined) updated[key] = manifest[key];
+  }
+  return updated;
+}
+
+// Keeps the "Sample slideshow" in step with sample-data/sample-slideshow/, so each software
+// update can show off new features in it: created (unpublished) on first start, and whenever
+// an update ships different sample files or settings, its slides are replaced with the new
+// ones (new images and videos included) and sample.json's settings applied. It can be hidden
+// but not deleted; one deleted by an older version comes back, hidden.
 async function syncSampleSlideshow() {
   const files = sampleFiles();
   if (!files.length) return;
@@ -80,38 +117,39 @@ async function syncSampleSlideshow() {
     const found = (configService.get('slideshows') || []).find((s) => s.name === NAME);
     state = { folder: found ? found.folder : null, signature: null };
   }
-  if (state && state.signature === signature) return;
-
   const slideshows = configService.get('slideshows') || [];
-  if (!state) {
+  const stillThere = !!state?.folder && slideshows.some((s) => s.folder === state.folder);
+  if (stillThere && state.signature === signature) return;
+
+  if (!stillThere) {
+    // First start, or deleted by an older version: add it. Hidden if it was here before.
     const folder = uniqueSlug(NAME);
+    const returning = !!state;
     await replaceSlides(folder, files);
     await configService.update({
-      slideshows: [...slideshows, {
+      slideshows: [...slideshows, withManifest({
         folder,
         name: NAME,
         priority: slideshows.length + 1,
         schedule: { type: 'always' },
         enabled: false,
+        ...(returning ? { hidden: true } : {}),
         addedAt: new Date().toISOString(),
-      }],
+      })],
       sampleSlideshow: { folder, signature },
       sampleSlideshowAdded: undefined,
     });
-    logger.info('Sample slideshow added (not published)', { folder, slides: files.length });
+    logger.info(returning ? 'Sample slideshow restored (hidden)' : 'Sample slideshow added (not published)', { folder, slides: files.length });
     return;
   }
 
-  const stillThere = state.folder && slideshows.some((s) => s.folder === state.folder);
-  if (stillThere) {
-    await replaceSlides(state.folder, files);
-    logger.info('Sample slideshow updated with new sample files', { folder: state.folder, slides: files.length });
-  }
-  // Deleted samples stay deleted; remember the files so this isn't checked again
+  await replaceSlides(state.folder, files);
   await configService.update({
-    sampleSlideshow: { folder: stillThere ? state.folder : null, signature },
+    slideshows: slideshows.map((s) => (s.folder === state.folder ? withManifest(s) : s)),
+    sampleSlideshow: { folder: state.folder, signature },
     sampleSlideshowAdded: undefined,
   });
+  logger.info('Sample slideshow updated with the new sample files', { folder: state.folder, slides: files.length });
 }
 
 module.exports = { syncSampleSlideshow };

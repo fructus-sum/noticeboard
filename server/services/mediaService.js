@@ -56,4 +56,27 @@ function getVideoDuration(filePath) {
   });
 }
 
-module.exports = { typeFromMime, processImage, processVideo, getVideoDuration, IMAGE_MIME, VIDEO_MIME };
+// A still picture of a video, for the admin panel's slide list and preview: the most typical
+// frame of the second or so starting 10% of the way in (between 1 and 5 s, so not a black
+// opening frame), at most 640 × 640 px. The video itself is only read.
+async function createThumbnail(videoPath, outDir, slideId) {
+  const seconds = await getVideoDuration(videoPath);
+  const at = seconds ? Math.min(5, Math.max(1, seconds * 0.1), Math.max(0, seconds - 0.5)) : 0;
+  const outFilename = `${slideId}-thumb.jpg`;
+  await new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .seekInput(at)
+      .frames(1)
+      .outputOptions([
+        '-vf', "thumbnail=25,scale='min(640,iw)':'min(640,ih)':force_original_aspect_ratio=decrease",
+        '-q:v', '3',
+      ])
+      .on('end', resolve)
+      .on('error', reject)
+      .save(path.join(outDir, outFilename));
+  });
+  logger.info('Video thumbnail created', { slideId, outFilename, at });
+  return outFilename;
+}
+
+module.exports = { typeFromMime, processImage, processVideo, getVideoDuration, createThumbnail, IMAGE_MIME, VIDEO_MIME };

@@ -5,19 +5,17 @@ const configService = require('./services/configService');
 const { slideshowJsonPath, mediaUrl } = require('./utils/pathHelpers');
 const logger = require('./utils/logger');
 const { displayBuildId } = require('./utils/displayBuildId');
-
-const DEV_ORIGINS = [
-  'http://localhost:3000',   // production build served by Express
-  'http://localhost:5173',   // display Vite dev server
-  'http://localhost:5174',   // admin Vite dev server
-  'http://localhost:5175',
-];
+const { displaySettings } = require('./services/brandingService');
 
 function buildPlaylist(activeSlideshows) {
   const defaultDuration = configService.get('display')?.defaultSlideDurationSeconds ?? 10;
+  const current = configService.get('slideshows') || [];
   const slides = [];
 
-  for (const ss of activeSlideshows) {
+  for (const active of activeSlideshows) {
+    // The scheduler lists which slideshows are on; their settings (e.g. a duration changed
+    // while they're on air) come from config.json as it is now
+    const ss = current.find((s) => s.folder === active.folder) || active;
     let data = { slides: [] };
     try {
       data = JSON.parse(fs.readFileSync(slideshowJsonPath(ss.folder), 'utf8'));
@@ -28,7 +26,9 @@ function buildPlaylist(activeSlideshows) {
       slides.push({
         type: slide.type,
         url: mediaUrl(ss.folder, slide.filename),
-        duration: slide.type === 'image' ? (slide.duration ?? defaultDuration) : null,
+        // Images: the slide's own time if it has one, else its slideshow's, else the default.
+        // Each slide carries its own, so a slideshow's last slide keeps its slideshow's time.
+        duration: slide.type === 'image' ? (slide.duration ?? ss.slideDurationSeconds ?? defaultDuration) : null,
         slideshow: ss.folder,
       });
     }
@@ -38,6 +38,19 @@ function buildPlaylist(activeSlideshows) {
 }
 
 let io;
+let lastSettings = '';
+
+// The displays' own look (the location pin, the logo): sent on connect, and again whenever
+// the settings change
+function broadcastDisplaySettings() {
+  if (!io) return;
+  const settings = displaySettings();
+  const json = JSON.stringify(settings);
+  if (json === lastSettings) return;
+  lastSettings = json;
+  io.emit('display:settings', settings);
+  logger.info('Socket: display:settings broadcast', settings);
+}
 
 function broadcastPlaylist() {
   if (!io) return;
@@ -47,11 +60,9 @@ function broadcastPlaylist() {
 }
 
 function initSocket(server) {
-  io = new Server(server, {
-    cors: process.env.NODE_ENV !== 'production'
-      ? { origin: DEV_ORIGINS, credentials: true }
-      : undefined,
-  });
+  // The displays are always served from this server, so no cross-origin access is needed.
+  // In development, Vite's hot-reload connections share the port: leave those to Vite.
+  io = new Server(server, { destroyUpgrade: process.env.NOTICEBOARD_DEV !== '1' });
 
   // Sent on every connect: a display that sees it change reloads to pick up the new build
   const buildId = displayBuildId();
@@ -59,6 +70,7 @@ function initSocket(server) {
   io.on('connection', (socket) => {
     logger.info('Socket: display connected', { id: socket.id });
     socket.emit('display:build', buildId);
+    socket.emit('display:settings', displaySettings());
 
     socket.on('display:ready', () => {
       const playlist = buildPlaylist(schedulerService.getActive());
@@ -72,9 +84,11 @@ function initSocket(server) {
   });
 
   schedulerService.on('update', broadcastPlaylist);
+  lastSettings = JSON.stringify(displaySettings());
+  configService.on('change', broadcastDisplaySettings);
 
   logger.info('Socket.io initialised');
   return io;
 }
 
-module.exports = { initSocket, buildPlaylist, broadcastPlaylist };
+module.exports = { initSocket, buildPlaylist, broadcastPlaylist, broadcastDisplaySettings };
