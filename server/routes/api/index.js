@@ -24,9 +24,12 @@ router.use('/auth', macFilter, authRouter);
 // Display info pop-up: MAC filter only, like the display itself
 router.use('/device', macFilter, deviceRouter);
 
-// Protected: MAC + JWT
+// Protected: MAC + JWT. The slides routes sit inside the slideshows API, so each request is
+// checked once (mounted side by side, a slide request was checked twice).
 router.use('/settings', adminAuth, settingsRouter);
-router.use('/slideshows', adminAuth, slideshowsRouter);
-router.use('/slideshows/:folder/slides', adminAuth, slidesRouter);
+const slideshowsApi = express.Router();
+slideshowsApi.use('/:folder/slides', slidesRouter);
+slideshowsApi.use('/', slideshowsRouter);
+router.use('/slideshows', adminAuth, slideshowsApi);
 
 module.exports = router;

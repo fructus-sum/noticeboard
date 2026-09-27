@@ -5,5 +5,8 @@
     "PLAYLIST_UPDATE": "playlist:update",
     "DISPLAY_BUILD": "display:build",
     "DISPLAY_SETTINGS": "display:settings"
+  },
+  "limits": {
+    "passwordMinLength": 8
   }
 }

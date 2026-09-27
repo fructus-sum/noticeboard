@@ -3,14 +3,14 @@ const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
 const multer = require('multer');
-const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const configService = require('../../services/configService');
 const updateService = require('../../services/updateService');
 const brandingService = require('../../services/brandingService');
+const adminPassword = require('../../services/adminPassword');
 const { LOGO_MIME } = require('../../services/mediaTypes');
+const { route } = require('../../middleware/asyncRoute');
 const { lanInterfaces } = require('../../utils/network');
-const { usesDefaultPassword } = require('../../utils/defaultPassword');
 const { tmpDir } = require('../../utils/pathHelpers');
 const logger = require('../../utils/logger');
 
@@ -84,13 +84,9 @@ router.put('/', async (req, res, next) => {
 });
 
 // Whether the admin password is still the default one: the admin panel warns until it's changed
-router.get('/security', async (req, res, next) => {
-  try {
-    res.json({ defaultPassword: await usesDefaultPassword(configService.get('passwordHash')) });
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/security', route(async (req, res) => {
+  res.json({ defaultPassword: await adminPassword.usesDefault() });
+}));
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 const logoUpload = multer({
@@ -146,29 +142,13 @@ router.delete('/logo', (req, res) => {
   res.json(logoInfo());
 });
 
-router.put('/password', async (req, res, next) => {
-  try {
-    const { current, newPassword } = req.body;
-    if (!current || !newPassword) {
-      return res.status(400).json({ error: 'current and newPassword are required' });
-    }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    const match = await bcrypt.compare(current, configService.get('passwordHash'));
-    if (!match) {
-      // 403, not 401: a 401 would send the admin panel to the login page
-      return res.status(403).json({ error: 'Current password is incorrect' });
-    }
-
-    await configService.set('passwordHash', await bcrypt.hash(newPassword, 10));
-    logger.info('Admin password changed', { ip: req.ip });
-    res.json({ ok: true });
-  } catch (err) {
-    next(err);
-  }
-});
+// A wrong current password is a 403, not 401: a 401 would send the admin panel to the login page
+router.put('/password', route(async (req, res) => {
+  const result = await adminPassword.change(req.body.current, req.body.newPassword);
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  logger.info('Admin password changed', { ip: req.ip });
+  res.json({ ok: true });
+}));
 
 // ── Software updates ──────────────────────────────────────────────────────────
 // Switching branch: check the branch, then the admin password (which gives a one-time token),
@@ -225,8 +205,7 @@ router.post('/updates/verify-password', updatePasswordLimiter, async (req, res, 
     if (!updateService.validBranchName(branch)) {
       return res.status(400).json({ error: "That isn't a valid branch name." });
     }
-    const match = typeof password === 'string' && password !== ''
-      && await bcrypt.compare(password, configService.get('passwordHash'));
+    const match = typeof password === 'string' && password !== '' && await adminPassword.verify(password);
     if (!match) {
       logger.warn('Branch switch: wrong password', { ip: req.ip, branch });
       // 403, not 401: a 401 would send the admin panel to the login page

@@ -6,6 +6,7 @@ const EventEmitter = require('events');
 const { readConfig, writeConfig } = require('../utils/configIO');
 const { configPath, dataDir, slideshowsDir } = require('../utils/pathHelpers');
 const defaults = require('../config/defaults');
+const { DEFAULT_PASSWORD, HASH_ROUNDS } = require('../config/passwordDefaults');
 
 class ConfigService extends EventEmitter {
   constructor() {
@@ -23,7 +24,7 @@ class ConfigService extends EventEmitter {
       this._config = await this._generateDefaults();
       await writeConfig(cfgPath, this._config);
       // logger not used here to avoid circular dep at init time
-      console.info('[config] Created default config.json with password Admin@12345');
+      console.info(`[config] Created default config.json with password ${DEFAULT_PASSWORD}`);
     } else {
       try {
         this._config = await readConfig(cfgPath);
@@ -36,7 +37,7 @@ class ConfigService extends EventEmitter {
   }
 
   async _generateDefaults() {
-    const passwordHash = await bcrypt.hash('Admin@12345', 10);
+    const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, HASH_ROUNDS);
     const jwtSecret = crypto.randomBytes(48).toString('hex');
 
     return {
