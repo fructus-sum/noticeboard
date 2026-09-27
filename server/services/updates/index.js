@@ -16,13 +16,15 @@
 //                            latest commit, the software it needs and its installer needs.
 //                            Downloads the branch, so the switch itself is quicker
 //   requestSwitch(name, by, { acceptMissing })  saves the switch and starts update.sh
-//   validBranchName, issueToken, takeToken       (from branchName.js and switchTokens.js)
+//   validBranchName                              (from branchName.js)
+//   issueToken(branch), takeToken(token, branch) the password check's one-time token for a
+//                            switch (services/actionTokens, action 'switch')
 //
 // Used by
 //   routes/api/settings/updates.js
 //
 // Uses
-//   ./git, ./branchName, ./updateFiles, ./installerVersion, ./switchTokens, utils/systemCheck,
+//   ./git, ./branchName, ./updateFiles, ./installerVersion, services/actionTokens, utils/systemCheck,
 //   utils/logger
 //
 // Change impact
@@ -33,7 +35,7 @@ const { git } = require('./git');
 const { validBranchName } = require('./branchName');
 const files = require('./updateFiles');
 const installer = require('./installerVersion');
-const tokens = require('./switchTokens');
+const tokens = require('../actionTokens');
 const { checkRequirements } = require('../../utils/systemCheck');
 const logger = require('../../utils/logger');
 
@@ -218,6 +220,6 @@ module.exports = {
   checkBranch,
   requestSwitch,
   validBranchName,
-  issueToken: tokens.issue,
-  takeToken: tokens.take,
+  issueToken: (branch) => tokens.issue('switch', branch),
+  takeToken: (token, branch) => tokens.take(token, 'switch', branch),
 };

@@ -12,7 +12,7 @@
 // Slots: default (the body), actions (buttons beside the title, e.g. Edit; hidden while folded)
 // Attributes (e.g. an id to link to) go to the card.
 // Used by: settings/DisplaySettingsCard, MacFilterCard, BrandingSettings, PasswordCard,
-//          updates/SoftwareUpdates, slideshow/SlideshowSettingsCard, SlideList
+//          DeleteContentCard, updates/SoftwareUpdates, slideshow/SlideshowSettingsCard, SlideList
 // Uses: useCollapsed
 import { computed, useId } from 'vue';
 import { useCollapsed } from '../../composables/useCollapsed.js';

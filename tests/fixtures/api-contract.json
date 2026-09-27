@@ -752,6 +752,45 @@
     "type": "application/json",
     "content": "{\"authenticated\":false}"
   },
+  "maintenance: verify, unknown action": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/verify-password",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Unknown action.\"}"
+  },
+  "maintenance: verify, wrong password": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/verify-password",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"Incorrect password. Nothing was changed.\"}"
+  },
+  "maintenance: delete all, no token": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/delete-all",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"The password check has expired. Nothing was changed; start again.\"}"
+  },
+  "maintenance: verify": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/verify-password",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "token": "string"
+    }
+  },
+  "maintenance: delete all": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/delete-all",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "deleted": []
+    }
+  },
   "logout": {
     "method": "POST",
     "path": "/api/auth/logout",

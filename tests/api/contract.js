@@ -175,6 +175,13 @@ function lanAddress() {
     console.log('(no network address found: the MAC-denied checks are skipped)');
   }
 
+  // Delete All: the password step, then the action with its token
+  await a('maintenance: verify, unknown action', 'POST', '/api/settings/maintenance/verify-password', { body: { password: 'Admin@12345', action: 'x' }, exact: true });
+  await a('maintenance: verify, wrong password', 'POST', '/api/settings/maintenance/verify-password', { body: { password: 'nope', action: 'delete-all' }, exact: true });
+  await a('maintenance: delete all, no token', 'POST', '/api/settings/maintenance/delete-all', { body: {}, exact: true });
+  const verified = await a('maintenance: verify', 'POST', '/api/settings/maintenance/verify-password', { body: { password: 'Admin@12345', action: 'delete-all' } });
+  await a('maintenance: delete all', 'POST', '/api/settings/maintenance/delete-all', { body: { token: verified.json.token } });
+
   await a('logout', 'POST', '/api/auth/logout', { exact: true });
   await s.stop();
 

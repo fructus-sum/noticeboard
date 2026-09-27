@@ -6,6 +6,7 @@
 //   security.js   /security, /password
 //   logo.js       /logo
 //   updates.js    /updates…, /version
+//   maintenance.js  /maintenance/… (Delete All)
 //
 // Used by
 //   routes/api/index.js
@@ -16,5 +17,6 @@ router.use(require('./general'));
 router.use(require('./security'));
 router.use(require('./logo'));
 router.use(require('./updates'));
+router.use(require('./maintenance'));
 
 module.exports = router;

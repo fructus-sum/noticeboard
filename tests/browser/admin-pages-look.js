@@ -130,7 +130,7 @@ async function capture(c, map, prefix) {
   texts['switch dialog'] = await c.evaluate(text('.dialog'));
   await c.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
   await sleep(300);
-  texts['after Esc'] = await c.evaluate(`!!document.querySelector('.dialog') ? 'dialog still open' : (document.querySelector('.card:last-of-type p.muted:last-of-type')?.textContent ?? '')`);
+  texts['after Esc'] = await c.evaluate(`!!document.querySelector('.dialog') ? 'dialog still open' : ([...document.querySelectorAll('section.card')].find((c) => c.querySelector('.card-toggle')?.textContent.trim() === 'Software updates')?.querySelector('p.muted:last-of-type')?.textContent ?? '')`);
   c.close();
   await s.stop();
 

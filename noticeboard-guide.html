@@ -1512,6 +1512,11 @@
             <td>Shows the version running and how updates went, and switches the GitHub branch updates come from. See <a href="#updates" style="color:var(--blue)">Automatic updates</a> and <a href="#branches" style="color:var(--blue)">Switching branch</a>.</td>
             <td>main</td>
           </tr>
+          <tr>
+            <td><strong>Delete content</strong></td>
+            <td><strong>Delete All</strong>: deletes every slideshow except the sample. See <a href="#delete-content" style="color:var(--blue)">Deleting your content</a>.</td>
+            <td>—</td>
+          </tr>
         </tbody>
       </table>
 
@@ -1524,6 +1529,10 @@
         <li><strong>Show the logo</strong> turns it on or off, on the screens and in the sidebar together.</li>
       </ul>
       <p>The <strong>background colour</strong> fills the screen around a slide that doesn't fill it, and behind the logo when nothing is published. Pick a colour, or type its code (<code>#</code> and six digits or letters a–f, for example <code>#000000</code> for black or <code>#ffffff</code> for white), then <strong>Save</strong>. Every screen changes within a few seconds; the logo preview shows it on the chosen colour.</p>
+
+      <h3 id="delete-content" style="scroll-margin-top:80px">Deleting your content</h3>
+      <p>The <strong>Delete content</strong> card at the bottom of the Settings page has <strong>Delete All…</strong>. It deletes every slideshow except the sample slideshow, with all their slides and files. The sample slideshow (and whether it's published or hidden), your settings, the logo and the background colour are kept: it isn't a factory reset.</p>
+      <p>Because it can't be undone, it asks three times, like switching branch: first it lists every slideshow it will delete and how many slides each has; then it asks for the admin password; then it gives you a last chance to back out. Cancelling at any step, or a wrong password, changes nothing. Screens stop showing the deleted slideshows straight away.</p>
 
       <h3>Restarting the server service</h3>
       <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the server. Run this command on the Pi via SSH or a terminal:</p>
