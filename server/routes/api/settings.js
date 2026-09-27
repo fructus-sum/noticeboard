@@ -8,7 +8,8 @@ const rateLimit = require('express-rate-limit');
 const configService = require('../../services/configService');
 const updateService = require('../../services/updateService');
 const brandingService = require('../../services/brandingService');
-const { lanInterfaces } = require('../../utils/networkInfo');
+const { LOGO_MIME } = require('../../services/mediaTypes');
+const { lanInterfaces } = require('../../utils/network');
 const { usesDefaultPassword } = require('../../utils/defaultPassword');
 const { tmpDir } = require('../../utils/pathHelpers');
 const logger = require('../../utils/logger');
@@ -102,7 +103,7 @@ const logoUpload = multer({
   }),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.mimetype)) return cb(null, true);
+    if (LOGO_MIME.includes(file.mimetype)) return cb(null, true);
     cb(Object.assign(new Error('The logo must be a PNG, JPEG, GIF or WebP image'), { status: 400 }));
   },
 }).single('logo');

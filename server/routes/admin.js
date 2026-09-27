@@ -1,9 +1,9 @@
 const express = require('express');
 const path = require('path');
-const { ROOT } = require('../utils/pathHelpers');
+const { adminDistDir } = require('../utils/pathHelpers');
 
 const router = express.Router();
-const ADMIN_DIST = path.join(ROOT, 'client', 'admin', 'dist');
+const ADMIN_DIST = adminDistDir();
 
 const FALLBACK = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <title>Noticeboard Admin</title>

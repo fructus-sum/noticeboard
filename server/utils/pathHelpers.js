@@ -11,6 +11,7 @@ function slideshowJsonPath(folderName) { return path.join(slideshowDir(folderNam
 function configPath() { return path.join(dataDir(), 'config.json'); }
 function logsDir() { return path.join(ROOT, 'logs'); }
 function displayDistDir() { return path.join(ROOT, 'client', 'display', 'dist'); }
+function adminDistDir() { return path.join(ROOT, 'client', 'admin', 'dist'); }
 function guidePath() { return path.join(ROOT, 'noticeboard-guide.html'); }
 // Software updates (installers/update.sh reads and writes the same files)
 function updateBranchPath() { return path.join(dataDir(), 'update-branch.env'); }
@@ -46,6 +47,7 @@ module.exports = {
   configPath,
   logsDir,
   displayDistDir,
+  adminDistDir,
   guidePath,
   updateBranchPath,
   updateStatusPath,

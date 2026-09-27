@@ -120,8 +120,24 @@ async function runGroup(group, filter) {
   return results;
 }
 
+// One run at a time: the suites use fixed ports, so two runs at once would test each other's servers
+function takeLock() {
+  const lock = path.join(os.tmpdir(), 'noticeboard-tests.lock');
+  try {
+    const pid = Number(fs.readFileSync(lock, 'utf8'));
+    process.kill(pid, 0);   // throws if that run has ended
+    console.error(`Another test run (process ${pid}) is still going; wait for it to finish.`);
+    process.exit(2);
+  } catch {
+    // No lock, or a stale one from a run that ended
+  }
+  fs.writeFileSync(lock, String(process.pid));
+  process.on('exit', () => { try { fs.rmSync(lock); } catch { /* already gone */ } });
+}
+
 (async () => {
   const [which = 'unit', filter] = process.argv.slice(2);
+  if (which !== 'unit') takeLock();
   const groups = which === 'all' ? GROUPS : [which];
   if (!groups.every((g) => GROUPS.includes(g))) {
     console.error(`Unknown group "${which}". Groups: ${GROUPS.join(', ')}, all`);

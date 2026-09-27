@@ -3,14 +3,7 @@ const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
 const logger = require('../utils/logger');
 
-const IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
-const VIDEO_MIME = new Set(['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg']);
-
-function typeFromMime(mime) {
-  if (IMAGE_MIME.has(mime)) return 'image';
-  if (VIDEO_MIME.has(mime)) return 'video';
-  return null;
-}
+// Which files are images or videos: services/mediaTypes.js
 
 async function processImage(inputPath, outDir, slideId) {
   const outFilename = `${slideId}.png`;
@@ -79,4 +72,4 @@ async function createThumbnail(videoPath, outDir, slideId) {
   return outFilename;
 }
 
-module.exports = { typeFromMime, processImage, processVideo, getVideoDuration, createThumbnail, IMAGE_MIME, VIDEO_MIME };
+module.exports = { processImage, processVideo, getVideoDuration, createThumbnail };

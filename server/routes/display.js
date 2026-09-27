@@ -1,9 +1,9 @@
 const express = require('express');
 const path = require('path');
-const { ROOT } = require('../utils/pathHelpers');
+const { displayDistDir } = require('../utils/pathHelpers');
 
 const router = express.Router();
-const DISPLAY_DIST = path.join(ROOT, 'client', 'display', 'dist');
+const DISPLAY_DIST = displayDistDir();
 
 const FALLBACK = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <title>Noticeboard Display</title>

@@ -1,14 +1,7 @@
 const express = require('express');
-const { lanInterfaces } = require('../../utils/networkInfo');
+const { lanInterfaces, plainAddress, isLoopback } = require('../../utils/network');
 
 const router = express.Router();
-
-const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
-
-// The address a request came from or arrived at, without IPv4-in-IPv6 wrapping
-function plainAddress(address = '') {
-  return address.replace(/^::ffff:/, '');
-}
 
 // This server's IP addresses and port, for the display's location pin: how to reach the
 // Noticeboard server from another device. They're the server's own addresses (never the
@@ -32,7 +25,7 @@ const exitRequests = new Map();   // device -> expiry time
 
 function deviceOf(req) {
   const address = req.socket.remoteAddress || '';
-  return LOOPBACK.test(address) ? 'this-server' : plainAddress(address);
+  return isLoopback(address) ? 'this-server' : plainAddress(address);
 }
 
 router.post('/kiosk-exit', (req, res) => {

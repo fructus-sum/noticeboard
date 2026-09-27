@@ -7,7 +7,7 @@ export default defineConfig({
   base: '/',
   resolve: {
     alias: {
-      '@shared': path.resolve(__dirname, '../shared'),
+      '@shared': path.resolve(__dirname, '../../shared'),   // the repository's shared/ (public values only)
     },
   },
   build: {

@@ -1,6 +1,6 @@
 import { ref, onUnmounted } from 'vue';
 import { io } from 'socket.io-client';
-import { SOCKET_EVENTS } from '@shared/constants.js';
+import { SOCKET_EVENTS } from '@shared/index.js';
 import { reloadSoon } from '../recovery.js';
 
 export function useSocket() {

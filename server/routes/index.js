@@ -4,11 +4,12 @@ const macFilter = require('../middleware/macFilter');
 const adminAuth = require('../middleware/adminAuth');
 const displayRouter = require('./display');
 const adminRouter = require('./admin');
-const { ROOT, slideshowsDir, guidePath, logoPath } = require('../utils/pathHelpers');
+const { slideshowsDir, guidePath, logoPath, displayDistDir, adminDistDir } = require('../utils/pathHelpers');
 const { hasCustomLogo, placeholderLogo } = require('../services/brandingService');
+const { SERVED_EXTENSIONS } = require('../services/mediaTypes');
 
-const DISPLAY_DIST = path.join(ROOT, 'client', 'display', 'dist');
-const ADMIN_DIST = path.join(ROOT, 'client', 'admin', 'dist');
+const DISPLAY_DIST = displayDistDir();
+const ADMIN_DIST = adminDistDir();
 
 // `frontends` is only set by npm run dev: Vite then serves the two web apps (with hot reload)
 // instead of their built copies, on this same port
@@ -20,9 +21,8 @@ function mountRoutes(app, frontends = null) {
     macFilter,
     (req, res, next) => {
       // Only serve known media extensions; block direct access to .json config files
-      const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mp3', '.wav', '.ogg'];
       const ext = path.extname(req.path).toLowerCase();
-      if (!allowed.includes(ext)) return res.status(404).send('Not Found');
+      if (!SERVED_EXTENSIONS.includes(ext)) return res.status(404).send('Not Found');
       res.setHeader('Accept-Ranges', 'bytes');
       next();
     },

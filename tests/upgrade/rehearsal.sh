@@ -51,6 +51,14 @@ link_modules() {   # the repository's node_modules, never modified (npm install/
   esac
 }
 
+unlink_modules() {
+  [ -e "$1/node_modules" ] || return 0
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) cmd //c rmdir "$(cygpath -w "$1/node_modules")" >/dev/null ;;
+    *) rm -f "$1/node_modules" ;;
+  esac
+}
+
 supervise() {   # systemd's Restart=always for noticeboard.service
   while [ ! -f "$MOCK/stop" ]; do
     ( cd "$PI" && NODE_ENV=production exec node server/index.js ) >> "$MOCK/server.log" 2>&1 &
@@ -67,6 +75,7 @@ cleanup() {
   touch "$MOCK/stop"
   kill "$(cat "$MOCK/pid" 2>/dev/null)" 2>/dev/null
   [ -n "${SUPERVISOR:-}" ] && wait "$SUPERVISOR" 2>/dev/null
+  unlink_modules "$PI"   # the link first, so deleting the folder can never reach this repository's node_modules
   rm -rf "$T"
 }
 trap cleanup EXIT

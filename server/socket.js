@@ -6,6 +6,8 @@ const { slideshowJsonPath, mediaUrl } = require('./utils/pathHelpers');
 const logger = require('./utils/logger');
 const { displayBuildId } = require('./utils/displayBuildId');
 const { displaySettings } = require('./services/brandingService');
+// The event names are shared with the viewer (shared/contract.json)
+const { socketEvents: EVENTS } = require('../shared/contract.json');
 
 function buildPlaylist(activeSlideshows) {
   const defaultDuration = configService.get('display')?.defaultSlideDurationSeconds ?? 10;
@@ -48,14 +50,14 @@ function broadcastDisplaySettings() {
   const json = JSON.stringify(settings);
   if (json === lastSettings) return;
   lastSettings = json;
-  io.emit('display:settings', settings);
+  io.emit(EVENTS.DISPLAY_SETTINGS, settings);
   logger.info('Socket: display:settings broadcast', settings);
 }
 
 function broadcastPlaylist() {
   if (!io) return;
   const playlist = buildPlaylist(schedulerService.getActive());
-  io.emit('playlist:update', playlist);
+  io.emit(EVENTS.PLAYLIST_UPDATE, playlist);
   logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length });
 }
 
@@ -69,12 +71,12 @@ function initSocket(server) {
 
   io.on('connection', (socket) => {
     logger.info('Socket: display connected', { id: socket.id });
-    socket.emit('display:build', buildId);
-    socket.emit('display:settings', displaySettings());
+    socket.emit(EVENTS.DISPLAY_BUILD, buildId);
+    socket.emit(EVENTS.DISPLAY_SETTINGS, displaySettings());
 
-    socket.on('display:ready', () => {
+    socket.on(EVENTS.DISPLAY_READY, () => {
       const playlist = buildPlaylist(schedulerService.getActive());
-      socket.emit('playlist:update', playlist);
+      socket.emit(EVENTS.PLAYLIST_UPDATE, playlist);
       logger.info('Socket: playlist sent to display', { id: socket.id, slideCount: playlist.slides.length });
     });
 

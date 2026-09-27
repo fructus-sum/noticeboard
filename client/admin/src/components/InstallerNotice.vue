@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { installerCommand } from '@shared/constants.js';
+import { installerCommand } from '@shared/index.js';
 import { api } from '../composables/useApi.js';
 
 // Updates can't change what only the installer sets up (kiosk scripts, system services, desktop

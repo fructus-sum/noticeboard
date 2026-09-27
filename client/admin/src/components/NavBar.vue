@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { PROJECT_URL } from '@shared/constants.js';
+import { PROJECT_URL } from '@shared/index.js';
 import { api } from '../composables/useApi.js';
 import { useBranding } from '../composables/useBranding.js';
 import { useNav } from '../composables/useNav.js';

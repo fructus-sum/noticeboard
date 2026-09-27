@@ -1,4 +1,5 @@
-const { lookupMac, isLocalhost, normalizeIp } = require('../utils/macLookup');
+const { lookupMac, isLocalhost } = require('../utils/macLookup');
+const { plainAddress } = require('../utils/network');
 const configService = require('./configService');
 const logger = require('../utils/logger');
 
@@ -8,7 +9,7 @@ function getClientIp(req) {
 
 async function resolveRequest(req) {
   const ip = getClientIp(req);
-  const normalized = normalizeIp(ip);
+  const normalized = plainAddress(ip);
 
   if (isLocalhost(normalized)) {
     return { mac: 'localhost', ip: normalized, approved: true };

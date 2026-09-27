@@ -14,8 +14,7 @@ const NAME = 'Sample slideshow';
 // taken from sample.json; the admin's own choices (published, hidden, schedule...) are kept.
 const MANIFEST = 'sample.json';
 const MANIFEST_SETTINGS = ['slideDurationSeconds'];
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i;
-const VIDEO_EXT = /\.(mp4|webm)$/i;
+const { SAMPLE_IMAGE_EXT: IMAGE_EXT, SAMPLE_VIDEO_EXT: VIDEO_EXT } = require('./mediaTypes');
 
 // The files in sample-data/sample-slideshow/, in name order (01-…, 02-…)
 function sampleFiles() {
