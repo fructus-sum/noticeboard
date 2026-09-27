@@ -125,3 +125,15 @@ label { display: block; font-size: 12px; font-weight: 500; color: var(--text-mut
 .danger-dialog .choices { margin: 0 0 16px 18px; line-height: 1.5; }
 .danger-dialog .choices li + li { margin-top: 6px; }
 .danger-dialog .tone-warn { color: #b45309; }
+
+/* A warning at the top of every admin page (updates/InstallerNotice, updates/UpdateAvailableNotice) */
+.page-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #92400e;
+}
+.page-warning p { margin-top: 6px; line-height: 1.5; }

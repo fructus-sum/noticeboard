@@ -100,6 +100,11 @@ function lanAddress() {
   await a('updates: branches', 'GET', '/api/settings/updates/branches');
   await a('updates: check, invalid name', 'POST', '/api/settings/updates/check', { body: { branch: '../x' }, exact: true });
   await a('updates: check, missing branch', 'POST', '/api/settings/updates/check', { body: { branch: 'no-such-branch-xyz' }, exact: true });
+  // The update schedule (this copy has no updater units: checked, then refused)
+  await a('updates: schedule, bad', 'PUT', '/api/settings/updates/schedule', { body: { every: 'sometimes' }, exact: true });
+  await a('updates: schedule, updater not set up', 'PUT', '/api/settings/updates/schedule', { body: { every: 'manual' }, exact: true });
+  await a('updates: install at, bad', 'PUT', '/api/settings/updates/install-at', { body: { at: 'soon' }, exact: true });
+  await a('updates: install now, updater not set up', 'POST', '/api/settings/updates/install-now', { exact: true });
   await a('updates: verify, wrong password', 'POST', '/api/settings/updates/verify-password', { body: { password: 'nope', branch: 'main' }, exact: true });
   await a('updates: switch, no token', 'POST', '/api/settings/updates/switch', { body: { branch: 'main', token: 'x' }, exact: true });
 

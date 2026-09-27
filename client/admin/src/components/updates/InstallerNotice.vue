@@ -37,7 +37,7 @@ async function copy() {
 </script>
 
 <template>
-  <div v-if="status?.needed" class="installer" role="alert">
+  <div v-if="status?.needed" class="installer page-warning" role="alert">
     <strong>Run the installer again on this Pi</strong>
     <p>
       This version of the noticeboard needs something that only the installer sets up, and updates can't do that
@@ -63,16 +63,7 @@ async function copy() {
 </template>
 
 <style scoped>
-.installer {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: #92400e;
-}
-.installer p { margin-top: 6px; line-height: 1.5; }
+/* The box itself is .page-warning (styles/base.css) */
 .installer ul { margin: 6px 0 0 18px; line-height: 1.5; }
 .installer__command {
   display: flex;

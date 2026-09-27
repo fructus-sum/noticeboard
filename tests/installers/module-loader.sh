@@ -68,7 +68,9 @@ run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=$SHA
   && ok "at a commit: all parts downloaded and loaded" || bad "sha" "$T/out"
 n_lib=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/lib/" "$T/curl.log")
 n_kiosk=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/kiosk/" "$T/curl.log")
-[ "$n_lib" = "$(ls "$REPO/installers/lib" | wc -l)" ] && [ "$n_kiosk" = 2 ] && ! grep -q "/main/installers" "$T/curl.log" \
+# The installer's own parts (INSTALLER_MODULES); installers/lib also holds parts only update.sh loads
+n_parts=$(sed -n 's/^INSTALLER_MODULES=(\([^)]*\)).*/\1/p' "$REPO/installers/install.sh" | wc -w)
+[ "$n_lib" = "$n_parts" ] && [ "$n_kiosk" = 2 ] && ! grep -q "/main/installers" "$T/curl.log" \
   && ok "every download pinned to that commit ($n_lib modules, $n_kiosk kiosk templates)" || bad "pinned ($n_lib, $n_kiosk)" "$T/curl.log"
 [ "$(leftovers)" = "$BEFORE" ] && ok "the downloaded parts are deleted once loaded" || bad "temp folder left in /tmp"
 

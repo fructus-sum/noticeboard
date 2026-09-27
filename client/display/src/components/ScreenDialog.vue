@@ -3,7 +3,7 @@
 // readable whatever slide is behind it: the location pin's pop-up and the exit button's.
 // Each user sets its own size, padding and text through its class; aria attributes pass through.
 //
-// Used by: DeviceInfo.vue, ExitKiosk.vue, InstallerWarning.vue
+// Used by: DeviceInfo.vue, ExitKiosk.vue, AdminWarning.vue
 </script>
 
 <template>

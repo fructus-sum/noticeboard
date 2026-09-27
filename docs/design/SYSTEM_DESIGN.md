@@ -106,7 +106,7 @@ noticeboard/
 ├── installers/
 │   ├── install.sh             the one installer: configuration, latest-installer switch, loading its parts, main()
 │   ├── lib/                   its steps: ui, branch, json, system, sudo, server, display, kiosk, desktop, firewall
-│   │                          (branch.sh and json.sh are also loaded by update.sh)
+│   │                          (branch.sh and json.sh are also loaded by update.sh; schedule.sh only by update.sh)
 │   ├── kiosk/                 server.sh, display.sh: the kiosk scripts it installs, as they are installed
 │   └── update.sh              the self-updater run by systemd on the server Pi
 ├── server/                    CommonJS, Express 4, socket.io 4
@@ -122,7 +122,7 @@ noticeboard/
 │   │                          schedulerService, settingsService, adminPassword, adminSession, macService,
 │   │                          mediaService, mediaTypes, mediaNames, uploadQueue, brandingService, sampleSlideshow,
 │   │                          contentReset, actionTokens
-│   │   └── updates/           index.js, git.js, branchName.js, updateFiles.js, installerVersion.js
+│   │   └── updates/           index.js, git.js, branchName.js, updateFiles.js, installerVersion.js, schedule.js
 │   ├── utils/                 pathHelpers, configIO, logger, macLookup, network, slugify, slideshowLock,
 │   │                          displayBuildId, systemCheck
 │   └── test/                  unit tests (node:test): foundations, installer version, Node.js version rule
@@ -151,7 +151,7 @@ Git ignores the runtime folders `data/`, `tmp/` and `logs/`, the built apps in `
 | Process | Started by | Runs as | What it is |
 |---|---|---|---|
 | `node server/index.js` | `noticeboard.service` (`Restart=always`, `RestartSec=5`) | desktop user | The whole server: HTTP, socket.io, scheduler, upload queue |
-| `bash installers/update.sh` | `noticeboard-update.timer` (boot+5 min, then every 15 min) or `noticeboard-update.path` (when `tmp/update-request` exists) | desktop user (`User=` in the unit; it re-execs itself as the owner if started as root) | Self-updater (oneshot) |
+| `bash installers/update.sh` | `noticeboard-update.timer` (boot+5 min, then every 15 min) or `noticeboard-update.path` (when `tmp/update-request` exists) | desktop user (`User=` in the unit; it re-execs itself as the owner if started as root) | Self-updater (oneshot): checks every run, installs when the update schedule says so or the admin asks (§9.1) |
 | `/opt/noticeboard/start-kiosk.sh` | XDG autostart `/etc/xdg/autostart/noticeboard-kiosk.desktop` at desktop login | desktop user | Bash loop that keeps Chromium in kiosk mode on `http://localhost:3000/` |
 | Chromium | the kiosk script | desktop user | Shows the viewer (`/`) |
 
@@ -195,7 +195,7 @@ socket.io attaches directly to the `http.Server`, so **`/socket.io` never passes
 | Event | Direction | When | Payload |
 |---|---|---|---|
 | `display:build` | server → one socket | on connect | 12-character SHA-1 of `client/display/dist/index.html`, or `null` |
-| `display:settings` | server → one socket, and broadcast | on connect; broadcast on `configService 'change'`, on `displayEvents.displaySettingsChanged` (the logo), and when the installer state changes (checked at start-up, when a display connects and every 5 minutes), when the settings differ from the last broadcast | `{ showDeviceInfo, logo: { url } \| null, background, installerNeeded }` (built by `services/displaySettings.js`) |
+| `display:settings` | server → one socket, and broadcast | on connect; broadcast on `configService 'change'`, on `displayEvents.displaySettingsChanged` (the logo), and when the installer or update state changes (checked at start-up, when a display connects and every 5 minutes), when the settings differ from the last broadcast | `{ showDeviceInfo, logo: { url } \| null, background, installerNeeded, updateAvailable }` (built by `services/displaySettings.js`) |
 | `display:ready` | display → server | on every (re)connect | none |
 | `playlist:update` | server → that socket (reply to `display:ready`), and broadcast | on `display:ready`; on `schedulerService 'update'`; on `displayEvents.playlistChanged` (a slideshow change, a slide deleted or reordered, an upload processed) | `{ slides: [{ type, url, duration, slideshow }] }` |
 
@@ -216,7 +216,7 @@ The event names are defined once, in `shared/contract.json`. `realtime/displaySo
 - It shows `SlideShow` when there are slides, otherwise `WaitingScreen`.
 - `DeviceInfo` (the location pin) appears if `showDeviceInfo` is on.
 - `ExitKiosk` appears unless `?kiosk=off`.
-- `InstallerWarning` (a small red triangle, bottom right) appears on every screen while `installerNeeded` is true; tapping it shows only "Please check the Admin panel for details."
+- `AdminWarning` (a small red triangle, bottom right) appears on every screen while `installerNeeded` or `updateAvailable` (manual updates, a new version waiting) is true; tapping it shows only "Please check the Admin panel for details."
 - The cursor is hidden while idle (`.app--idle`).
 - `startDailyReload` runs unless `?kiosk=off`.
 
@@ -237,7 +237,7 @@ A Vue Router SPA under `/admin/`:
 - **Mounting:** `main.js` mounts only after `router.isReady()`. Before that the router reports `/` as the page, so the sidebar would show on the login page, and its requests (which need a login) would send the browser to the login page again and again.
 - **Login check:** a global `beforeEach` asks `GET /api/auth/status` (through useApi, which never redirects for this call) and sends the user to `/login` when they aren't logged in.
 - **API calls:** go through `composables/useApi.js`, which sends the cookie with each request. A 401 response loads `/admin/login`, unless the browser is already on it.
-- **The frame on every page but the login page:** the sidebar, the default-password warning and the updater's notices (`UpdateNotice`, `InstallerNotice`), in `App.vue`. It stays while moving between pages, so a notice is the same on every page, and closing one closes it everywhere.
+- **The frame on every page but the login page:** the sidebar, the default-password warning and the updater's notices (`UpdateNotice`, `InstallerNotice`, `UpdateAvailableNotice`), in `App.vue`. It stays while moving between pages, so a notice is the same on every page, and closing one closes it everywhere.
 - **Section cards:** every section card of the Settings and slideshow pages is a `CollapsibleCard`: it folds away to its title and is remembered in the browser (`useCollapsed`). A card holding a warning stays open (D39).
 - **Shared state:** module-level singletons shared between components: `useBranding` (logo), `useSecurity` (default-password flag), `useCollapsed` (the folded cards) and `useNav` (sidebar collapsed, stored in `localStorage`).
 - **Views:**
@@ -281,7 +281,10 @@ A Vue Router SPA under `/admin/`:
 | `GET /api/settings/security` | adminAuth | `{ defaultPassword }` | useSecurity |
 | `GET/POST/DELETE /api/settings/logo` | adminAuth | logo info / upload / reset | useBranding, LogoSettings |
 | `PUT /api/settings/password` | adminAuth | change the password (403 when the current one is wrong) | PasswordCard |
-| `GET /api/settings/updates` | adminAuth | update info (git, the status and check files, systemd unit presence) | useUpdateInfo |
+| `GET /api/settings/updates` | adminAuth | update info (git, the status and check files, systemd unit presence, the schedule, the waiting version) | useUpdateInfo, UpdateAvailableNotice |
+| `PUT /api/settings/updates/schedule` | adminAuth | `{ every, time, day }` → saves the schedule, asks update.sh to check (400 not valid, 409 without the updater) | UpdateSchedule |
+| `PUT /api/settings/updates/install-at` | adminAuth | `{ at }` → a set time for the waiting version, then a check | UpdateSchedule |
+| `POST /api/settings/updates/install-now` | adminAuth | status `requested`, request `install-now` (409 while an update runs) | UpdateSchedule |
 | `GET/DELETE /api/settings/updates/notice` | adminAuth | read or dismiss `update-notice.json` | UpdateNotice |
 | `GET /api/settings/updates/installer` | adminAuth | whether the installer needs running again | InstallerNotice |
 | `GET /api/settings/version` | adminAuth | `{ commit, date, installedAt, branch }` | NavBar |
@@ -310,9 +313,10 @@ Error conventions:
 | File | Server side | update.sh side |
 |---|---|---|
 | `data/update-branch.env` | `updateFiles.saveSwitch` writes `NOTICEBOARD_BRANCH=<b>`; `updateFiles.readBranchSetting` reads it | reads `NOTICEBOARD_BRANCH` and `NOTICEBOARD_MAIN_AT_SWITCH`; `write_branch_setting` (lib/branch.sh) writes both |
-| `tmp/update-request` | `requestSwitch` writes it | the systemd `.path` unit starts `update.sh`, which deletes the file at once |
+| `tmp/update-request` | `requestSwitch` (`<time> <branch>`), `installNow` (`install-now`), `setSchedule` and `setInstallAt` (`check`) write it | the systemd `.path` unit starts `update.sh`, which deletes the file at once; `check` only checks, anything else may install |
+| `data/update-schedule.env` | `updateFiles.saveSchedule` (`EVERY`, `TIME`, `DAY`, `SINCE`), `saveInstallAt` (`AT`); `readSchedule` | `lib/schedule.sh` reads it; `set_install_at` removes `AT` once its time has come (or sets it, when Update now finds the lock busy) |
 | `data/update-status.json` | `requestSwitch` writes `state: requested`; `getInfo` and `versionInfo` read it | `write_status` for every other state |
-| `data/update-check.json` | `getInfo` reads it | `write_check` |
+| `data/update-check.json` | `getInfo` reads it (the waiting version: `waitingUpdate`) | `write_check`, with `installCheckedAt`, `fetchedAt`, `nextInstall`, `available`, `availableSubject`, `availableDate` |
 | `data/update-notice.json` | `getNotice` reads it; `dismissNotice` deletes it | `returned_to_main` writes it |
 | `tmp/noticeboard-uploads/*` | multer puts uploads here; the queue deletes them | a file younger than 60 min means "upload in progress, wait" |
 | `tmp/update.lock` | none | `flock`, also held by `install.sh` |
@@ -376,7 +380,7 @@ A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'alway
 - **Rate limits:** API 120/min; login 5/15 min; the password checks inside the admin panel (branch switch, Delete All) 5 wrong/15 min, counted together.
 - **Uploads:** 500 MB per file, 50 files; logo upload 20 MB; logo fits within 500×500.
 - **Scheduler and viewer:** at most 5 active slideshows; scheduler interval 60 s; display clock constants in `slideshowClock.js`.
-- **Updates:** a stale update counts after 60 min; a password-check token lasts 5 min; timer every 15 min; kiosk exit request expires after 60 s.
+- **Updates:** a stale update counts after 60 min; a password-check token lasts 5 min; timer every 15 min (the schedule decides when a run installs; manual mode checks once a day); kiosk exit request expires after 60 s.
 - **Kiosk:** the server kiosk URL is `http://localhost:3000/` regardless of `config.port` (see §16).
 
 ### 5.4 Browser storage
@@ -400,7 +404,8 @@ Under `/opt/noticeboard` on a server Pi.
 | `data/branding/logo.png` | PNG within 500×500 | brandingService.saveLogo | `/branding/logo`, logoVersion (mtime) | removeLogo | viewer waiting screen, admin sidebar |
 | `data/update-branch.env` | `KEY=value` lines | requestSwitch (via updates/updateFiles), update.sh, install.sh | update.sh, install.sh, updates/updateFiles | same | branch following |
 | `data/update-status.json` | flat JSON, all values strings | install.sh and update.sh (`write_json`), requestSwitch (JSON.stringify) | services/updates (getInfo, versionInfo) | same | Software updates card, sidebar "Last updated" |
-| `data/update-check.json` | flat JSON | update.sh | updates/updateFiles | update.sh | Software updates card |
+| `data/update-check.json` | flat JSON | update.sh | updates/updateFiles | update.sh | Software updates card, the schedule's next run (`installCheckedAt`, `fetchedAt`), the waiting version |
+| `data/update-schedule.env` | `KEY=value` lines (`NOTICEBOARD_UPDATE_EVERY`, `_TIME`, `_DAY`, `_SINCE`, `_AT`) | the admin panel (updates/updateFiles) | update.sh (lib/schedule.sh), updates/updateFiles | the admin panel; update.sh (`_AT`) | the update schedule (missing: every 15 minutes) |
 | `data/update-notice.json` | flat JSON | update.sh (branch merged) | updates/updateFiles | dismissNotice (deletes) | home page notice |
 | `data/installer.json` | `{ version (number), branch, commit, time }` | install.sh (last step of a server install) | updates/installerVersion (`installedVersion`) | install.sh | home page installer box, switch check |
 | `data/backups/<time>-from-<branch>/…` | copies of the `.json`/`.env` files in `data/` | update.sh before a branch switch | the admin (manually) | none | recovery |
@@ -438,7 +443,8 @@ Outside the install folder:
 | A playlist change waits for the current slide to finish | `slideshowClock.setSlides` (pending) |
 | "No slideshow published" with the logo; a pulsing dot while disconnected | `WaitingScreen.vue`, `brandingService.displaySettings` |
 | Location pin with the server's address | `DeviceInfo.vue` → `GET /api/device` (`network.lanInterfaces`) |
-| The updater's notices on every admin page; the warning mark on every screen while the installer needs running again | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`; `InstallerWarning.vue`, `services/displaySettings` (`installerNeeded`), `updates/installerVersion` |
+| The updater's notices on every admin page; the warning mark on every screen while the installer needs running again, or (manual updates) a new version waits | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`, `UpdateAvailableNotice`; `AdminWarning.vue`, `services/displaySettings` (`installerNeeded`, `updateAvailable`), `updates/installerVersion`, `services/updates` |
+| Update schedule: every 15 minutes, every 2 hours, daily or weekly at a time, or manual; a waiting version with Update now, Set a time, or the automatic install | `UpdateSchedule`, `UpdateStatus`, `settings/updates.js`, `services/updates` (`schedule.js`, `updateFiles`), `installers/lib/schedule.sh`, update.sh |
 | Exit button (kiosk only), cursor hides when idle | `ExitKiosk.vue`, `useActivity.js`, device.js exit requests, kiosk scripts |
 | Screens reload after an update; nightly reload; recovery reload | `useSocket.js` (`display:build`), `recovery.js`, `displayBuildId.js` |
 | Login, 7-day session, logout | `LoginView`, `auth.js`, `adminAuth.js`, router guard |
@@ -527,20 +533,22 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
 
 1. Work out `BRANCH`: `NOTICEBOARD_BRANCH` (a one-off) → `update-branch.env` → `main`. Also read `MAIN_AT_SWITCH`.
 2. If running as root while the folder is owned by someone else, re-exec as the owner. Refuse to run as any other user.
-3. If `tmp/update-request` exists, delete it at once and set `requested` and `force`. `--force` also sets `force`.
-4. `flock -n tmp/update.lock`. If it's busy, write `status: requested` (for a switch) and exit 0.
+3. Read the schedule (`read_schedule`), the time (`now_epoch`), and `installCheckedAt`/`fetchedAt` from the check file. If `tmp/update-request` exists, delete it at once; unless it says `check`, set `requested` and `force`. `--force` also sets `force`.
+4. `flock -n tmp/update.lock`. If it's busy, write `status: requested` (for a switch, or for Update now, which also sets the schedule's `AT` to now so the next run installs) and exit 0.
 5. `PREVIOUS_BRANCH` = the current symbolic ref, `CURRENT` = `HEAD`. `valid_branch`, else cancel and restore the setting.
 6. The service must be `active` or `activating`, else `check: waiting`.
 7. Uploads in progress (a file younger than 60 min in `tmp/noticeboard-uploads`) → `check: waiting`.
-8. **Merged-branch return**, when following a non-main branch and not switching: `branch_merged`.
+7a. **May this run install?** `due` when requested, when switching, or when `install_due` (lib/schedule.sh) says so. Otherwise it only checks; in manual mode, not at all if the last check was less than a day ago.
+8. **Merged-branch return**, only when `due`, following a non-main branch and not switching: `branch_merged`.
    - Fetch main.
    - If the branch was deleted (`ls-remote` exit code 2), compare `CURRENT`.
    - Otherwise require main to have moved on from `MAIN_AT_SWITCH`.
    - Then `merge-base --is-ancestor`, or `merge-tree --write-tree` to detect a squash or rebase.
    - If merged: `write_branch_setting main`, `switching=1`, `RETURNED_FROM`.
 9. `git fetch origin +refs/heads/B:refs/remotes/origin/B`. On failure: a switch is cancelled; a deleted branch gives `check: error`; otherwise `check: offline`.
-10. `TARGET = origin/B`. If it equals `CURRENT`: when switching, check out the branch and write the notice or status. Always `check: up-to-date`.
+10. `TARGET = origin/B`; record `fetchedAt`, and when `due` `installCheckedAt` (and remove a set time that has come). If it equals `CURRENT`: when switching, check out the branch and write the notice or status. Always `check: up-to-date`.
 11. A previously failed target (`tmp/update-failed-commit`) is skipped unless forced.
+11a. **Not due:** `check: available` with the waiting commit, its subject and date, and when it will be installed; exit 0.
 12. `refuse_reason`: the target has files in `data tmp logs .env`, or (when switching) its `update.sh` lacks the text `update-branch.env`.
 13. On a switch, `backup_settings` → `data/backups/<time>-from-<prev>/`.
 14. `status: updating`. `PORT = server_port` (node + configIO).
@@ -551,6 +559,8 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
     - On failure, roll back and restart again.
 17. Success: remove the failed-commit file, write the status (`updated`, the switched message, or the merged notice), `remember_main` (records `NOTICEBOARD_MAIN_AT_SWITCH` after a switch to a non-main branch), `check: up-to-date`.
 
+Every `write_check` also records `installCheckedAt`, `fetchedAt` and `nextInstall` (`next_install`), so the admin panel shows when the next automatic install is without working it out itself. **The schedule's rules** (`lib/schedule.sh`, D41): 15 minutes, every run; 2 hours, 2 hours since the last run that could install (or since the schedule was chosen, `SINCE`); daily and weekly, the first run at or after the chosen time since then, so a Pi that was off catches up at its next run; manual, never by itself. A set time (`AT`) takes the place of the automatic install until it has come. Times are the Pi's local clock; `NOTICEBOARD_NOW` sets the time for tests.
+
 `write_json` (`lib/json.sh`, shared with the installer) builds flat JSON objects from strings in bash, stripping control characters and escaping `\` and `"`, and replaces the file atomically.
 
 ### 9.2 Server side (`services/updates/`)
@@ -560,6 +570,7 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
 - **The switch has three steps:** `checkBranch`, then `verify-password` issues a one-time token, then `switch` consumes it and calls `requestSwitch`.
   - `requestSwitch` rechecks the branch and refuses missing software unless `acceptMissing`.
   - `updateFiles.saveSwitch` writes the branch file, then `status: requested`, then the request file, and restores all three on failure.
+- **The schedule:** `setSchedule` and `setInstallAt` check the values (`updates/schedule.js`), save them (`updateFiles`) and write a `check` request, so update.sh records the new next install time within seconds; `installNow` writes status `requested` and an `install-now` request. `getInfo` adds the schedule and the waiting version (`waitingUpdate`: the check file's `available`, unless it is the running commit); `manualUpdateWaiting` gives the screens' `updateAvailable`.
 - **Installer-needed:** `installerVersion.installedVersion` reads `data/installer.json`, else estimates from `start-kiosk.sh` (contains `kiosk-exit` → 1, else 0; no file → null). It is compared with `installer.version` in `system-requirements.json`.
 
 ---
@@ -632,7 +643,7 @@ Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the b
 | `curl` | installers, kiosk scripts | downloads, health and exit checks |
 | `chromium` / `chromium-browser` | kiosk scripts | display |
 | `arp` (net-tools) | node-arp | MAC filter |
-| `systemctl`, `systemd-run`, `flock`, `runuser`, `logger`, `xset`, `xdg-user-dir`, `getent`, `visudo`, `passwd`, `ss`, `ps`, `sshd`, `ufw`, `firewall-cmd`, `nft`, `iptables`, `apt-get`, `apt-cache`, `hostname`, `stat` | installers | OS set-up |
+| `date` (GNU: `-d`, used by lib/schedule.sh), `systemctl`, `systemd-run`, `flock`, `runuser`, `logger`, `xset`, `xdg-user-dir`, `getent`, `visudo`, `passwd`, `ss`, `ps`, `sshd`, `ufw`, `firewall-cmd`, `nft`, `iptables`, `apt-get`, `apt-cache`, `hostname`, `stat` | installers | OS set-up |
 
 `system-requirements.json` lists Node.js, npm, Git, FFmpeg, FFprobe, curl and Chromium, with version ranges and install hints. It also holds `installer.version` and `installer.changes`.
 
@@ -837,10 +848,11 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** settings/general.js.
 
 **`services/updates/`**
-- **`index.js`:** `getInfo`, `versionInfo`, `getNotice`/`dismissNotice`, `installerStatus`, `listBranches`, `checkBranch` (+ `requirementsOf`), `requestSwitch`; re-exports `validBranchName`, `issueToken` and `takeToken`. Errors for the admin carry `expose`. Used by settings/updates.js.
+- **`index.js`:** `getInfo`, `versionInfo`, `getNotice`/`dismissNotice`, `installerStatus`, `listBranches`, `checkBranch` (+ `requirementsOf`), `requestSwitch`, `setSchedule`, `setInstallAt`, `installNow`, `waitingUpdate`, `manualUpdateWaiting`; re-exports `validBranchName`, `issueToken` and `takeToken`. Errors for the admin carry `expose`. Used by settings/updates.js.
 - **`git.js`:** `git(args, timeout)` in ROOT, never prompting.
 - **`branchName.js`:** `validBranchName`, the JS twin of `installers/lib/branch.sh` `valid_branch` (kept in step by `tests/installers/branch-names.sh`).
-- **`updateFiles.js`:** the one owner of the files shared with update.sh: `readBranchSetting`, `readStatus`/`readCheck`/`readNotice`, `deleteNotice`, `requestPending`, `unitsEnabled`, `saveSwitch` (the three writes in order, restored on failure).
+- **`updateFiles.js`:** the one owner of the files shared with update.sh: `readBranchSetting`, `readStatus`/`readCheck`/`readNotice`, `deleteNotice`, `requestPending`, `unitsEnabled`, `readSchedule`/`saveSchedule`/`saveInstallAt` (`update-schedule.env`), `requestRun` (`check` or `install-now`), `saveInstallNow`, `saveSwitch` (the three writes in order, restored on failure).
+- **`schedule.js`:** `EVERY`, `DEFAULT`, `parseSchedule`, `parseInstallAt` (a valid schedule and set time; the rules for when to install are only in lib/schedule.sh, D41).
 - **`installerVersion.js`:** `installedVersion` (record, else the kiosk-script heuristic), `installerNeeds`, `status`. Also used by server/test/installer.test.js.
 
 ### 12.5 Utilities
@@ -896,7 +908,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/CornerButton.vue` | the faint round button in a top corner (`corner`, `opacity`, `hoverOpacity`; icon in the slot) | none | |
 | `components/ScreenDialog.vue` | the dark centred card for pop-ups | none | |
 | `components/DeviceInfo.vue` | pin (top left, 0.3 → 0.8) and pop-up: the server's addresses and port, and the viewer's URL (never the admin panel's); `GET /api/device` | CornerButton, ScreenDialog | its own 90 s auto-close timer |
-| `components/InstallerWarning.vue` | the warning mark (bottom right, 20 px, red) and its one-line message | ScreenDialog | its own 60 s auto-close timer |
+| `components/AdminWarning.vue` | the warning mark (bottom right, 20 px, red) and its one-line message, while the installer needs running again or a manual update waits | ScreenDialog | its own 60 s auto-close timer |
 | `components/ExitKiosk.vue` | exit button (top right, 0.5 → 0.9), confirm; `POST /api/device/kiosk-exit` | CornerButton, ScreenDialog | its own 60 s auto-close timer |
 
 ### 12.7 Admin (`client/admin`)
@@ -904,8 +916,8 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | File | Purpose | Uses | Notes |
 |---|---|---|---|
 | `main.js`, `router/index.js` | imports `styles/base.css`; mount after the router is ready; routes; login check (`api.get('/auth/status', { redirectOn401: false })`, never redirects by itself) | Vue Router, useApi | |
-| `styles/base.css` | the global styles: CSS variables, layout, buttons, cards, fields, messages, badges, and the confirmation dialogs' texts (`.danger-dialog`: paragraphs, `.warnings`, `.choices`, `.tone-warn`, `.actions`) | none | |
-| `App.vue` | the layout: the sidebar, the warnings and the updater's notices (every page but the login page), then the page | NavBar, DefaultPasswordWarning, UpdateNotice, InstallerNotice, useNav | |
+| `styles/base.css` | the global styles: CSS variables, layout, buttons, cards, fields, messages, badges, the page warnings' box (`.page-warning`), and the confirmation dialogs' texts (`.danger-dialog`: paragraphs, `.warnings`, `.choices`, `.tone-warn`, `.actions`) | none | |
+| `App.vue` | the layout: the sidebar, the warnings and the updater's notices (every page but the login page), then the page | NavBar, DefaultPasswordWarning, UpdateNotice, InstallerNotice, UpdateAvailableNotice, useNav | |
 | `composables/useApi.js` | one `request` core behind `api.get/post/put/patch/del/upload`; a 401 → the login page, unless `redirectOn401: false` (then thrown like any error); errors carry `status` and `serverMessage` | none | |
 | `composables/useSlideshowActions.js` | `setEnabled`, `setHidden` (errors shown in an alert) with `toggling` / `hiding` busy state | useApi | |
 | `composables/useFlash.js` | a reactive `{ text, tone, ok(text, clearAfterMs), error(text), clear() }` for "Saved." and error messages | none | |
@@ -926,9 +938,11 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/NavIcon.vue` | inline SVG icons | none | |
 | `components/DefaultPasswordWarning.vue` | red banner | useSecurity | |
 | `components/updates/UpdateNotice.vue` | dismissable updater notice (in the layout: every page) | useApi | |
-| `components/updates/InstallerNotice.vue` | run-the-installer box (in the layout: every page) | useApi, `@shared` installerCommand | |
-| `components/updates/SoftwareUpdates.vue` | the card: puts the parts together, shows the outcome of the last attempt | useUpdateInfo, UpdateStatus, BranchSwitcher, SwitchDialogs | |
-| `components/updates/UpdateStatus.vue` | the facts (running, updates, last check, last update) and the progress box | useUpdateInfo helpers | |
+| `components/updates/InstallerNotice.vue` | run-the-installer box (in the layout: every page; the box is `.page-warning`) | useApi, `@shared` installerCommand | |
+| `components/updates/UpdateAvailableNotice.vue` | "Update available" with manual updates (in the layout: every page, nothing to close), linking to `/settings#updates` | useApi | |
+| `components/updates/UpdateSchedule.vue` | in the Software updates card: the waiting version (Update now, Set a time, or the automatic install's time) and the schedule form | useApi, useFlash, FlashMessage, useUpdateInfo helpers | |
+| `components/updates/SoftwareUpdates.vue` | the card (`id="updates"`): puts the parts together, shows the outcome of the last attempt; open while an update runs, went wrong, or (manual) waits | useUpdateInfo, UpdateStatus, UpdateSchedule, BranchSwitcher, SwitchDialogs, CollapsibleCard | |
+| `components/updates/UpdateStatus.vue` | the facts (running, updates and the schedule, last check, last update) and the progress box | useUpdateInfo helpers | |
 | `components/updates/BranchSwitcher.vue` | branch name, Check branch, the result with the software and installer panels, "Switch to …" | useApi, useUpdateInfo helpers | |
 | `components/updates/SwitchDialogs.vue` | Missing software (its own ModalDialog), then the shared steps with the switch's texts (ids `switch-…`) | useApi, ModalDialog, ConfirmDangerDialogs, useUpdateInfo helpers | |
 | `components/settings/DeleteContentCard.vue` | the "Delete content" card: Delete All… (loads the slideshows; nothing but the sample → says so), the warning listing each slideshow and its slides, the shared steps | useApi, useFlash, FlashMessage, CollapsibleCard, ConfirmDangerDialogs | |
@@ -953,6 +967,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `lib/ui.sh` | `has_tty`, `ask`, `ask_yes_no`, `ask_choice` (the 1/2 questions), `ask_port`, `ask_yes_in_time`, `banner`; `choose_mode`, `choose_branch`, `offer_reboot` | main, sudo, display, server, firewall |
 | `lib/branch.sh` | `valid_branch` (the full rule), `read_branch_setting`, `read_main_at_switch`, `write_branch_setting` (atomic) | ui, server, **update.sh** |
 | `lib/json.sh` | `write_json`, `json_string` | server (`update-status.json`), **update.sh** |
+| `lib/schedule.sh` | `read_schedule`, `now_epoch`, `iso_time`, `to_epoch`, `install_due`, `next_install`, `set_install_at` (D41) | **update.sh only** (not one of `INSTALLER_MODULES`) |
 | `lib/system.sh` | `update_system`, `chromium_package`, `node_new_enough`, `lock_install_dir`, `slideshow_port` | server, display, firewall |
 | `lib/sudo.sh` | `check_sudo_password` and its helpers, `SUDO_STATUS` | main, the summaries |
 | `lib/server.sh` | `install_server`, `fetch_branch`, `save_branch_setting`, `write_service`, `write_update_units`, `write_installer_record` (its own `printf`: `version` is a number), `summary_server` | main |
@@ -1006,6 +1021,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `install_server` | installers/lib/server.sh | main | many | several | the whole server set-up | installations |
 | `install_commit` / `restart_server` | update.sh | main | git, npm, kill, curl | config port | the code on disk, restart | every automatic update |
 | `branch_merged` | update.sh | main | git fetch, ls-remote, merge-base, merge-tree | update-branch.env | none | auto-return to main |
+| `install_due` / `next_install` | installers/lib/schedule.sh | update.sh | date | update-schedule.env, update-check.json | none | when every Pi installs updates; what the admin panel says about it |
 
 ---
 
@@ -1055,6 +1071,7 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 | D38 | Media names: the rule, and what the admin panel shows | `services/mediaNames.js` (the rule: trimmed, no control characters, at most `limits.mediaNameMax`); `mediaDisplayName` in `shared/index.js` (`name`, else `originalName`, else the type and date added) | For slides now, and for audio tracks later. Names stay in the admin panel: the playlist doesn't carry them. |
 | D39 | Section cards that fold, and never hide a warning | `components/ui/CollapsibleCard.vue` + `useCollapsed` | Each card says when it needs attention: Change password (the default password), Software updates (an update running, the server restarting, the last attempt failed, rolled back or cancelled, an error message), Slides (a failed slide or upload). The page warnings sit outside the cards. |
 | D40 | Asking for the admin password again before something that can't easily be undone | `services/actionTokens.js` (the one-time token, per action), `middleware/passwordLimiter.js` (wrong tries, counted together), `components/ui/ConfirmDangerDialogs.vue` (the dialogs), `.danger-dialog` in `styles/base.css` (their texts) | Used by the branch switch and Delete All; Restore Defaults will use it too. Each action keeps its own warning texts. |
+| D41 | The update schedule: when an install is due | `installers/lib/schedule.sh` only (update.sh); it writes the next install time into update-check.json for the admin panel | The server only checks and saves the values (`updates/schedule.js`, `updateFiles`); `updateFiles.readSchedule` reads the file with the same defaults as `read_schedule`. |
 
 ---
 
@@ -1071,7 +1088,7 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 6. The **new update.sh must still contain the text `update-branch.env`**. Otherwise older Pis refuse to switch to the branch.
 7. **Nothing may be tracked under `data/`, `tmp/`, `logs/` or `.env`.** Otherwise every updater refuses the commit.
 8. The **`tmp/noticeboard-uploads/`** folder must stay the place where uploads wait, because update.sh waits for it.
-9. **`tmp/update-request`** starts an update; the server writes it, and the systemd path unit watches for it.
+9. **`tmp/update-request`** starts update.sh; the server writes it, and the systemd path unit watches for it. An older update.sh treats any text in it as a request to install, which is only what `check` avoids.
 
 **Kiosk scripts** (not updated by sync)
 10. `GET /` answers 200 when the device is allowed and 404 when MAC filtering blocks it.
@@ -1083,7 +1100,7 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 14. The guide anchors the admin panel links to must stay.
 
 **Files in `data/`** (their formats and paths must not change)
-15. `config.json` (JSON5-readable, with every key in §5.1), `slideshows/<folder>/slideshow.json` (slide fields in §5.1 and §6), media names, `branding/logo.png`, `update-branch.env`, `update-status.json`, `update-check.json`, `update-notice.json`, `installer.json` and `backups/`.
+15. `config.json` (JSON5-readable, with every key in §5.1), `slideshows/<folder>/slideshow.json` (slide fields in §5.1 and §6), media names, `branding/logo.png`, `update-branch.env`, `update-status.json`, `update-check.json` (keys may be added), `update-notice.json`, `update-schedule.env`, `installer.json` and `backups/`.
 
 **Viewer and admin pages already open in browsers**
 16. They keep running old code until they reload, so:
@@ -1129,9 +1146,9 @@ Run them with `node tests/run.js <group> [filter]` or the npm scripts. `npm run 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|
 | unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (15 tests, including 30 simulated days); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS), the media name rule and mediaDisplayName (9) | Node 20+ |
-| api (`test:api`) | `tests/api/` | **contract.js**: 86 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
-| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), Delete All's card and dialogs (`delete-all.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
-| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
+| api (`test:api`) | `tests/api/` | **contract.js**: 90 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), the update schedule's routes and the screens' mark (`update-schedule.js`), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
+| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), Delete All's card and dialogs (`delete-all.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
+| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return, **the schedule** with a fake clock: `update-schedule.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
 The upgrade rehearsal works like this:
@@ -1159,10 +1176,9 @@ Every planned change starts here, before any code: what changes and why, the par
 |---|---|---|
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
 | 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
-| 18.5 | Update schedule (15 min, 2 hours, daily, weekly, manual) | Approved |
 | 18.6 | Restore Defaults (as if newly installed on the branch the Pi follows) | Approved |
 
-Order of work, on the branch `QALife-updates`: 18.5, 18.6, each finished, tested and committed before the next (friendly names, folding cards and Delete All are done: D38, D39, D40). 18.6 uses the confirmation steps and password tokens Delete All built (D40). 18.6 reinstalls through update.sh, whose request handling 18.5 changes, so 18.5 comes first. None of the four changes the installer: `INSTALLER_VERSION` stays 2, and no Pi is asked to run the installer again.
+On the branch `QALife-updates`; friendly names, folding cards, Delete All and the update schedule are done (D38–D41). 18.6 uses the confirmation steps and password tokens Delete All built (D40) and update.sh's requests (D41). None of the four changes the installer: `INSTALLER_VERSION` stays 2, and no Pi is asked to run the installer again.
 
 ### 18.1 The viewer's black screen that only a power cycle cleared
 
@@ -1192,39 +1208,6 @@ cat /proc/device-tree/model; uname -r; chromium --version
 ### 18.2 Remove the unused npm packages
 
 Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Pi's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
-
-### 18.5 Update schedule
-
-**What changes:** the Software updates card gets **Update schedule**: every 15 minutes (the default, as today), every 2 hours, daily, weekly or manual. Daily and weekly have a time (default 00:00) and weekly a day (default Sunday). Times are the Pi's own clock, and the card says so.
-
-**Keeping the systemd timer as it is:** the installer's timer still starts update.sh every 15 minutes (changing it would need the installer run again). update.sh itself decides what to do on each run:
-- **15 minutes, 2 hours, daily, weekly:** check (fetch) on every run, as now; **install** only when due. 2 hours: at least 2 hours since the last install check. Daily and weekly: the first run at or after the chosen time since the last install check, so a Pi that was off or offline at that time **catches up at the next run** (the owner's choice).
-- **Manual:** check once a day, never install by itself.
-- **While an update waits (every mode), the Software updates card offers three choices:** **Update now**; **Set a time** (a date and time, default the next 00:00), which takes the place of the automatic install until it has run and can be changed by setting another time; or waiting for the automatic install, whose time the card shows (not in manual mode, which has none).
-- **Manual mode only:** while an update waits, an admin notice on every page says "Update available" and links to the Software updates card, and the warning mark shows on every screen. Neither has a close or cancel button: both stay until the Pi is up to date, even once a time is set.
-- **Update now**, a branch switch (§9.2) and Restore Defaults (18.6) write `tmp/update-request` as today; a requested run is always due, whatever the schedule. A branch switch the admin makes with the switcher therefore always happens straight away.
-- The merged-branch return (§9.1 step 8) installs main, so it follows the schedule like any other install (in manual mode it is the waiting update the notice announces).
-
-**Data:** a new file `data/update-schedule.env`, owned on the server side by `updates/updateFiles.js` and read by update.sh through a new `installers/lib/schedule.sh` (loaded by update.sh with `branch` and `json`):
-```
-NOTICEBOARD_UPDATE_EVERY=15min|2h|daily|weekly|manual
-NOTICEBOARD_UPDATE_TIME=HH:MM        daily and weekly
-NOTICEBOARD_UPDATE_DAY=0-6           weekly (0 = Sunday)
-NOTICEBOARD_UPDATE_AT=<ISO time>     a set time for the waiting update (any mode), removed once it has run
-```
-A missing or unreadable file means every 15 minutes, which is today's behaviour, so nothing changes for existing Pis until someone picks a schedule. update.sh records the time of its last install check in `data/update-check.json` (new key `installCheckedAt`) and, when an update waits, the waiting commit (`available`, with its subject and date).
-
-**Server and screens:**
-- `services/updates`: `getInfo` adds the schedule, the next install time and the waiting update; new `PUT /api/settings/updates/schedule`, `POST /api/settings/updates/install-now`, `PUT /api/settings/updates/install-at`.
-- `display:settings` gains a key `updateAvailable` (true only in manual mode while an update waits, set time or not); `installerNeeded` stays as it is (§15 #16: keys may only be added). `InstallerWarning.vue` becomes `AdminWarning.vue`, shown when either is true, with the same mark and message.
-- Admin: `UpdateSchedule.vue` (the schedule, and the three choices while an update waits) in the Software updates card; `UpdateAvailableNotice.vue` in the layout (manual mode; no close button).
-
-**Risks:**
-- After a rollback to older code, its update.sh ignores the schedule file and updates every 15 minutes until new code is installed again; the file is kept.
-- The schedule relies on the Pi's clock (normally set from the network). Before the clock is set, a daily or weekly install can happen early or late; update.sh never installs because of a clock that moved backwards.
-- Tests need a fake clock: update.sh takes the time from `NOTICEBOARD_NOW` when set (tests only, like `NOTICEBOARD_SYSTEMD_DIR`).
-
-**Tests:** installers (`update-schedule.sh`: each mode, catching up after being off, manual never installing, a set time replacing the automatic install, a request always installing, the missing file = 15 minutes), api (the routes, the check file read), browser (the card's three choices, the manual notice staying until up to date, the warning mark on the viewer), `socket-events.js` (the new key), the upgrade rehearsal.
 
 ### 18.6 Restore Defaults
 

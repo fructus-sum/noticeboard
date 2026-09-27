@@ -9,12 +9,13 @@
 //   runs or the server restarts, or the last attempt went wrong (a warning).
 //
 // Used by: views/SettingsView
-// Uses: useUpdateInfo (the data and polling), UpdateStatus, BranchSwitcher, SwitchDialogs,
-//   CollapsibleCard
+// Uses: useUpdateInfo (the data and polling), UpdateStatus, UpdateSchedule, BranchSwitcher,
+//   SwitchDialogs, CollapsibleCard
 import { ref, computed, onMounted } from 'vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { useUpdateInfo } from '../../composables/useUpdateInfo.js';
 import UpdateStatus from './UpdateStatus.vue';
+import UpdateSchedule from './UpdateSchedule.vue';
 import BranchSwitcher from './BranchSwitcher.vue';
 import SwitchDialogs from './SwitchDialogs.vue';
 
@@ -25,9 +26,11 @@ const messageIsError = ref(false);
 const switcher = ref(null);
 const dialogs = ref(null);
 
-// Something the admin must see: an update running, or the last attempt gone wrong
+// Something the admin must see: an update running, the last attempt gone wrong, or (manual
+// updates) a new version waiting
 const attention = computed(() => !!(info.value?.busy || restarting.value || messageIsError.value
-  || ['failed', 'rolled-back', 'cancelled'].includes(info.value?.status?.state)));
+  || ['failed', 'rolled-back', 'cancelled'].includes(info.value?.status?.state)
+  || (info.value?.schedule?.every === 'manual' && info.value?.waiting)));
 
 function say(text, isError) {
   message.value = text;
@@ -37,6 +40,11 @@ function say(text, isError) {
 function startSwitch(checked) {
   message.value = '';
   dialogs.value.open(checked);
+}
+
+// The schedule or a set time was saved: the answer is the new updates info
+function scheduleChanged(newInfo) {
+  info.value = newInfo;
 }
 
 function switched(newInfo) {
@@ -53,7 +61,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <CollapsibleCard title="Software updates" name="settings-updates" :attention="attention">
+  <CollapsibleCard id="updates" title="Software updates" name="settings-updates" :attention="attention">
 
     <p v-if="loadError" class="error-msg">{{ loadError }}</p>
     <p v-else-if="!info" class="muted">Loading…</p>
@@ -61,6 +69,7 @@ onMounted(() => {
 
     <template v-else>
       <UpdateStatus :info="info" :restarting="restarting" />
+      <UpdateSchedule v-if="info.autoUpdates" :info="info" @changed="scheduleChanged" @started="switched" />
       <BranchSwitcher
         v-if="!(info.busy || restarting)"
         ref="switcher"

@@ -31,6 +31,7 @@ function updateStatusPath() { return path.join(dataDir(), 'update-status.json');
 function updateCheckPath() { return path.join(dataDir(), 'update-check.json'); }
 function updateNoticePath() { return path.join(dataDir(), 'update-notice.json'); }
 function updateRequestPath() { return path.join(ROOT, 'tmp', 'update-request'); }
+function updateSchedulePath() { return path.join(dataDir(), 'update-schedule.env'); }
 // What install.sh set up: the version of its last run, and the server Pi's kiosk script
 function installerRecordPath() { return path.join(dataDir(), 'installer.json'); }
 function serverKioskPath() { return path.join(ROOT, 'start-kiosk.sh'); }
@@ -64,6 +65,7 @@ module.exports = {
   updateCheckPath,
   updateNoticePath,
   updateRequestPath,
+  updateSchedulePath,
   installerRecordPath,
   serverKioskPath,
   requirementsPath,

@@ -323,7 +323,14 @@
       "instant": "boolean",
       "lastCheck": "null",
       "pending": "boolean",
-      "status": "null"
+      "schedule": {
+        "at": "null",
+        "day": "number",
+        "every": "string",
+        "time": "string"
+      },
+      "status": "null",
+      "waiting": "null"
     }
   },
   "updates: notice": {
@@ -385,6 +392,34 @@
     "status": 404,
     "type": "application/json",
     "content": "{\"error\":\"There's no branch called \\\"no-such-branch-xyz\\\" on GitHub.\"}"
+  },
+  "updates: schedule, bad": {
+    "method": "PUT",
+    "path": "/api/settings/updates/schedule",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"The schedule must be one of: 15min, 2h, daily, weekly, manual.\"}"
+  },
+  "updates: schedule, updater not set up": {
+    "method": "PUT",
+    "path": "/api/settings/updates/schedule",
+    "status": 409,
+    "type": "application/json",
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
+  },
+  "updates: install at, bad": {
+    "method": "PUT",
+    "path": "/api/settings/updates/install-at",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Choose a date and time for the update.\"}"
+  },
+  "updates: install now, updater not set up": {
+    "method": "POST",
+    "path": "/api/settings/updates/install-now",
+    "status": 409,
+    "type": "application/json",
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
   },
   "updates: verify, wrong password": {
     "method": "POST",
@@ -653,7 +688,8 @@
       "logo": {
         "url": "string"
       },
-      "showDeviceInfo": "boolean"
+      "showDeviceInfo": "boolean",
+      "updateAvailable": "boolean"
     }
   },
   "socket: playlist:update": {

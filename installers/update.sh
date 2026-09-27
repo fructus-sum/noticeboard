@@ -8,8 +8,13 @@
 # changed or deleted.
 #
 # Runs every 15 minutes from noticeboard-update.timer, and straight away when the admin panel
-# asks for a branch switch (noticeboard-update.path watches tmp/update-request). Both are set
-# up by install.sh. Runs as the user that owns /opt/noticeboard, which is also the user the
+# asks for something (noticeboard-update.path watches tmp/update-request). Both are set up by
+# install.sh. The update schedule chosen in the admin panel (data/update-schedule.env, read by
+# lib/schedule.sh) decides whether a run may install: every run checks for a new version (in
+# manual mode once a day) and records whether one is waiting; it installs only when that's due,
+# or when the admin asked (Update now, a branch switch). The request file says what was asked:
+# "install-now", "check" (only check, e.g. after the schedule changed), or anything else (a
+# branch switch, as older servers write it). Runs as the user that owns /opt/noticeboard, which is also the user the
 # server runs as. No sudo.
 #
 #   Check now:             bash /opt/noticeboard/installers/update.sh
@@ -36,6 +41,7 @@ BRANCH_FILE="$INSTALL_DIR/data/update-branch.env"    # NOTICEBOARD_BRANCH=<branc
 STATUS_FILE="$INSTALL_DIR/data/update-status.json"   # the last update or branch switch, shown in the admin panel
 CHECK_FILE="$INSTALL_DIR/data/update-check.json"     # the last check for updates, shown in the admin panel
 NOTICE_FILE="$INSTALL_DIR/data/update-notice.json"   # shown on the admin home page until someone closes it
+SCHEDULE_FILE="$INSTALL_DIR/data/update-schedule.env" # the update schedule, written by the admin panel (lib/schedule.sh)
 BACKUP_DIR="$INSTALL_DIR/data/backups"               # settings are copied here before a branch switch
 REQUEST_FILE="$INSTALL_DIR/tmp/update-request"       # written by the admin panel to update right now
 LOCK_FILE="$INSTALL_DIR/tmp/update.lock"             # install.sh holds this lock too
@@ -50,9 +56,10 @@ BRANCH_SUPPORT_MARKER="update-branch.env"
 export GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=60
 
 # Shared with install.sh: the branch setting (valid_branch, read_branch_setting,
-# read_main_at_switch, write_branch_setting) and the JSON files (write_json). Loaded now, from
-# this commit, before a checkout can replace them. If they can't be, nothing is touched.
-for lib in branch json; do
+# read_main_at_switch, write_branch_setting) and the JSON files (write_json); and the update
+# schedule (read_schedule, install_due, next_install, set_install_at). Loaded now, from this
+# commit, before a checkout can replace them. If they can't be, nothing is touched.
+for lib in branch json schedule; do
   # shellcheck source=lib/branch.sh
   if ! source "$INSTALL_DIR/installers/lib/$lib.sh"; then
     echo "Can't load installers/lib/$lib.sh, so nothing was updated. To repair this noticeboard, run the installer: curl -fsSL $INSTALLER_URL | sudo bash" >&2
@@ -70,6 +77,10 @@ RETURNED_FROM=""     # the branch this run went back to main from, because it wa
 PREVIOUS_BRANCH=""   # the branch and commit running before this update
 CURRENT=""
 TARGET=""            # the commit being installed
+NOW=""               # this run's time, in seconds (lib/schedule.sh now_epoch)
+INSTALL_CHECKED_AT="" # the last run that could install (update-check.json), for the schedule
+FETCHED_AT=""        # the last time GitHub was checked (update-check.json)
+AVAILABLE=""         # a newer commit waiting for its install time
 
 # git checkout replaces this file while it runs, so everything runs from main(),
 # called on the last line: bash has read the whole file before main() starts.
@@ -87,20 +98,31 @@ main() {
 
   cd "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR/tmp" "$INSTALL_DIR/data"
+  NOW=$(now_epoch)
+  read_schedule
+  INSTALL_CHECKED_AT=$(check_value installCheckedAt)
+  FETCHED_AT=$(check_value fetchedAt)
 
-  # The admin panel asked for this run (a branch switch). The request is taken straight away:
-  # systemd starts this whenever the file exists, so leaving it would start it again and again.
-  local requested="" force=""
+  # The admin panel asked for this run. The request is taken straight away: systemd starts this
+  # whenever the file exists, so leaving it would start it again and again. Anything but "check"
+  # asks for an install (a branch switch, or Update now).
+  local requested="" force="" request=""
   if [ -f "$REQUEST_FILE" ]; then
-    requested=1
-    force=1   # asked for by the admin, so a commit that failed before is tried again
+    request=$(head -c 200 "$REQUEST_FILE" 2>/dev/null | tr -d '\r\n' || true)
     rm -f "$REQUEST_FILE"
+    if [ "$request" != check ]; then
+      requested=1
+      force=1   # asked for by the admin, so a commit that failed before is tried again
+    fi
   fi
   if [ "${1:-}" = "--force" ]; then force=1; fi
 
   exec 9>>"$LOCK_FILE"
   if ! flock -n 9; then
-    if [ -n "$requested" ]; then
+    if [ "$request" = install-now ]; then
+      set_install_at "$NOW"   # a set time that has come: the next check installs
+      write_status requested "The installer or another update is running. The update starts at the next check, within 15 minutes."
+    elif [ -n "$requested" ]; then
       write_status requested "The installer or another update is running. The switch to $BRANCH starts at the next check, within 15 minutes."
     fi
     echo "The installer or another update is running; trying again at the next check."
@@ -139,8 +161,20 @@ main() {
     exit 0
   fi
 
-  # A branch whose work is all in main now isn't needed any more: go back to main
-  if [ -z "$switching" ] && [ "$BRANCH" != main ] && [ "$(read_branch_setting)" = "$BRANCH" ] && branch_merged; then
+  # May this run install? Always when the admin asked or a switch is pending; otherwise when
+  # the schedule says so (lib/schedule.sh). Otherwise it only checks.
+  local due="" fetched
+  fetched=$(to_epoch "$FETCHED_AT")
+  if [ -n "$requested" ] || [ -n "$switching" ] || install_due "$NOW" "$(to_epoch "$INSTALL_CHECKED_AT")"; then
+    due=1
+  elif [ "$SCHEDULE_EVERY" = manual ] && [ -z "$request" ] && [ -n "$fetched" ] && [ $((NOW - fetched)) -lt 85500 ]; then
+    echo "Manual updates: checked for a new version less than a day ago."
+    exit 0
+  fi
+
+  # A branch whose work is all in main now isn't needed any more: go back to main (an install,
+  # so only when one is due)
+  if [ -n "$due" ] && [ -z "$switching" ] && [ "$BRANCH" != main ] && [ "$(read_branch_setting)" = "$BRANCH" ] && branch_merged; then
     echo "$BRANCH has been merged into main; going back to main."
     RETURNED_FROM=$BRANCH
     write_branch_setting main
@@ -168,6 +202,14 @@ main() {
     exit 1
   fi
   TARGET=$(git rev-parse "origin/$BRANCH")
+  FETCHED_AT=$(iso_time "$NOW")
+  if [ -n "$due" ]; then
+    INSTALL_CHECKED_AT=$(iso_time "$NOW")
+    if [ -n "$SCHEDULE_AT" ] && [ "$NOW" -ge "$SCHEDULE_AT" ]; then
+      set_install_at ""   # the set time has come: this run is the install it was for
+      SCHEDULE_AT=""
+    fi
+  fi
 
   if [ "$CURRENT" = "$TARGET" ]; then
     if [ -n "$switching" ]; then
@@ -194,6 +236,14 @@ main() {
     fi
     write_check skipped "${TARGET:0:7} from $BRANCH couldn't be installed before, so it's skipped until a newer commit arrives. Still running ${CURRENT:0:7}."
     echo "Skipping ${TARGET:0:7}: it failed before. Push a fix, or retry with: bash $INSTALL_DIR/installers/update.sh --force"
+    exit 0
+  fi
+
+  # Not due: the new version waits for its install time, or for the admin in manual mode
+  if [ -z "$due" ]; then
+    AVAILABLE=$TARGET
+    write_check available "A new version is waiting: ${TARGET:0:7} from $BRANCH. $(waiting_note)"
+    echo "Update available: ${TARGET:0:7} from $BRANCH (not due yet)."
     exit 0
   fi
 
@@ -369,9 +419,36 @@ write_status() {   # write_status <state> <message>
     message "$2" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 
-# The last check for updates (result: up-to-date, waiting, skipped, offline or error)
+# The last check for updates (result: up-to-date, available, waiting, skipped, offline or error),
+# with what the schedule needs next time (installCheckedAt, fetchedAt) and what the admin panel
+# shows: the next automatic install (nextInstall) and a waiting version (available, its subject
+# and date)
 write_check() {   # write_check <result> <message>
-  write_json "$CHECK_FILE" result "$1" branch "$BRANCH" message "$2" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  local next="" subject="" committed=""
+  next=$(next_install "$NOW" "$(to_epoch "$INSTALL_CHECKED_AT")")
+  if [ -n "$AVAILABLE" ]; then
+    subject=$(git log -1 --format=%s "$AVAILABLE" 2>/dev/null || true)
+    committed=$(git log -1 --format=%cI "$AVAILABLE" 2>/dev/null || true)
+  fi
+  write_json "$CHECK_FILE" result "$1" branch "$BRANCH" message "$2" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    installCheckedAt "$INSTALL_CHECKED_AT" fetchedAt "$FETCHED_AT" nextInstall "${next:+$(iso_time "$next")}" \
+    available "$AVAILABLE" availableSubject "$subject" availableDate "$committed"
+}
+
+# A value from the last check (update-check.json), or nothing
+check_value() {   # check_value <key>
+  sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" "$CHECK_FILE" 2>/dev/null | head -n 1 || true
+}
+
+# When a waiting version will be installed, for the admin
+waiting_note() {
+  local next
+  if [ "$SCHEDULE_EVERY" = manual ] && [ -z "$SCHEDULE_AT" ]; then
+    echo "Updates are manual: it's installed when you choose, in Settings → Software updates."
+    return
+  fi
+  next=$(next_install "$NOW" "$(to_epoch "$INSTALL_CHECKED_AT")")
+  if [ -n "$next" ]; then echo "It's installed at $(date -d "@$next" '+%-d %b %Y, %H:%M'), or when you choose Update now."; fi
 }
 
 # Put a commit's files in place: code, dependencies and the built SPAs (as install.sh does).

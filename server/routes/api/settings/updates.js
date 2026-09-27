@@ -44,6 +44,11 @@ router.post('/updates/check', jsonRoute(async (req) => {
   return { ...result, current: info.branch, currentCommit: info.commit };
 }));
 
+// The update schedule, a set time for the waiting version, and Update now
+router.put('/updates/schedule', jsonRoute((req) => updateService.setSchedule(req.body, req.ip)));
+router.put('/updates/install-at', jsonRoute((req) => updateService.setInstallAt(req.body?.at, req.ip)));
+router.post('/updates/install-now', jsonRoute((req) => updateService.installNow(req.ip)));
+
 router.post('/updates/verify-password', wrongPasswordLimiter, route(async (req, res) => {
   const { password, branch } = req.body;
   if (!updateService.validBranchName(branch)) {

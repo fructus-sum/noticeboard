@@ -16,6 +16,14 @@
 //                            latest commit, the software it needs and its installer needs.
 //                            Downloads the branch, so the switch itself is quicker
 //   requestSwitch(name, by, { acceptMissing })  saves the switch and starts update.sh
+//   setSchedule(body, by)  → info: saves the update schedule, then asks update.sh to check
+//                            (it works out the next install time)
+//   setInstallAt(value, by) → info: a set time for the waiting update, then a check
+//   installNow(by)         → info: installs the latest version of the followed branch now
+//   waitingUpdate(info)    → the version waiting to be installed ({ commit, subject, date,
+//                            nextInstall }), or null
+//   manualUpdateWaiting()  → whether the screens show the warning mark for it: manual
+//                            updates, and a version waiting (SYSTEM_DESIGN §14 D41)
 //   validBranchName                              (from branchName.js)
 //   issueToken(branch), takeToken(token, branch) the password check's one-time token for a
 //                            switch (services/actionTokens, action 'switch')
@@ -24,7 +32,8 @@
 //   routes/api/settings/updates.js
 //
 // Uses
-//   ./git, ./branchName, ./updateFiles, ./installerVersion, services/actionTokens, utils/systemCheck,
+//   ./git, ./branchName, ./updateFiles, ./installerVersion, ./schedule, services/actionTokens,
+//   utils/systemCheck,
 //   utils/logger
 //
 // Change impact
@@ -35,6 +44,7 @@ const { git } = require('./git');
 const { validBranchName } = require('./branchName');
 const files = require('./updateFiles');
 const installer = require('./installerVersion');
+const scheduleRules = require('./schedule');
 const tokens = require('../actionTokens');
 const { checkRequirements } = require('../../utils/systemCheck');
 const logger = require('../../utils/logger');
@@ -69,12 +79,13 @@ async function getInfo() {
       reason: "This copy of the noticeboard wasn't installed from GitHub by the installer, so it can't update itself.",
     };
   }
-  const [configured, status, lastCheck, units, pending] = await Promise.all([
+  const [configured, status, lastCheck, units, pending, schedule] = await Promise.all([
     files.readBranchSetting(),
     files.readStatus(),
     files.readCheck(),
     files.unitsEnabled(),
     files.requestPending(),
+    files.readSchedule(),
   ]);
   return {
     available: true,
@@ -87,7 +98,77 @@ async function getInfo() {
     busy: inProgress(status),
     status,                        // the last update or switch (update.sh)
     lastCheck,                     // the last check for updates (update.sh)
+    schedule,                      // { every, time, day, at } (data/update-schedule.env)
+    waiting: waitingUpdate({ commit, lastCheck }),
   };
+}
+
+// A newer version update.sh found but hasn't installed yet (not due), or null
+function waitingUpdate({ commit, lastCheck }) {
+  if (lastCheck?.result !== 'available' || !lastCheck.available || lastCheck.available === commit) return null;
+  return {
+    commit: lastCheck.available,
+    subject: lastCheck.availableSubject || '',
+    date: lastCheck.availableDate || null,
+    nextInstall: lastCheck.nextInstall || null,
+  };
+}
+
+async function manualUpdateWaiting() {
+  const [schedule, lastCheck, commit] = await Promise.all([
+    files.readSchedule(),
+    files.readCheck(),
+    git(['rev-parse', 'HEAD']).catch(() => null),
+  ]);
+  return schedule.every === 'manual' && !!waitingUpdate({ commit, lastCheck });
+}
+
+// The updater must be set up for any of these to happen
+async function updaterReady() {
+  const info = await getInfo();
+  if (!info.available) throw userError(409, info.reason);
+  if (!info.autoUpdates && !info.instant) {
+    throw userError(409, "Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.");
+  }
+  return info;
+}
+
+async function setSchedule(body, by) {
+  const parsed = scheduleRules.parseSchedule(body);
+  if (parsed.error) throw userError(400, parsed.error);
+  await updaterReady();
+  await files.saveSchedule(parsed);
+  await files.requestRun('check');
+  logger.info('Update schedule changed', { ...parsed, by });
+  return getInfo();
+}
+
+async function setInstallAt(value, by) {
+  const parsed = scheduleRules.parseInstallAt(value);
+  if (parsed.error) throw userError(400, parsed.error);
+  await updaterReady();
+  await files.saveInstallAt(parsed.at);
+  await files.requestRun('check');
+  logger.info('Update time set', { at: parsed.at, by });
+  return getInfo();
+}
+
+async function installNow(by) {
+  const info = await updaterReady();
+  if (info.busy) throw userError(409, 'An update is already in progress. Wait for it to finish.');
+  const when = info.instant ? 'It starts within a few seconds.' : 'It starts at the next update check, within 15 minutes.';
+  await files.saveInstallNow({
+    state: 'requested',
+    branch: info.branch || info.configuredBranch,
+    previousBranch: info.branch,
+    commit: info.commit,
+    previousCommit: info.commit,
+    target: info.waiting?.commit || '',
+    message: `Update to the latest version of ${info.configuredBranch} requested. ${when}`,
+    time: new Date().toISOString(),
+  });
+  logger.info('Update now requested', { by });
+  return getInfo();
 }
 
 // When the installed version was made (date), and when this noticeboard installed it
@@ -219,6 +300,11 @@ module.exports = {
   listBranches,
   checkBranch,
   requestSwitch,
+  setSchedule,
+  setInstallAt,
+  installNow,
+  waitingUpdate,
+  manualUpdateWaiting,
   validBranchName,
   issueToken: (branch) => tokens.issue('switch', branch),
   takeToken: (token, branch) => tokens.take(token, 'switch', branch),

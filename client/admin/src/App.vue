@@ -13,6 +13,7 @@ import NavBar from './components/NavBar.vue';
 import DefaultPasswordWarning from './components/DefaultPasswordWarning.vue';
 import UpdateNotice from './components/updates/UpdateNotice.vue';
 import InstallerNotice from './components/updates/InstallerNotice.vue';
+import UpdateAvailableNotice from './components/updates/UpdateAvailableNotice.vue';
 import { useNav } from './composables/useNav.js';
 
 const route = useRoute();
@@ -28,6 +29,7 @@ const showNav = computed(() => route.path !== '/login');
       <div v-if="showNav" class="page-notices">
         <UpdateNotice />
         <InstallerNotice />
+        <UpdateAvailableNotice />
       </div>
       <RouterView />
     </main>

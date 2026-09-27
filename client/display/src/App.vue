@@ -14,7 +14,7 @@
 //
 // Uses
 //   useSocket (playlist, connection, display settings), useActivity, recovery.js
-//   (startDailyReload), SlideShow, WaitingScreen, DeviceInfo, ExitKiosk, InstallerWarning
+//   (startDailyReload), SlideShow, WaitingScreen, DeviceInfo, ExitKiosk, AdminWarning
 import { computed } from 'vue';
 import { useSocket } from './composables/useSocket.js';
 import { useActivity } from './composables/useActivity.js';
@@ -22,7 +22,7 @@ import SlideShow from './components/SlideShow.vue';
 import WaitingScreen from './components/WaitingScreen.vue';
 import DeviceInfo from './components/DeviceInfo.vue';
 import ExitKiosk from './components/ExitKiosk.vue';
-import InstallerWarning from './components/InstallerWarning.vue';
+import AdminWarning from './components/AdminWarning.vue';
 import { startDailyReload } from './recovery.js';
 
 const { playlist, connected, received, settings } = useSocket();
@@ -41,7 +41,7 @@ if (kiosk) startDailyReload(() => connected.value);
     <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
     <DeviceInfo v-if="settings.showDeviceInfo" />
     <ExitKiosk v-if="kiosk" :visible="active" />
-    <InstallerWarning v-if="settings.installerNeeded" />
+    <AdminWarning v-if="settings.installerNeeded || settings.updateAvailable" />
   </div>
 </template>
 
