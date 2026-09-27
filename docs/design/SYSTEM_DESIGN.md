@@ -194,7 +194,7 @@ socket.io attaches directly to the `http.Server`, so **`/socket.io` never passes
 | Event | Direction | When | Payload |
 |---|---|---|---|
 | `display:build` | server → one socket | on connect | 12-character SHA-1 of `client/display/dist/index.html`, or `null` |
-| `display:settings` | server → one socket, and broadcast | on connect; broadcast on `configService 'change'` and `displayEvents.displaySettingsChanged` (the logo), when the settings differ from the last broadcast | `{ showDeviceInfo, logo: { url } \| null, background }` (a colour code) |
+| `display:settings` | server → one socket, and broadcast | on connect; broadcast on `configService 'change'`, on `displayEvents.displaySettingsChanged` (the logo), and when the installer state changes (checked at start-up, when a display connects and every 5 minutes), when the settings differ from the last broadcast | `{ showDeviceInfo, logo: { url } \| null, background, installerNeeded }` (built by `services/displaySettings.js`) |
 | `display:ready` | display → server | on every (re)connect | none |
 | `playlist:update` | server → that socket (reply to `display:ready`), and broadcast | on `display:ready`; on `schedulerService 'update'`; on `displayEvents.playlistChanged` (a slideshow change, a slide deleted or reordered, an upload processed) | `{ slides: [{ type, url, duration, slideshow }] }` |
 
@@ -215,6 +215,7 @@ The event names are defined once, in `shared/contract.json`. `realtime/displaySo
 - It shows `SlideShow` when there are slides, otherwise `WaitingScreen`.
 - `DeviceInfo` (the location pin) appears if `showDeviceInfo` is on.
 - `ExitKiosk` appears unless `?kiosk=off`.
+- `InstallerWarning` (a small red triangle, bottom right) appears on every screen while `installerNeeded` is true; tapping it shows only "Please check the Admin panel for details."
 - The cursor is hidden while idle (`.app--idle`).
 - `startDailyReload` runs unless `?kiosk=off`.
 
@@ -235,10 +236,11 @@ A Vue Router SPA under `/admin/`:
 - **Mounting:** `main.js` mounts only after `router.isReady()`. Before that the router reports `/` as the page, so the sidebar would show on the login page, and its requests (which need a login) would send the browser to the login page again and again.
 - **Login check:** a global `beforeEach` asks `GET /api/auth/status` (through useApi, which never redirects for this call) and sends the user to `/login` when they aren't logged in.
 - **API calls:** go through `composables/useApi.js`, which sends the cookie with each request. A 401 response loads `/admin/login`, unless the browser is already on it.
+- **The frame on every page but the login page:** the sidebar, the default-password warning and the updater's notices (`UpdateNotice`, `InstallerNotice`), in `App.vue`. It stays while moving between pages, so a notice is the same on every page, and closing one closes it everywhere.
 - **Shared state:** module-level singletons shared between components: `useBranding` (logo), `useSecurity` (default-password flag) and `useNav` (sidebar collapsed, stored in `localStorage`).
 - **Views:**
   - `LoginView`
-  - `SlideshowsView` (home): notices, device banner, list, create, publish, hide, delete
+  - `SlideshowsView` (home): device banner, list, create, publish, hide, delete
   - `SlideshowDetailView`: loads the slideshow; `components/slideshow/` has its settings card (with the schedule editor) and its slide list (uploads, reorder, thumbnails, preview)
   - `SettingsView`: loads the settings; one component per card: display, MAC filtering, logo, password (`components/settings/`), software updates (`components/updates/`)
 
@@ -430,6 +432,7 @@ Outside the install folder:
 | A playlist change waits for the current slide to finish | `slideshowClock.setSlides` (pending) |
 | "No slideshow published" with the logo; a pulsing dot while disconnected | `WaitingScreen.vue`, `brandingService.displaySettings` |
 | Location pin with the server's address | `DeviceInfo.vue` → `GET /api/device` (`network.lanInterfaces`) |
+| The updater's notices on every admin page; the warning mark on every screen while the installer needs running again | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`; `InstallerWarning.vue`, `services/displaySettings` (`installerNeeded`), `updates/installerVersion` |
 | Exit button (kiosk only), cursor hides when idle | `ExitKiosk.vue`, `useActivity.js`, device.js exit requests, kiosk scripts |
 | Screens reload after an update; nightly reload; recovery reload | `useSocket.js` (`display:build`), `recovery.js`, `displayBuildId.js` |
 | Login, 7-day session, logout | `LoginView`, `auth.js`, `adminAuth.js`, router guard |
@@ -606,9 +609,9 @@ noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
 | socket.io / socket.io-client | realtime/displaySocket.js / useSocket.js | real-time channel |
 | winston | logger | logging |
 | vue, vue-router | client apps | UI |
-| **cors** | **nothing** | unused (to be removed: §18.4) |
+| **cors** | **nothing** | unused (to be removed: §18.3) |
 
-Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the build): `vite`, `@vitejs/plugin-vue` (the client builds). **Unused:** `nodemon` (server) and `concurrently` (root), to be removed (§18.4).
+Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the build): `vite`, `@vitejs/plugin-vue` (the client builds). **Unused:** `nodemon` (server) and `concurrently` (root), to be removed (§18.3).
 
 ### 11.2 System programs
 
@@ -647,7 +650,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 **`server/realtime/displaySocket.js`**
 - **Purpose:** the only socket.io module. `initDisplaySocket(httpServer)`: on connect sends `display:build` and `display:settings`; answers `display:ready` with the playlist; broadcasts `playlist:update` on the scheduler's `'update'` and `displayEvents.playlistChanged`, and `display:settings` (only when changed) on a config `'change'` and `displayEvents.displaySettingsChanged`.
 - **State:** inside the function: the io server and the last settings sent.
-- **Imports:** socket.io, schedulerService, configService, displayEvents, playlistService, brandingService (`displaySettings`), displayBuildId, logger, `shared/contract.json`.
+- **Imports:** socket.io, schedulerService, configService, displayEvents, playlistService, displaySettings (the payload, and its installer state checked every 5 minutes), displayBuildId, logger, `shared/contract.json`.
 - **Imported by:** index.js only.
 - **Change impact:** `/socket.io`, the event names and the payloads are the contract with screens already open.
 
@@ -771,8 +774,13 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** slides.js, sampleSlideshow.
 
 **`services/brandingService.js`**
-- **Purpose:** the logo (fit 500×500, save, remove, placeholder cache, version = mtime), `backgroundColour()` (the saved colour, else the contract's default) and `displaySettings()`.
-- **Used by:** realtime/displaySocket.js (`displaySettings`), routes/index.js, settings/logo.js.
+- **Purpose:** the logo (fit 500×500, save, remove, placeholder cache, version = mtime, `logoEnabled`) and `backgroundColour()` (the saved colour, else the contract's default).
+- **Used by:** services/displaySettings.js, routes/index.js, settings/logo.js.
+
+**`services/displaySettings.js`**
+- **Purpose:** the one place that builds the `display:settings` payload: `current()` → `{ showDeviceInfo, logo, background, installerNeeded }`; `refresh()` reads the installer state again (`installerVersion.status`), keeping the last one on an error.
+- **Uses:** configService, brandingService, updates/installerVersion, logger.
+- **Used by:** realtime/displaySocket.js.
 
 **`services/sampleSlideshow.js`**
 - **Purpose:** `syncSampleSlideshow()`. It signs the sample files together with `sample.json`, and creates, restores (hidden) or replaces the sample's slides. It applies the `sample.json` settings, and replaces an older config's `sampleSlideshowAdded` flag with `sampleSlideshow`.
@@ -849,7 +857,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | File | Purpose | Uses | Notes |
 |---|---|---|---|
 | `index.html`, `main.js` | mount | App.vue | inline base styles (duplicated in App.vue's `<style>`) |
-| `App.vue` | composition, `?kiosk=off`, idle cursor | useSocket, useActivity, recovery, the four components | |
+| `App.vue` | composition, `?kiosk=off`, idle cursor, the background colour (`--nb-background`) | useSocket, useActivity, recovery, the five components | |
 | `composables/useSocket.js` | socket.io client; playlist, settings, build reload | `@shared` SOCKET_EVENTS, recovery | `'connect'`/`'disconnect'` are socket.io built-ins |
 | `composables/useActivity.js` | activity with real mouse moves; idle after 3 s | none | |
 | `recovery.js` | `reloadWhenServerUp`, `reloadSoon`, `recoverByReloading`, `startDailyReload` | sessionStorage | |
@@ -863,6 +871,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/CornerButton.vue` | the faint round button in a top corner (`corner`, `opacity`, `hoverOpacity`; icon in the slot) | none | |
 | `components/ScreenDialog.vue` | the dark centred card for pop-ups | none | |
 | `components/DeviceInfo.vue` | pin (top left, 0.3 → 0.8) and pop-up: the server's addresses and port, and the viewer's URL (never the admin panel's); `GET /api/device` | CornerButton, ScreenDialog | its own 90 s auto-close timer |
+| `components/InstallerWarning.vue` | the warning mark (bottom right, 20 px, red) and its one-line message | ScreenDialog | its own 60 s auto-close timer |
 | `components/ExitKiosk.vue` | exit button (top right, 0.5 → 0.9), confirm; `POST /api/device/kiosk-exit` | CornerButton, ScreenDialog | its own 60 s auto-close timer |
 
 ### 12.7 Admin (`client/admin`)
@@ -871,14 +880,14 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 |---|---|---|---|
 | `main.js`, `router/index.js` | imports `styles/base.css`; mount after the router is ready; routes; login check (`api.get('/auth/status', { redirectOn401: false })`, never redirects by itself) | Vue Router, useApi | |
 | `styles/base.css` | the global styles: CSS variables, layout, buttons, cards, fields, messages, badges | none | |
-| `App.vue` | the layout (sidebar + page) | NavBar, DefaultPasswordWarning, useNav | |
+| `App.vue` | the layout: the sidebar, the warnings and the updater's notices (every page but the login page), then the page | NavBar, DefaultPasswordWarning, UpdateNotice, InstallerNotice, useNav | |
 | `composables/useApi.js` | one `request` core behind `api.get/post/put/del/upload`; a 401 → the login page, unless `redirectOn401: false` (then thrown like any error); errors carry `status` and `serverMessage` | none | |
 | `composables/useSlideshowActions.js` | `setEnabled`, `setHidden` (errors shown in an alert) with `toggling` / `hiding` busy state | useApi | |
 | `composables/useFlash.js` | a reactive `{ text, tone, ok(text, clearAfterMs), error(text), clear() }` for "Saved." and error messages | none | |
 | `composables/useUpdateInfo.js` | the Software updates data: `GET /settings/updates` and `/branches`, polling every 3 s while an update runs or the server restarts, reloading the page when another version runs; helpers `short`, `when`, `runningName`, `canSwitch`, `missingSoftware` | useApi | |
 | `composables/useBranding.js`, `useSecurity.js`, `useNav.js` | shared singleton state | useApi / localStorage | |
 | `views/LoginView.vue` | login form: a wrong password or "too many tries" shown on the page, "Could not reach server" without an answer | useApi | |
-| `views/SlideshowsView.vue` | home: notices, device banner, list, create, publish, hide, delete | useApi, useSlideshowActions, StatusBadge, PublishToggle, TagPill, UpdateNotice, InstallerNotice | |
+| `views/SlideshowsView.vue` | home: device banner, list, create, publish, hide, delete | useApi, useSlideshowActions, StatusBadge, PublishToggle, TagPill | |
 | `views/SlideshowDetailView.vue` | loads the default duration, the slideshow (404 → the list) and its slides; the header with its tags; the disabled banner | useApi, SlideshowSettingsCard, SlideList, TagPill | |
 | `views/SettingsView.vue` | loads `GET /settings` once for the Display and MAC cards; the cards in order | useApi, the settings and updates cards | |
 | `components/slideshow/SlideshowSettingsCard.vue` | the settings facts, publish/disable, hide/unhide, the edit form (name, priority, duration) | useApi, useSlideshowActions, useFlash, ScheduleEditor, StatusBadge, PublishToggle, FlashMessage, `@shared` LIMITS | |
@@ -889,8 +898,8 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/NavBar.vue` | sidebar | useApi, useBranding, useNav, NavIcon, `@shared` PROJECT_URL | |
 | `components/NavIcon.vue` | inline SVG icons | none | |
 | `components/DefaultPasswordWarning.vue` | red banner | useSecurity | |
-| `components/updates/UpdateNotice.vue` | dismissable updater notice | useApi | |
-| `components/updates/InstallerNotice.vue` | run-the-installer box | useApi, `@shared` installerCommand | |
+| `components/updates/UpdateNotice.vue` | dismissable updater notice (in the layout: every page) | useApi | |
+| `components/updates/InstallerNotice.vue` | run-the-installer box (in the layout: every page) | useApi, `@shared` installerCommand | |
 | `components/updates/SoftwareUpdates.vue` | the card: puts the parts together, shows the outcome of the last attempt | useUpdateInfo, UpdateStatus, BranchSwitcher, SwitchDialogs | |
 | `components/updates/UpdateStatus.vue` | the facts (running, updates, last check, last update) and the progress box | useUpdateInfo helpers | |
 | `components/updates/BranchSwitcher.vue` | branch name, Check branch, the result with the software and installer panels, "Switch to …" | useApi, useUpdateInfo helpers | |
@@ -961,7 +970,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `versionInfo` | services/updates/index.js | settings/updates.js `/version` | git, updateFiles.readStatus | HEAD, update-status.json | none | sidebar "Last updated" |
 | `adminPassword.usesDefault` | services/adminPassword.js | settings/security.js `/security` | bcrypt | config.passwordHash | cache | the default-password banner |
 | `requireApprovedDevice` / `requireAdmin` | middleware/access.js | every route (via macFilter/adminAuth) | macService, adminSession | config.macFiltering, ARP, the cookie | 404 / 401 responses, logs | **who can reach anything**; the 404 and 401 conventions other programs rely on |
-| `displaySettings` | services/brandingService.js | realtime/displaySocket.js | logoVersion, configService | config.display, logo mtime | none | the `display:settings` payload |
+| `displaySettings.current` / `refresh` | services/displaySettings.js | realtime/displaySocket.js | brandingService, configService, installerVersion.status | config.display, logo mtime, installer.json, system-requirements.json | none | the `display:settings` payload (open screens: keys may only be added) |
 | `createSlideshowClock` | client/display/src/slideshowClock.js | SlideShow.vue, tests | injected timers | none | none | all viewer timing (tested) |
 | `useApi.request` | client/admin/src/composables/useApi.js | every admin component | fetch | none | redirects to login on 401 | every admin call; the 401-vs-403 convention |
 | `run_installer_from` / `use_latest_installer` | install.sh | main, use_branch_installer | curl, bash -n, exec | update-branch.env | exec replaces the process | which installer version runs (and what older installers accept: a line starting `INSTALLER_VERSION=`) |
@@ -1071,7 +1080,7 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 2. **The server kiosk URL is hard-coded to port 3000.** Changing `config.port` would break the server Pi's own screen until the kiosk script is edited.
 3. **An empty client IP counts as this Pi itself** in the MAC filter (D6).
 4. **`PUT /api/settings` does not validate `port` or the `macFiltering` shape.** A bad value is saved as it is. A port change takes effect only after a restart.
-5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.4).
+5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.3).
 6. The media route allows audio extensions (`.mp3 .wav .ogg`) that nothing produces.
 7. The admin panel ignores reorder errors (`.catch(() => {})`), so the order shown can differ from what was saved.
 8. `configService.init` **regenerates the defaults when `config.json` doesn't parse**. The admin password, the MAC list and the slideshow list are then lost from the config, although their folders remain.
@@ -1089,7 +1098,7 @@ Run them with `node tests/run.js <group> [filter]` or the npm scripts. `npm run 
 |---|---|---|---|
 | unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (15 tests, including 30 simulated days); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS) (7) | Node 20+ |
 | api (`test:api`) | `tests/api/` | **contract.js**: 78 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
-| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
+| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
 | installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
@@ -1097,6 +1106,8 @@ The upgrade rehearsal works like this:
 1. An installed older version (`NB_BASELINE`, default `fc4ba53`), with data seeded through its own API, takes the working tree through **its own** update.sh, as a real Pi does.
 2. The new update.sh installs a following commit.
 3. It goes back to the baseline.
+
+The display settings a screen receives are compared the way open screens depend on them: every key the older version sent keeps its value; new keys may be added.
 
 Helpers:
 - `tests/run.js` is the runner. It lists the files itself, so it works on Node 20, and it finds Chrome and Git Bash.
@@ -1115,31 +1126,14 @@ Every planned change starts here, before any code: what changes and why, the par
 | # | Change | Status |
 |---|---|---|
 | 18.1 | Merge `refactor/architecture` into `main` | Waiting: the server Pi follows the branch for about a day first |
-| 18.2 | The updater's warnings on every admin page, and a warning mark on the viewer | Approved; in progress |
-| 18.3 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
-| 18.4 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
+| 18.2 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
+| 18.3 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
 
 ### 18.1 Merge `refactor/architecture` into `main`
 
 A pull request, merged with a merge commit. Each Pi's update.sh then sees the branch's work in `main` and goes back to following `main` by itself (§9.1, the merged-branch return), with the "merged into main" notice; the code it runs doesn't change. The branch is deleted on GitHub afterwards, with the owner's OK. This entry is removed from `main` once merged.
 
-### 18.2 The updater's warnings on every admin page, and a warning mark on the viewer
-
-**Why:** "Run the installer again on this Pi" (`InstallerNotice`) and "back on main" (`UpdateNotice`) are only shown on the Slideshows page (`SlideshowsView`).
-
-**Change:**
-- **Admin panel:** both notices move into the layout (`App.vue`), under the default-password warning, so they show on every page except the login page. The layout stays mounted while navigating, so a notice looks the same on every page, and closing "back on main" hides it everywhere.
-- **Viewer:** while the installer warning is active, a small red warning triangle (about 20 px) sits in the bottom-right corner, always visible, clear of the slides' controls. Clicking or tapping it shows only "Please check the Admin panel for details." (`components/InstallerWarning.vue`, on `ScreenDialog`.)
-- **Server:** the `display:settings` payload gains `installerNeeded`, from `updates/installerVersion.status()`. The installer writes its record after restarting the server, and an update can raise the version needed, so the socket checks again when a display connects and every 5 minutes, and sends the settings only when they change (as now). A new `services/displaySettings.js` builds the whole payload (the branding from `brandingService`, the warning from `installerVersion`), so `realtime/displaySocket.js` keeps one source.
-- **The guide:** the warning mark, in the viewer section.
-
-**Which screens:** every screen showing the viewer, the server Pi's own and every remote display (the owner's choice).
-
-**Compatibility:** an old viewer ignores `installerNeeded`. Nothing for the installer.
-
-**Tests:** browser: the notices on the Slideshows, slideshow and Settings pages, and gone on the login page; the triangle shown and hidden with the installer record, and its message; socket-events: the new key.
-
-### 18.3 The viewer's black screen that only a power cycle cleared
+### 18.2 The viewer's black screen that only a power cycle cleared
 
 **What was seen (on `main`):** the slides went black while the location pin still showed; slideshow changes no longer reached that screen; the Pi's own keyboard and mouse stopped responding, even unplugged and plugged back in; the server and the viewer still worked from other devices; only a power cycle brought the screen back. The code involved is the same on this branch, so it has to be assumed to be present here too.
 
@@ -1160,10 +1154,10 @@ cat /proc/device-tree/model; uname -r; chromium --version
 - The viewer reports to the server that it is alive and drawing (driven by the browser's drawing loop, which stops when the page is no longer drawn), every 30 seconds.
 - The kiosk script checks its own screen's reports; if they stop while the server answers, it restarts the browser.
 - If a new browser doesn't bring them back (the compositor or driver is stuck), a small root service installed by the installer restarts the desktop session, and as a last resort reboots the Pi (rate-limited, and logged).
-- This changes the kiosk scripts and adds a unit, so `INSTALLER_VERSION` goes to 3 and the admin panel will ask for the installer to be run again (18.2).
+- This changes the kiosk scripts and adds a unit, so `INSTALLER_VERSION` goes to 3 and the admin panel and every screen will ask for the installer to be run again (§3.5, §3.6).
 
 **Step 3, prevention:** chosen from what the logs show (e.g. Chromium's graphics or video-decoding flags, or a driver setting). The exact design of steps 2 and 3 is written here, and reviewed, before any code.
 
-### 18.4 Remove the unused npm packages
+### 18.3 Remove the unused npm packages
 
 Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Pi's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.

@@ -3,7 +3,7 @@
 //
 // E.g. the branch this noticeboard followed was merged into main, so it went back to main
 // (data/update-notice.json). It stays, for every admin, until someone closes it.
-// Used by: views/SlideshowsView
+// Used by: App.vue (every page but the login page)
 // Uses: useApi (GET and DELETE /settings/updates/notice)
 import { ref, onMounted } from 'vue';
 import { api } from '../../composables/useApi.js';

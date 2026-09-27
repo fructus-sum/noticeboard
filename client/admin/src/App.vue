@@ -1,11 +1,18 @@
 <script setup>
-// client/admin/src/App.vue — the admin panel's frame: the sidebar (not on the login page), the default-password warning, the page
+// client/admin/src/App.vue — the admin panel's frame: the sidebar, the warnings, the page
+//
+// On every page but the login page: the sidebar, the default-password warning and the updater's
+// notices ("back on main", "Run the installer again on this Pi"). The frame stays while moving
+// between pages, so a notice is the same on every page, and closing one closes it everywhere.
 // Used by: main.js
-// Uses: NavBar, DefaultPasswordWarning, useNav (the collapsed sidebar), the router's page
+// Uses: NavBar, DefaultPasswordWarning, updates/UpdateNotice, updates/InstallerNotice, useNav (the
+//   collapsed sidebar), the router's page
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import NavBar from './components/NavBar.vue';
 import DefaultPasswordWarning from './components/DefaultPasswordWarning.vue';
+import UpdateNotice from './components/updates/UpdateNotice.vue';
+import InstallerNotice from './components/updates/InstallerNotice.vue';
 import { useNav } from './composables/useNav.js';
 
 const route = useRoute();
@@ -18,6 +25,10 @@ const showNav = computed(() => route.path !== '/login');
     <NavBar v-if="showNav" />
     <main class="main">
       <DefaultPasswordWarning v-if="showNav" />
+      <div v-if="showNav" class="page-notices">
+        <UpdateNotice />
+        <InstallerNotice />
+      </div>
       <RouterView />
     </main>
   </div>

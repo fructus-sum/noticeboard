@@ -3,19 +3,19 @@
 // Provides
 //   saveLogo(path), removeLogo(), hasCustomLogo(), placeholderLogo() (the placeholder, scaled once
 //   per version), logoVersion() (changes with the logo, for cache-busting), MAX_SIZE (500)
+//   logoEnabled()     whether the logo is shown (Settings → Branding)
 //   backgroundColour() → the viewer's background colour: the saved one, else the default
-//   displaySettings() → { showDeviceInfo, logo: { url } | null, background }, sent to the displays
 //
 // Used by
-//   routes/index.js (/branding/logo), routes/api/settings/logo.js, realtime/displaySocket
+//   routes/index.js (/branding/logo), routes/api/settings/logo.js, services/displaySettings
 //
 // Uses
 //   sharp, services/configService (display settings), utils/pathHelpers, shared/contract.json
 //   (the default background and the colour's form)
 //
 // Change impact
-//   displaySettings() is the display:settings payload, a contract with open screens
-//   (SYSTEM_DESIGN §15).
+//   The logo URL and the colour go to open screens in the display:settings payload
+//   (services/displaySettings; SYSTEM_DESIGN §15).
 const fs = require('fs');
 const sharp = require('sharp');
 const configService = require('./configService');
@@ -82,14 +82,6 @@ function backgroundColour() {
   return typeof saved === 'string' && new RegExp(DISPLAY.colourPattern).test(saved) ? saved : DISPLAY.defaultBackground;
 }
 
-// What every display needs to know about its own look, sent over the socket
-function displaySettings() {
-  return {
-    showDeviceInfo: configService.get('display')?.showDeviceInfo !== false,
-    logo: logoEnabled() ? { url: `/branding/logo?v=${logoVersion()}` } : null,
-    background: backgroundColour(),
-  };
-}
 
 module.exports = {
   MAX_SIZE,
@@ -100,5 +92,4 @@ module.exports = {
   logoVersion,
   logoEnabled,
   backgroundColour,
-  displaySettings,
 };

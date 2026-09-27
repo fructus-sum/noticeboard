@@ -131,7 +131,7 @@ defineExpose({ reset });
           <ul>
             <li v-for="c in checked.installer.changes" :key="c">{{ c }}</li>
           </ul>
-          The Slideshows page shows the command to run once the switch is done.
+          Every admin page shows the command to run once the switch is done.
         </div>
 
         <button class="btn-danger" @click="emit('switch', checked)">Switch to {{ checked.branch }}…</button>

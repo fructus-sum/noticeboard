@@ -122,6 +122,11 @@ async function snapshot() {
 function compare(beforeFile, afterFile) {
   const before = JSON.parse(fs.readFileSync(beforeFile, 'utf8'));
   const after = JSON.parse(fs.readFileSync(afterFile, 'utf8'));
+  // display:settings may gain keys (open screens running an older viewer ignore them: SYSTEM_DESIGN
+  // §15); the keys the older version sent must keep their values
+  if (before.displaySettings && after.displaySettings) {
+    after.displaySettings = Object.fromEntries(Object.keys(before.displaySettings).map((k) => [k, after.displaySettings[k]]));
+  }
   let differences = 0;
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
     const a = JSON.stringify(before[key]);

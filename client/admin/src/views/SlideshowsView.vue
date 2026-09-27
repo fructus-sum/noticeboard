@@ -8,12 +8,10 @@
 //
 // Used by: router/index.js
 // Uses: useApi (/slideshows, /settings/device), useSlideshowActions, ui/StatusBadge,
-//   ui/PublishToggle, ui/TagPill, updates/UpdateNotice, updates/InstallerNotice
+//   ui/PublishToggle, ui/TagPill
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
-import UpdateNotice from '../components/updates/UpdateNotice.vue';
-import InstallerNotice from '../components/updates/InstallerNotice.vue';
 import StatusBadge from '../components/ui/StatusBadge.vue';
 import PublishToggle from '../components/ui/PublishToggle.vue';
 import TagPill from '../components/ui/TagPill.vue';
@@ -111,9 +109,6 @@ onMounted(loadDevice);
 
 <template>
   <div>
-    <UpdateNotice />
-    <InstallerNotice />
-
     <div
       v-if="device?.interfaces?.length"
       class="card"

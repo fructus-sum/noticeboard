@@ -616,6 +616,7 @@
   "socket: display:settings": {
     "content": {
       "background": "string",
+      "installerNeeded": "boolean",
       "logo": {
         "url": "string"
       },

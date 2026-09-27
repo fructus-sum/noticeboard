@@ -6,7 +6,7 @@
 // page says so, with the command to copy. It stays until the installer has been run: there's
 // nothing to close.
 //
-// Used by: views/SlideshowsView
+// Used by: App.vue (every page but the login page)
 // Uses: useApi (GET /settings/updates/installer), installerCommand from @shared
 import { ref, computed, onMounted } from 'vue';
 import { installerCommand } from '@shared/index.js';

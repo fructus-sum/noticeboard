@@ -172,7 +172,7 @@ async function confirmSwitch() {
         Remember: this noticeboard is still missing {{ missing.map((r) => r.name).join(', ') }}.
       </p>
       <p v-if="target.installer?.needed" class="tone-warn">
-        Afterwards, run the installer again on this Pi: the Slideshows page will show how.
+        Afterwards, run the installer again on this Pi: the admin panel will show how.
       </p>
       <p>This is your last chance to back out:</p>
       <ul class="choices">

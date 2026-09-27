@@ -4,8 +4,9 @@
 // Responsibilities
 //   Shows SlideShow while there are slides, else WaitingScreen (the logo, or why nothing shows),
 //   on the background colour chosen in Settings (the CSS variable --nb-background);
-//   the location pin (when turned on in Settings) and the exit button (kiosk only, while someone
-//   uses the mouse, keyboard or touchscreen); the nightly reload. ?kiosk=off (a screen that left
+//   the location pin (when turned on in Settings), the exit button (kiosk only, while someone
+//   uses the mouse, keyboard or touchscreen) and the warning mark while the installer needs running
+//   again; the nightly reload. ?kiosk=off (a screen that left
 //   kiosk mode) makes it an ordinary page: no exit button, no nightly reload.
 //
 // Used by
@@ -13,7 +14,7 @@
 //
 // Uses
 //   useSocket (playlist, connection, display settings), useActivity, recovery.js
-//   (startDailyReload), SlideShow, WaitingScreen, DeviceInfo, ExitKiosk
+//   (startDailyReload), SlideShow, WaitingScreen, DeviceInfo, ExitKiosk, InstallerWarning
 import { computed } from 'vue';
 import { useSocket } from './composables/useSocket.js';
 import { useActivity } from './composables/useActivity.js';
@@ -21,6 +22,7 @@ import SlideShow from './components/SlideShow.vue';
 import WaitingScreen from './components/WaitingScreen.vue';
 import DeviceInfo from './components/DeviceInfo.vue';
 import ExitKiosk from './components/ExitKiosk.vue';
+import InstallerWarning from './components/InstallerWarning.vue';
 import { startDailyReload } from './recovery.js';
 
 const { playlist, connected, received, settings } = useSocket();
@@ -39,6 +41,7 @@ if (kiosk) startDailyReload(() => connected.value);
     <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
     <DeviceInfo v-if="settings.showDeviceInfo" />
     <ExitKiosk v-if="kiosk" :visible="active" />
+    <InstallerWarning v-if="settings.installerNeeded" />
   </div>
 </template>
 

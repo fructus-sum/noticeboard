@@ -9,14 +9,16 @@
 //   initDisplaySocket(httpServer) → the socket.io server. On connect: display:build and
 //     display:settings; on display:ready: that display's playlist. Afterwards:
 //       playlist:update to all   on the scheduler's 'update' and on displayEvents.playlistChanged
-//       display:settings to all  on a config 'change' and on displayEvents.displaySettingsChanged,
-//                                only when the settings differ from the last ones sent
+//       display:settings to all  on a config 'change', on displayEvents.displaySettingsChanged,
+//                                and when the installer state changes (checked when a display
+//                                connects and every 5 minutes), only when the settings differ
+//                                from the last ones sent
 //
 // Used by
 //   server/index.js
 //
 // Uses
-//   socket.io; services/playlistService (buildPlaylist), services/brandingService (displaySettings),
+//   socket.io; services/playlistService (buildPlaylist), services/displaySettings (the payload),
 //   services/schedulerService (getActive, 'update'), services/configService ('change'),
 //   services/displayEvents, utils/displayBuildId, utils/logger
 //
@@ -29,7 +31,7 @@ const schedulerService = require('../services/schedulerService');
 const configService = require('../services/configService');
 const displayEvents = require('../services/displayEvents');
 const { buildPlaylist } = require('../services/playlistService');
-const { displaySettings } = require('../services/brandingService');
+const displaySettings = require('../services/displaySettings');
 const { displayBuildId } = require('../utils/displayBuildId');
 const logger = require('../utils/logger');
 const { socketEvents: EVENTS } = require('../../shared/contract.json');
@@ -40,11 +42,11 @@ function initDisplaySocket(httpServer) {
 
   // Sent on every connect: a display that sees it change reloads to pick up the new build
   const buildId = displayBuildId();
-  let lastSettings = JSON.stringify(displaySettings());
+  let lastSettings = JSON.stringify(displaySettings.current());
 
-  // The displays' own look: sent again only when it has changed
+  // The displays' own look and state: sent again only when it has changed
   function broadcastDisplaySettings() {
-    const settings = displaySettings();
+    const settings = displaySettings.current();
     const json = JSON.stringify(settings);
     if (json === lastSettings) return;
     lastSettings = json;
@@ -58,10 +60,16 @@ function initDisplaySocket(httpServer) {
     logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length });
   }
 
+  const INSTALLER_CHECK_MS = 5 * 60 * 1000;
+  displaySettings.refresh().then(broadcastDisplaySettings);
+  setInterval(() => displaySettings.refresh().then(broadcastDisplaySettings), INSTALLER_CHECK_MS).unref();
+
   io.on('connection', (socket) => {
     logger.info('Socket: display connected', { id: socket.id });
     socket.emit(EVENTS.DISPLAY_BUILD, buildId);
-    socket.emit(EVENTS.DISPLAY_SETTINGS, displaySettings());
+    socket.emit(EVENTS.DISPLAY_SETTINGS, displaySettings.current());
+    // The installer state is read from files: check it again, and tell everyone if it changed
+    displaySettings.refresh().then(broadcastDisplaySettings);
 
     socket.on(EVENTS.DISPLAY_READY, () => {
       const playlist = buildPlaylist(schedulerService.getActive());
