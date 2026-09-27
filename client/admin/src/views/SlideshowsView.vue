@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
 import UpdateNotice from '../components/UpdateNotice.vue';
+import InstallerNotice from '../components/InstallerNotice.vue';
 
 const router = useRouter();
 const slideshows = ref([]);
@@ -108,6 +109,7 @@ onMounted(loadDevice);
 <template>
   <div>
     <UpdateNotice />
+    <InstallerNotice />
 
     <div
       v-if="device?.interfaces?.length"

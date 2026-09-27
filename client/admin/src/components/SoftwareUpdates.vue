@@ -326,6 +326,16 @@ onUnmounted(() => {
               </ul>
             </div>
 
+            <div v-if="checked.installer?.needed" class="software software--missing installer-needed">
+              <strong>⚠ After switching, run the installer again on this Pi.</strong>
+              {{ checked.branch }} needs something only the installer sets up, which a switch can’t do by itself.
+              Until it’s run, these stay as they were:
+              <ul>
+                <li v-for="c in checked.installer.changes" :key="c">{{ c }}</li>
+              </ul>
+              The Slideshows page shows the command to run once the switch is done.
+            </div>
+
             <button class="btn-danger" @click="openPassword">Switch to {{ checked.branch }}…</button>
           </template>
         </div>
@@ -400,6 +410,9 @@ onUnmounted(() => {
           <p v-if="missingSoftware.length" class="tone-warn">
             Remember: this noticeboard is still missing {{ missingSoftware.map((r) => r.name).join(', ') }}.
           </p>
+          <p v-if="checked.installer?.needed" class="tone-warn">
+            Afterwards, run the installer again on this Pi: the Slideshows page will show how.
+          </p>
           <p>This is your last chance to back out:</p>
           <ul class="choices">
             <li><strong>Cancel</strong> leaves everything exactly as it is: still {{ running }}, nothing changed.</li>
@@ -461,6 +474,7 @@ code { font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-r
 .software--ok { background: #f0fdf4; color: #166534; }
 .software--missing { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
 .software--unknown { background: var(--surface-2); color: var(--text-muted); }
+.installer-needed ul { margin-bottom: 6px; }
 .accept { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 16px; }
 .accept input { width: auto; margin-top: 2px; }
 .dialog button:disabled { opacity: 0.5; cursor: not-allowed; }

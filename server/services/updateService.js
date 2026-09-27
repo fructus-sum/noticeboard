@@ -4,6 +4,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const {
   ROOT, updateBranchPath, updateStatusPath, updateCheckPath, updateNoticePath, updateRequestPath, systemdDir,
+  installerRecordPath, serverKioskPath, requirementsPath,
 } = require('../utils/pathHelpers');
 const logger = require('../utils/logger');
 const { checkRequirements } = require('../utils/systemCheck');
@@ -184,19 +185,63 @@ async function checkBranch(name) {
     throw userError(422, `"${name}" can't be used: it's older than branch switching, so this noticeboard couldn't be switched back from the admin panel.`);
   }
   const [subject = '', date = ''] = (await git(['log', '-1', '--format=%s%x00%cI', commit])).split('\0');
-  return { branch: name, commit, subject, date, requirements: await requirementsOf(commit) };
+  return { branch: name, commit, subject, date, ...(await requirementsOf(commit)) };
 }
 
-// Checks this noticeboard's software against the branch's system-requirements.json.
-// { listed: false } for a branch without one: it can't be checked.
+// Checks this noticeboard's software against the branch's system-requirements.json
+// (requirements: { listed: false } for a branch without one: it can't be checked), and
+// whether the branch needs the installer run again here
 async function requirementsOf(commit) {
   const text = await git(['show', `${commit}:system-requirements.json`]).catch(() => null);
-  if (!text) return { listed: false };
+  if (!text) return { requirements: { listed: false }, installer: installerNeeds(null, null) };
   try {
-    return { listed: true, ...(await checkRequirements(JSON.parse(text))) };
+    const list = JSON.parse(text);
+    const [checked, installed] = await Promise.all([checkRequirements(list), installedInstallerVersion()]);
+    return { requirements: { listed: true, ...checked }, installer: installerNeeds(list, installed) };
   } catch {
-    return { listed: false, unreadable: true };
+    return { requirements: { listed: false, unreadable: true }, installer: installerNeeds(null, null) };
   }
+}
+
+// ── The installer ─────────────────────────────────────────────────────────────
+// Updates can't change what only install.sh sets up: kiosk scripts, system services, desktop
+// shortcuts, system packages. A version's system-requirements.json says which installer
+// version it needs; install.sh records the version of each run in data/installer.json.
+
+// The version of the installer that last ran on this noticeboard. Installers from before the
+// record are told apart by the kiosk script they wrote (version 1 added the exit button).
+// null: not set up by the installer (e.g. a development copy), so there's nothing to say.
+async function installedInstallerVersion() {
+  const record = await readJson(installerRecordPath());
+  if (Number.isInteger(record?.version)) return record.version;
+  const kiosk = await fs.readFile(serverKioskPath(), 'utf8').catch(() => null);
+  if (kiosk === null) return null;
+  return kiosk.includes('kiosk-exit') ? 1 : 0;
+}
+
+// What running the installer again brings, for a version with system-requirements.json <list>:
+// needed when the last run here is older than the version it asks for
+function installerNeeds(list, installed) {
+  const required = Number.isInteger(list?.installer?.version) ? list.installer.version : 0;
+  const needed = installed !== null && installed < required;
+  const changes = !needed ? [] : (Array.isArray(list.installer.changes) ? list.installer.changes : [])
+    .filter((c) => Number.isInteger(c?.version) && c.version > installed && c.version <= required);
+  return {
+    required,
+    installed,
+    needed,
+    changes: changes.map((c) => String(c.change || '')).filter(Boolean),
+    displays: changes.some((c) => c.displays === true),   // remote display Pis need it too
+  };
+}
+
+// For the admin home page: whether this noticeboard's version needs the installer run again,
+// and the branch to run it from (the one this noticeboard follows)
+async function installerStatus() {
+  const [list, installed, branch] = await Promise.all([
+    readJson(requirementsPath()), installedInstallerVersion(), configuredBranch(),
+  ]);
+  return { ...installerNeeds(list, installed), branch };
 }
 
 // One-time proof that the admin password was checked, for the final confirmation
@@ -269,6 +314,8 @@ module.exports = {
   versionInfo,
   getNotice,
   dismissNotice,
+  installerStatus,
+  installerNeeds,
   listBranches,
   checkBranch,
   validBranchName,

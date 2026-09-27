@@ -9,3 +9,8 @@ export const API_BASE = '/api';
 
 // The project on GitHub (the installers use the same repository)
 export const PROJECT_URL = 'https://github.com/fructus-sum/noticeboard';
+
+// The command that runs <branch>'s installer on a Pi (in a terminal on it, or over SSH)
+export function installerCommand(branch = 'main') {
+  return `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/${branch}/installers/install.sh | sudo bash`;
+}

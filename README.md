@@ -81,7 +81,7 @@ After the installer's reboot, the kiosk starts automatically.
 
 ## Updates
 
-The server Pi checks GitHub every 15 minutes and installs new versions by itself; every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Pi to another branch (with checks, the admin password and a final confirmation); a Pi whose branch is merged into `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. Before a switch, the Pi checks its software against the branch's list of what it needs (`system-requirements.json`) and warns about anything missing, with an extra confirmation to switch anyway. The user guide has the details and the commands.
+The server Pi checks GitHub every 15 minutes and installs new versions by itself; every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Pi to another branch (with checks, the admin password and a final confirmation); a Pi whose branch is merged into `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. Before a switch, the Pi checks its software against the branch's list of what it needs (`system-requirements.json`) and warns about anything missing, with an extra confirmation to switch anyway. When a version needs something only the installer sets up (such as the kiosk), the admin panel's Slideshows page says to run the installer again and shows the command. The user guide has the details and the commands.
 
 ## Status
 
@@ -91,7 +91,7 @@ The server Pi checks GitHub every 15 minutes and installs new versions by itself
 
 ## Development
 
-Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch.
+Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch. Its `installer.version` must match `INSTALLER_VERSION` in `installers/install.sh`: raise both (and add a line to `installer.changes`) whenever the installer changes what updates can't, such as the kiosk scripts or system services.
 
 ```bash
 npm install

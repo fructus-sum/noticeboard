@@ -205,6 +205,9 @@ router.delete('/updates/notice', updateRoute(async (req) => {
   return { ok: true };
 }));
 
+// Whether this version needs the installer run again on the Pi, for the admin home page
+router.get('/updates/installer', updateRoute(() => updateService.installerStatus()));
+
 // The installed version, for "Last updated" in the sidebar ({ version: null } without git)
 router.get('/version', updateRoute(async () => ({ version: await updateService.versionInfo() })));
 

@@ -902,8 +902,8 @@
       <p>If the server's address does change, run the installer again on each remote display Pi and give it the new address.</p>
 
       <h3>Running the installer again</h3>
-      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub. It never touches your slideshows, slides or settings.</p>
-      <p>On a server Pi that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it.</p>
+      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub, from the branch the Pi follows (<em>main</em> unless you've switched), so what it sets up matches the version it installs. It never touches your slideshows, slides or settings.</p>
+      <p>On a server Pi that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it. If you go back to <em>main</em>, it hands over to <em>main</em>'s installer, which carries on with your answers.</p>
 
       <h3 id="firewall" style="scroll-margin-top:80px">Firewall (optional)</h3>
       <p>Just before it offers to reboot, the installer asks <em>"Check this Pi's firewall?"</em>. Many Pis already have a firewall set up the way their owner wants, so it changes nothing unless you answer <strong>y</strong>.</p>
@@ -1547,6 +1547,11 @@
         </tbody>
       </table>
 
+      <h3 id="installer-needed" style="scroll-margin-top:80px">When the installer needs running again</h3>
+      <p>Updates change the Noticeboard app, but not what only the installer sets up on the Pi: the kiosk that shows the slideshow full screen, the system services, the desktop shortcuts and system packages. When a new version (or a branch you switch to) changes one of those, an amber box at the top of the admin panel's <strong>Slideshows</strong> page says <strong>Run the installer again on this Pi</strong>. It lists what running it brings and shows the command to run, with a <strong>Copy</strong> button. The command is for the branch the Pi follows.</p>
+      <p>Run it in a terminal on the server Pi, or over SSH. It keeps your answers (press Enter), slideshows and settings, and offers to restart at the end. The box goes away once the installer has run; there's nothing to close. Until then the noticeboard works as before, just without what the box lists. If the box says so, run the installer on each remote display Pi too.</p>
+      <p>Before you switch branch, the check tells you if that branch will need the installer run again (see <a href="#branches" style="color:var(--blue)">Switching branch</a>).</p>
+
       <h3 id="branches" style="scroll-margin-top:80px">Switching branch</h3>
       <p>Besides <em>main</em>, the project on GitHub can have other branches holding work in progress, such as a new feature being tried out. You can switch this noticeboard to one of them from the admin panel. Updates then come from that branch until you switch back. Nothing changes until you've checked the branch and confirmed twice.</p>
 
@@ -1555,7 +1560,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Choose and check the branch</strong>
-            <p>In <strong>Settings → Software updates</strong>, type the branch name or pick it from the list, then click <strong>Check branch</strong>. The noticeboard checks that the branch exists on GitHub and can be used, and shows the change: the branch and version running now → the new branch and its version, with its latest change. It also checks the software on this Pi against the list the branch keeps of what it needs (see below). Nothing has changed yet.</p>
+            <p>In <strong>Settings → Software updates</strong>, type the branch name or pick it from the list, then click <strong>Check branch</strong>. The noticeboard checks that the branch exists on GitHub and can be used, and shows the change: the branch and version running now → the new branch and its version, with its latest change. It also checks the software on this Pi against the list the branch keeps of what it needs (see below), and says if the branch will need the installer run again on this Pi after the switch (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>). Nothing has changed yet.</p>
           </div>
         </div>
         <div class="step">

@@ -1,5 +1,13 @@
 {
   "_comment": "The software this branch needs on the Noticeboard server Pi, besides the packages npm installs. Keep it up to date on every branch: when a change needs new software, or a newer version of something listed, update this file in the same commit. Before switching branch, the admin panel checks the Pi against the target branch's list (Settings → Software updates). versions: space-separated conditions must all hold; || separates alternatives; * means any version.",
+  "installer": {
+    "_comment": "Updates can't change what only the installer sets up: kiosk scripts, system services, desktop shortcuts and system packages. When install.sh changes any of those, raise version here and INSTALLER_VERSION in install.sh to the same number (in the same commit), and add a line to changes saying what running it again brings. displays: true when remote display Pis need it too. A server Pi whose last installer run is older warns on the admin home page, and before switching to this branch.",
+    "version": 2,
+    "changes": [
+      { "version": 1, "change": "The full-screen kiosk only for the slideshow, in a browser of its own, with an exit button", "displays": true },
+      { "version": 2, "change": "A Noticeboard Help shortcut on the desktop, and the viewer hiding the mouse cursor by itself (unclutter is no longer used)", "displays": true }
+    ]
+  },
   "software": [
     {
       "name": "Node.js",
