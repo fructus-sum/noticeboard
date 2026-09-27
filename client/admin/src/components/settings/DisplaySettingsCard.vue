@@ -6,8 +6,9 @@
 //
 // Props: settings, from GET /settings (null until the page has loaded it; the defaults show meanwhile)
 // Used by: views/SettingsView
-// Uses: useApi, useFlash, FlashMessage; LIMITS from @shared (the duration's range, which the server checks)
+// Uses: useApi, useFlash, FlashMessage, CollapsibleCard; LIMITS from @shared (the duration's range, which the server checks)
 import { ref, watch } from 'vue';
+import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import { useFlash } from '../../composables/useFlash.js';
@@ -44,8 +45,7 @@ async function save() {
 </script>
 
 <template>
-  <div class="card">
-    <h2>Display</h2>
+  <CollapsibleCard title="Display" name="settings-display">
     <form @submit.prevent="save">
       <div class="field" style="max-width:240px">
         <label>Default image duration (seconds)</label>
@@ -66,5 +66,5 @@ async function save() {
         <FlashMessage :flash="msg" />
       </div>
     </form>
-  </div>
+  </CollapsibleCard>
 </template>

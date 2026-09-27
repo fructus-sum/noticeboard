@@ -2,19 +2,22 @@
 // client/admin/src/components/settings/PasswordCard.vue — Settings → Change password
 //
 // The current password, the new one twice (PUT /settings/password). Once changed, the warning
-// about the default password goes away. The page links here as /settings#password.
+// about the default password goes away. The page links here as /settings#password; while the
+// default password is in use the card stays open (it answers that warning).
 //
 // Used by: views/SettingsView
-// Uses: useApi, useSecurity (refreshSecurity), useFlash, FlashMessage; LIMITS from @shared (the
+// Uses: useApi, useSecurity (refreshSecurity, defaultPassword), useFlash, FlashMessage,
+//   CollapsibleCard; LIMITS from @shared (the
 //   minimum length, which the server checks)
 import { ref } from 'vue';
+import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import { useSecurity } from '../../composables/useSecurity.js';
 import { useFlash } from '../../composables/useFlash.js';
 import FlashMessage from '../ui/FlashMessage.vue';
 
-const { refreshSecurity } = useSecurity();
+const { refreshSecurity, defaultPassword } = useSecurity();
 
 const currentPw = ref('');
 const newPw     = ref('');
@@ -41,8 +44,7 @@ async function changePassword() {
 </script>
 
 <template>
-  <div id="password" class="card">
-    <h2>Change password</h2>
+  <CollapsibleCard id="password" title="Change password" name="settings-password" :attention="defaultPassword">
     <form @submit.prevent="changePassword" style="max-width:320px">
       <div class="field">
         <label>Current password</label>
@@ -61,5 +63,5 @@ async function changePassword() {
         <FlashMessage :flash="msg" />
       </div>
     </form>
-  </div>
+  </CollapsibleCard>
 </template>

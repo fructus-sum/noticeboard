@@ -891,11 +891,11 @@
     "text-align": "start"
   },
   "desktop: settings card title": {
-    "display": "block",
+    "display": "flex",
     "position": "static",
     "width": "975px",
     "height": "23px",
-    "margin": "0px 0px 12px",
+    "margin": "0px",
     "padding": "0px",
     "border": "0px none rgb(17, 24, 39)",
     "border-radius": "0px",
@@ -920,7 +920,7 @@
     "z-index": "auto",
     "max-width": "none",
     "overflow-y": "visible",
-    "min-height": "0px",
+    "min-height": "auto",
     "text-align": "start"
   },
   "desktop: settings field label": {
@@ -2244,11 +2244,11 @@
     "text-align": "start"
   },
   "phone: settings card title": {
-    "display": "block",
+    "display": "flex",
     "position": "static",
     "width": "290px",
     "height": "23px",
-    "margin": "0px 0px 12px",
+    "margin": "0px",
     "padding": "0px",
     "border": "0px none rgb(17, 24, 39)",
     "border-radius": "0px",
@@ -2273,7 +2273,7 @@
     "z-index": "auto",
     "max-width": "none",
     "overflow-y": "visible",
-    "min-height": "0px",
+    "min-height": "auto",
     "text-align": "start"
   },
   "phone: settings field label": {

@@ -12,9 +12,10 @@
 // Props: settings, from GET /settings (null until the page has loaded it)
 // Used by: views/SettingsView
 // Uses: useApi (PUT /settings, /settings/logo), useBranding (the logo, shared with the sidebar),
-//   useFlash, FlashMessage; DEFAULT_BACKGROUND and isColour from @shared (the server checks the
+//   useFlash, FlashMessage, CollapsibleCard; DEFAULT_BACKGROUND and isColour from @shared (the server checks the
 //   same form)
 import { ref, computed, watch, onMounted } from 'vue';
+import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { DEFAULT_BACKGROUND, isColour } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import { useBranding } from '../../composables/useBranding.js';
@@ -116,8 +117,7 @@ onMounted(refreshLogo);
 </script>
 
 <template>
-  <div class="card">
-    <h2>Branding</h2>
+  <CollapsibleCard title="Branding" name="settings-branding">
 
     <h3>Logo</h3>
     <p class="muted">
@@ -177,7 +177,7 @@ onMounted(refreshLogo);
       <FlashMessage :flash="colourMsg" />
     </form>
     <p v-if="!codeValid" class="error-msg">A colour code is # and six digits or letters a–f, e.g. #1a2b3c.</p>
-  </div>
+  </CollapsibleCard>
 </template>
 
 <style scoped>

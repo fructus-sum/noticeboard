@@ -12,11 +12,13 @@
 // Props: folder. v-model:slides, the list as the server returns it (the page loads it first).
 //
 // Used by: views/SlideshowDetailView
-// Uses: useApi (the slides routes), SlidePreview; mediaUrl, mediaDisplayName and LIMITS from @shared
+// It stays open while a slide or an upload has failed (a warning).
+// Uses: useApi (the slides routes), SlidePreview, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { mediaUrl, mediaDisplayName, LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import SlidePreview from './SlidePreview.vue';
+import CollapsibleCard from '../ui/CollapsibleCard.vue';
 
 const props = defineProps({ folder: { type: String, required: true } });
 const slides = defineModel('slides', { type: Array, required: true });
@@ -96,6 +98,9 @@ async function uploadFile(e) {
   }
 }
 
+// Something the admin must see: a slide that failed to process, or an upload that failed
+const attention = computed(() => !!uploadErr.value || slides.value.some(s => s.status === 'error'));
+
 // Polling while any slide is processing
 let pollTimer = null;
 const hasProcessing = computed(() => slides.value.some(s => s.status === 'processing' || s.thumbnailPending));
@@ -167,17 +172,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 style="margin:0">Slides ({{ slides.length }})</h2>
-      <div style="display:flex;gap:8px;align-items:center">
+  <CollapsibleCard :title="`Slides (${slides.length})`" name="slideshow-slides" :attention="attention">
+    <template #actions>
         <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
         <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
           {{ uploading ? `Uploading${uploadCount > 1 ? ` ${uploadCount} files` : ''}…` : '+ Upload' }}
           <input ref="fileInput" type="file" accept="image/*,video/*" multiple style="display:none" :disabled="uploading" @change="uploadFile" />
         </label>
-      </div>
-    </div>
+    </template>
 
     <p v-if="!slides.length" style="color:var(--text-muted)">No slides yet. Upload an image or video.</p>
     <p v-else style="color:var(--text-muted);font-size:12px;margin-bottom:6px">
@@ -240,7 +242,7 @@ onUnmounted(() => {
         <button class="btn-danger" style="padding:4px 8px;font-size:12px" @click="deleteSlide(slide)">✕</button>
       </div>
     </div>
-  </div>
+  </CollapsibleCard>
 
   <SlidePreview
     v-if="preview"

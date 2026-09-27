@@ -12,8 +12,9 @@
 //
 // Used by: views/SlideshowDetailView
 // Uses: useApi (PUT /slideshows/:folder), useSlideshowActions, useFlash, ScheduleEditor, StatusBadge,
-//   PublishToggle, FlashMessage; LIMITS from @shared (the duration's range, which the server checks)
+//   PublishToggle, FlashMessage, CollapsibleCard; LIMITS from @shared (the duration's range, which the server checks)
 import { ref, computed } from 'vue';
+import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import { useFlash } from '../../composables/useFlash.js';
@@ -76,13 +77,12 @@ async function save() {
 </script>
 
 <template>
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <h2 style="margin:0">Settings</h2>
+  <CollapsibleCard title="Settings" name="slideshow-settings">
+    <template #actions>
       <button class="btn-ghost" style="font-size:12px;padding:5px 10px" @click="editing = !editing">
         {{ editing ? 'Cancel' : 'Edit' }}
       </button>
-    </div>
+    </template>
 
     <div v-if="!editing" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;font-size:13px;align-items:start">
       <div><span style="color:var(--text-muted)">Name</span><br>{{ slideshow.name }}</div>
@@ -143,5 +143,5 @@ async function save() {
         <FlashMessage :flash="saveMsg" />
       </div>
     </form>
-  </div>
+  </CollapsibleCard>
 </template>

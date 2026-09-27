@@ -8,8 +8,9 @@
 //
 // Props: settings, from GET /settings (null until the page has loaded it)
 // Used by: views/SettingsView
-// Uses: useApi, useFlash, FlashMessage, MacFilterWarning
+// Uses: useApi, useFlash, FlashMessage, MacFilterWarning, CollapsibleCard
 import { ref, watch } from 'vue';
+import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { api } from '../../composables/useApi.js';
 import { useFlash } from '../../composables/useFlash.js';
 import FlashMessage from '../ui/FlashMessage.vue';
@@ -83,8 +84,7 @@ function removeMac(mac) {
 </script>
 
 <template>
-  <div class="card">
-    <h2>MAC filtering</h2>
+  <CollapsibleCard title="MAC filtering" name="settings-mac">
     <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <input id="mac-toggle" type="checkbox" v-model="macEnabled" style="width:auto" @change="onMacToggle" />
       <label for="mac-toggle" style="margin:0;font-size:13px;font-weight:400;color:var(--text)">
@@ -112,7 +112,7 @@ function removeMac(mac) {
       <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
       <FlashMessage :flash="msg" />
     </div>
-  </div>
+  </CollapsibleCard>
 
   <MacFilterWarning
     v-if="macWarning"

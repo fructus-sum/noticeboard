@@ -271,9 +271,9 @@
       "overflow-y": "visible"
     },
     "slideshow: slides card title": {
-      "display": "block",
+      "display": "flex",
       "position": "static",
-      "width": "72.625px",
+      "width": "898.797px",
       "height": "23px",
       "margin": "0px",
       "padding": "0px",

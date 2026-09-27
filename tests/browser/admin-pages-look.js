@@ -72,7 +72,7 @@ async function capture(c, map, prefix) {
   await sleep(500);
   Object.assign(look, await capture(c, {
     'back button': 'text:button:← Back', 'title': 'h1', 'sample tag': 'text:span:Sample', 'settings card': '.card',
-    'settings facts': '.card > div:nth-child(2)', 'status badge': 'text:span:Disabled', 'publish toggle': 'text:button:Publish',
+    'settings facts': '.card .card-body > div:first-child', 'status badge': 'text:span:Disabled', 'publish toggle': 'text:button:Publish',
     'hide button': 'text:button:Hide', 'disabled banner': 'text:span:This slideshow is', 'slides card title': 'text:h2:Slides',
     'upload button': 'text:label:+ Upload', 'slide row': '.slide-row', 'slide thumb': '.slide-thumb', 'thumb image': '.slide-thumb img',
     'play mark': '.slide-thumb__play', 'status pill': '.badge', 'move up': 'text:button:↑', 'delete slide': 'text:button:✕',
