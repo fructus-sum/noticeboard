@@ -26,7 +26,7 @@
 //
 // Used by
 //   routes/api/slideshows.js, routes/api/slides.js, services/uploadQueue.js,
-//   services/sampleSlideshow.js, socket.js (the playlist)
+//   services/sampleSlideshow.js, services/playlistService.js, services/schedulerService.js
 //
 // Uses
 //   configService (the entries; its 'change' event tells the scheduler and the displays),

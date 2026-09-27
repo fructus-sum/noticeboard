@@ -5,6 +5,7 @@ const configService = require('../../services/configService');
 const updateService = require('../../services/updateService');
 const brandingService = require('../../services/brandingService');
 const adminPassword = require('../../services/adminPassword');
+const displayEvents = require('../../services/displayEvents');
 const { LOGO_MIME } = require('../../services/mediaTypes');
 const { parseSlideSeconds } = require('../../services/slideshowRules');
 const { createUpload } = require('../../middleware/uploads');
@@ -110,7 +111,7 @@ router.post('/logo', (req, res, next) => {
     if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
     try {
       const { width, height } = await brandingService.saveLogo(req.file.path);
-      configService.emit('change');   // displays pick up the new logo
+      displayEvents.displaySettingsChanged();   // displays pick up the new logo
       logger.info('Logo uploaded', { width, height });
       res.json(logoInfo());
     } catch (err) {
@@ -125,7 +126,7 @@ router.post('/logo', (req, res, next) => {
 // Back to the placeholder logo
 router.delete('/logo', (req, res) => {
   brandingService.removeLogo();
-  configService.emit('change');
+  displayEvents.displaySettingsChanged();
   logger.info('Logo reset to the default');
   res.json(logoInfo());
 });

@@ -1,0 +1,43 @@
+{
+  "01 connect": [
+    "display:build string",
+    "display:settings {\"showDeviceInfo\":true,\"logo\":{\"url\":\"/branding/logo?v=V\"}}",
+    "playlist:update (empty)"
+  ],
+  "02 create a slideshow": [],
+  "03 upload an image (unpublished)": [
+    "playlist:update (empty)"
+  ],
+  "04 publish": [
+    "playlist:update events:image:10",
+    "playlist:update events:image:10"
+  ],
+  "05 change its duration": [
+    "playlist:update events:image:6"
+  ],
+  "06 upload another image (published)": [
+    "playlist:update events:image:6,events:image:6"
+  ],
+  "07 reorder": [
+    "playlist:update events:image:6,events:image:6"
+  ],
+  "08 delete a slide": [
+    "playlist:update events:image:6"
+  ],
+  "09 hide the location pin": [
+    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"}}"
+  ],
+  "10 change the default duration": [],
+  "11 upload a logo": [
+    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"}}"
+  ],
+  "12 turn the logo off": [
+    "display:settings {\"showDeviceInfo\":false,\"logo\":null}"
+  ],
+  "13 back to the default logo": [],
+  "14 unpublish": [
+    "playlist:update (empty)",
+    "playlist:update (empty)"
+  ],
+  "15 delete the slideshow": []
+}

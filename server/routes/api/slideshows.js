@@ -4,7 +4,7 @@ const express = require('express');
 const store = require('../../services/slideshowStore');
 const rules = require('../../services/slideshowRules');
 const { route } = require('../../middleware/asyncRoute');
-const { broadcastPlaylist } = require('../../socket');
+const displayEvents = require('../../services/displayEvents');
 const logger = require('../../utils/logger');
 
 const router = express.Router();
@@ -53,7 +53,7 @@ router.put('/:folder', route(async (req, res) => {
 
   await store.replace(req.params.folder, updated);
   // e.g. a new duration for a slideshow on air; displays ignore a playlist that hasn't changed
-  broadcastPlaylist();
+  displayEvents.playlistChanged();
   logger.info('Slideshow updated', { folder: req.params.folder });
   res.json(updated);
 }));

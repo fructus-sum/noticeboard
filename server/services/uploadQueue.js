@@ -5,8 +5,7 @@ const { slidesDir } = require('../utils/pathHelpers');
 const { processImage, processVideo, getVideoDuration, createThumbnail } = require('./mediaService');
 const { typeFromMime } = require('./mediaTypes');
 const store = require('./slideshowStore');
-const configService = require('./configService');
-const { broadcastPlaylist } = require('../socket');
+const displayEvents = require('./displayEvents');
 const logger = require('../utils/logger');
 
 const queue = new PQueue({ concurrency: 2 });
@@ -41,8 +40,7 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
       }
 
       await updateSlide(folder, slideId, { filename, duration, status: 'ready', ...(thumbnail ? { thumbnail } : {}) });
-      configService.emit('change');
-      broadcastPlaylist();
+      displayEvents.playlistChanged();
       logger.info('Slide ready', { folder, slideId, type });
     } catch (err) {
       await updateSlide(folder, slideId, { status: 'error', error: err.message });

@@ -7,10 +7,9 @@ const multer = require('multer');
 const store = require('../../services/slideshowStore');
 const { typeFromMime, IMAGE_MIME, VIDEO_MIME } = require('../../services/mediaTypes');
 const { enqueueProcessing, enqueueThumbnail, queueSize } = require('../../services/uploadQueue');
-const configService = require('../../services/configService');
 const { createUpload } = require('../../middleware/uploads');
 const { route } = require('../../middleware/asyncRoute');
-const { broadcastPlaylist } = require('../../socket');
+const displayEvents = require('../../services/displayEvents');
 const logger = require('../../utils/logger');
 
 const router = express.Router({ mergeParams: true });
@@ -73,8 +72,7 @@ router.delete('/:id', route(async (req, res) => {
   if (!slide) return res.status(404).json({ error: 'Slide not found' });
 
   store.removeSlideFiles(folder, slide);   // the media file and a video's thumbnail
-  configService.emit('change');
-  broadcastPlaylist();   // displays drop it once the slide on screen has had its time
+  displayEvents.playlistChanged();   // displays drop it once the slide on screen has had its time
   logger.info('Slide deleted', { folder, id });
   res.json({ ok: true });
 }));
@@ -114,8 +112,7 @@ router.put('/reorder', route(async (req, res) => {
     ];
     return data.slides;
   });
-  configService.emit('change');
-  broadcastPlaylist();   // the new order starts once the slide on screen has had its time
+  displayEvents.playlistChanged();   // the new order starts once the slide on screen has had its time
   logger.info('Slides reordered', { folder });
   res.json(reordered);
 }));

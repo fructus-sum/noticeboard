@@ -3,7 +3,7 @@ const configService = require('./services/configService');
 const schedulerService = require('./services/schedulerService');
 const { syncSampleSlideshow } = require('./services/sampleSlideshow');
 const createApp = require('./app');
-const { initSocket } = require('./socket');
+const { initDisplaySocket } = require('./realtime/displaySocket');
 const { createDevFrontends } = require('./utils/devFrontends');
 const logger = require('./utils/logger');
 
@@ -22,7 +22,7 @@ async function main() {
     logger.info('Development: Vite serves the viewer and the admin panel on this port');
   }
 
-  const io = initSocket(server);
+  const io = initDisplaySocket(server);
   schedulerService.init();
 
   server.listen(port, () => {
