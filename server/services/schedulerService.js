@@ -1,5 +1,6 @@
 const EventEmitter = require('events');
 const configService = require('./configService');
+const store = require('./slideshowStore');
 const logger = require('../utils/logger');
 
 class SchedulerService extends EventEmitter {
@@ -27,7 +28,7 @@ class SchedulerService extends EventEmitter {
   }
 
   computeActive() {
-    const slideshows = configService.get('slideshows') || [];
+    const slideshows = store.list();
     const now = new Date();
 
     const candidates = slideshows

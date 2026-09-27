@@ -1,17 +1,15 @@
 const express = require('express');
 const fs = require('fs');
-const crypto = require('crypto');
-const path = require('path');
-const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const configService = require('../../services/configService');
 const updateService = require('../../services/updateService');
 const brandingService = require('../../services/brandingService');
 const adminPassword = require('../../services/adminPassword');
 const { LOGO_MIME } = require('../../services/mediaTypes');
+const { parseSlideSeconds } = require('../../services/slideshowRules');
+const { createUpload } = require('../../middleware/uploads');
 const { route } = require('../../middleware/asyncRoute');
 const { lanInterfaces } = require('../../utils/network');
-const { tmpDir } = require('../../utils/pathHelpers');
 const logger = require('../../utils/logger');
 
 const router = express.Router();
@@ -49,11 +47,9 @@ function mergeDisplay(current, change) {
   if (!change || typeof change !== 'object') return { error: 'display must be an object' };
   const merged = { ...current };
   if (change.defaultSlideDurationSeconds !== undefined) {
-    const seconds = Number(change.defaultSlideDurationSeconds);
-    if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
-      return { error: 'The slide duration must be a whole number of seconds from 1 to 3600' };
-    }
-    merged.defaultSlideDurationSeconds = seconds;
+    const seconds = parseSlideSeconds(change.defaultSlideDurationSeconds);
+    if (seconds.error) return { error: seconds.error };
+    merged.defaultSlideDurationSeconds = seconds.value;
   }
   if (change.showDeviceInfo !== undefined) merged.showDeviceInfo = change.showDeviceInfo === true;
   if (change.logo !== undefined) merged.logo = { ...current.logo, enabled: change.logo?.enabled !== false };
@@ -89,19 +85,11 @@ router.get('/security', route(async (req, res) => {
 }));
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
-const logoUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      fs.mkdirSync(tmpDir(), { recursive: true });
-      cb(null, tmpDir());
-    },
-    filename: (req, file, cb) => cb(null, `logo-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${path.extname(file.originalname).toLowerCase()}`),
-  }),
-  limits: { fileSize: 20 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (LOGO_MIME.includes(file.mimetype)) return cb(null, true);
-    cb(Object.assign(new Error('The logo must be a PNG, JPEG, GIF or WebP image'), { status: 400 }));
-  },
+const logoUpload = createUpload({
+  prefix: 'logo',
+  maxFileBytes: 20 * 1024 * 1024,
+  allowed: LOGO_MIME,
+  rejectMessage: 'The logo must be a PNG, JPEG, GIF or WebP image',
 }).single('logo');
 
 function logoInfo() {

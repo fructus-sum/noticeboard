@@ -1,8 +1,8 @@
 const { Server } = require('socket.io');
-const fs = require('fs');
 const schedulerService = require('./services/schedulerService');
 const configService = require('./services/configService');
-const { slideshowJsonPath, mediaUrl } = require('./utils/pathHelpers');
+const store = require('./services/slideshowStore');
+const { mediaUrl } = require('./utils/pathHelpers');
 const logger = require('./utils/logger');
 const { displayBuildId } = require('./utils/displayBuildId');
 const { displaySettings } = require('./services/brandingService');
@@ -11,20 +11,13 @@ const { socketEvents: EVENTS } = require('../shared/contract.json');
 
 function buildPlaylist(activeSlideshows) {
   const defaultDuration = configService.get('display')?.defaultSlideDurationSeconds ?? 10;
-  const current = configService.get('slideshows') || [];
   const slides = [];
 
   for (const active of activeSlideshows) {
     // The scheduler lists which slideshows are on; their settings (e.g. a duration changed
     // while they're on air) come from config.json as it is now
-    const ss = current.find((s) => s.folder === active.folder) || active;
-    let data = { slides: [] };
-    try {
-      data = JSON.parse(fs.readFileSync(slideshowJsonPath(ss.folder), 'utf8'));
-    } catch {
-      // empty or missing slideshow.json — skip
-    }
-    for (const slide of data.slides.filter(s => s.status === 'ready')) {
+    const ss = store.find(active.folder) || active;
+    for (const slide of store.readSlides(ss.folder).slides.filter((s) => s.status === 'ready')) {
       slides.push({
         type: slide.type,
         url: mediaUrl(ss.folder, slide.filename),

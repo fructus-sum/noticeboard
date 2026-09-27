@@ -1,33 +1,22 @@
 const PQueue = require('p-queue').default;
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const { writeConfig } = require('../utils/configIO');
-const { slideshowJsonPath, slidesDir } = require('../utils/pathHelpers');
+const { slidesDir } = require('../utils/pathHelpers');
 const { processImage, processVideo, getVideoDuration, createThumbnail } = require('./mediaService');
 const { typeFromMime } = require('./mediaTypes');
+const store = require('./slideshowStore');
 const configService = require('./configService');
 const { broadcastPlaylist } = require('../socket');
 const logger = require('../utils/logger');
-const { withSlideshowLock } = require('../utils/slideshowLock');
 
 const queue = new PQueue({ concurrency: 2 });
 
-function readSlideshowJson(folder) {
-  const p = slideshowJsonPath(folder);
-  if (!fs.existsSync(p)) return { slides: [] };
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return { slides: [] }; }
-}
-
-async function updateSlide(folder, slideId, patch) {
-  // Two slides can finish processing at once; the lock stops one save wiping out the other
-  await withSlideshowLock(folder, async () => {
-    const data = readSlideshowJson(folder);
-    const idx = data.slides.findIndex(s => s.id === slideId);
-    if (idx !== -1) {
-      data.slides[idx] = { ...data.slides[idx], ...patch };
-      await writeConfig(slideshowJsonPath(folder), data);
-    }
+// Two slides can finish processing at once; the store's lock stops one save wiping out the other.
+// A slide deleted meanwhile stays deleted.
+function updateSlide(folder, slideId, patch) {
+  return store.modifySlides(folder, (data) => {
+    const idx = data.slides.findIndex((s) => s.id === slideId);
+    if (idx !== -1) data.slides[idx] = { ...data.slides[idx], ...patch };
   });
 }
 

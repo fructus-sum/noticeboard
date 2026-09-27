@@ -1,186 +1,124 @@
+// /api/slideshows/:folder/slides: a slideshow's slides: uploading, listing, deleting, reordering,
+// and making missing video thumbnails. Mounted inside the slideshows API (api/index.js), behind
+// its admin check. The data belongs to services/slideshowStore.js; processing to uploadQueue.
 const express = require('express');
-const multer = require('multer');
-const fs = require('fs');
 const crypto = require('crypto');
-const path = require('path');
-const { writeConfig } = require('../../utils/configIO');
-const { slideshowJsonPath, slidesDir, tmpDir } = require('../../utils/pathHelpers');
+const multer = require('multer');
+const store = require('../../services/slideshowStore');
 const { typeFromMime, IMAGE_MIME, VIDEO_MIME } = require('../../services/mediaTypes');
 const { enqueueProcessing, enqueueThumbnail, queueSize } = require('../../services/uploadQueue');
 const configService = require('../../services/configService');
-const logger = require('../../utils/logger');
-const { withSlideshowLock } = require('../../utils/slideshowLock');
+const { createUpload } = require('../../middleware/uploads');
+const { route } = require('../../middleware/asyncRoute');
 const { broadcastPlaylist } = require('../../socket');
+const logger = require('../../utils/logger');
 
 const router = express.Router({ mergeParams: true });
 
-const ALLOWED_MIME = new Set([...IMAGE_MIME, ...VIDEO_MIME]);
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = tmpDir();
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '';
-    cb(null, `upload-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 500 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (ALLOWED_MIME.has(file.mimetype)) return cb(null, true);
-    const err = Object.assign(new Error('Unsupported file type'), { status: 400 });
-    cb(err);
-  },
+const upload = createUpload({
+  prefix: 'upload',
+  maxFileBytes: 500 * 1024 * 1024,
+  allowed: new Set([...IMAGE_MIME, ...VIDEO_MIME]),
+  rejectMessage: 'Unsupported file type',
 });
 
 // Verify slideshow exists before handling any slide routes
 router.use((req, res, next) => {
-  const list = configService.get('slideshows') || [];
-  if (!list.find(s => s.folder === req.params.folder)) {
+  if (!store.find(req.params.folder)) {
     return res.status(404).json({ error: 'Slideshow not found' });
   }
   next();
 });
 
-function readSlideshowJson(folder) {
-  const p = slideshowJsonPath(folder);
-  if (!fs.existsSync(p)) return { slides: [] };
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return { slides: [] }; }
-}
-
 // GET /api/slideshows/:folder/slides
 router.get('/', (req, res) => {
-  res.json(readSlideshowJson(req.params.folder).slides);
+  res.json(store.readSlides(req.params.folder).slides);
 });
 
 // POST /api/slideshows/:folder/slides
-router.post('/', upload.array('files', 50), async (req, res, next) => {
-  try {
-    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+router.post('/', upload.array('files', 50), route(async (req, res) => {
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
 
-    const { folder } = req.params;
-    const queued = [];
+  const { folder } = req.params;
+  const queued = req.files.map((file) => ({
+    entry: {
+      id: crypto.randomUUID(),
+      type: typeFromMime(file.mimetype),
+      filename: null,
+      status: 'processing',
+      duration: null,
+      addedAt: new Date().toISOString(),
+    },
+    tmpPath: file.path,
+    mime: file.mimetype,
+  }));
 
-    for (const file of req.files) {
-      const slideId = crypto.randomUUID();
-      const type = typeFromMime(file.mimetype);
-      const entry = {
-        id: slideId,
-        type,
-        filename: null,
-        status: 'processing',
-        duration: null,
-        addedAt: new Date().toISOString(),
-      };
-      queued.push({ entry, slideId, tmpPath: file.path, mime: file.mimetype });
-    }
+  await store.modifySlides(folder, (data) => { data.slides.push(...queued.map((q) => q.entry)); });
 
-    await withSlideshowLock(folder, async () => {
-      const data = readSlideshowJson(folder);
-      data.slides.push(...queued.map(q => q.entry));
-      await writeConfig(slideshowJsonPath(folder), data);
-    });
-
-    for (const { slideId, tmpPath, mime } of queued) {
-      enqueueProcessing({ folder, slideId, tmpPath, mime });
-    }
-
-    logger.info('Slides upload accepted', { folder, count: queued.length, ...queueSize() });
-    res.status(202).json(queued.map(q => q.entry));
-  } catch (err) {
-    next(err);
+  for (const { entry, tmpPath, mime } of queued) {
+    enqueueProcessing({ folder, slideId: entry.id, tmpPath, mime });
   }
-});
+
+  logger.info('Slides upload accepted', { folder, count: queued.length, ...queueSize() });
+  res.status(202).json(queued.map((q) => q.entry));
+}));
 
 // DELETE /api/slideshows/:folder/slides/:id
-router.delete('/:id', async (req, res, next) => {
-  try {
-    const { folder, id } = req.params;
-    const slide = await withSlideshowLock(folder, async () => {
-      const data = readSlideshowJson(folder);
-      const idx = data.slides.findIndex(s => s.id === id);
-      if (idx === -1) return null;
-      const [removed] = data.slides.splice(idx, 1);
-      await writeConfig(slideshowJsonPath(folder), data);
-      return removed;
-    });
-    if (!slide) return res.status(404).json({ error: 'Slide not found' });
+router.delete('/:id', route(async (req, res) => {
+  const { folder, id } = req.params;
+  const slide = await store.modifySlides(folder, (data) => {
+    const idx = data.slides.findIndex((s) => s.id === id);
+    return idx === -1 ? null : data.slides.splice(idx, 1)[0];
+  });
+  if (!slide) return res.status(404).json({ error: 'Slide not found' });
 
-    // Delete the media file (and a video's thumbnail) if they exist
-    for (const name of [slide.filename, slide.thumbnail]) {
-      if (!name) continue;
-      const filePath = path.join(slidesDir(folder), name);
-      if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
-    }
-
-    configService.emit('change');
-    broadcastPlaylist();   // displays drop it once the slide on screen has had its time
-    logger.info('Slide deleted', { folder, id });
-    res.json({ ok: true });
-  } catch (err) {
-    next(err);
-  }
-});
+  store.removeSlideFiles(folder, slide);   // the media file and a video's thumbnail
+  configService.emit('change');
+  broadcastPlaylist();   // displays drop it once the slide on screen has had its time
+  logger.info('Slide deleted', { folder, id });
+  res.json({ ok: true });
+}));
 
 // POST /api/slideshows/:folder/slides/thumbnails
 // Creates the missing thumbnails of this slideshow's videos, from a frame the server picks
-router.post('/thumbnails', async (req, res, next) => {
-  try {
-    const { folder } = req.params;
-    const missing = await withSlideshowLock(folder, async () => {
-      const data = readSlideshowJson(folder);
-      const videos = data.slides.filter((s) => s.type === 'video' && s.status === 'ready' && s.filename
-        && !s.thumbnailPending && !(s.thumbnail && fs.existsSync(path.join(slidesDir(folder), s.thumbnail))));
-      for (const s of videos) {
-        s.thumbnailPending = true;
-        delete s.thumbnail;
-        delete s.thumbnailError;
-      }
-      if (videos.length) await writeConfig(slideshowJsonPath(folder), data);
-      return videos;
-    });
-    for (const s of missing) enqueueThumbnail({ folder, slideId: s.id, filename: s.filename });
-    logger.info('Missing video thumbnails queued', { folder, count: missing.length });
-    res.status(202).json({ queued: missing.length });
-  } catch (err) {
-    next(err);
-  }
-});
+router.post('/thumbnails', route(async (req, res) => {
+  const { folder } = req.params;
+  const missing = await store.modifySlides(folder, (data) => {
+    const videos = data.slides.filter((s) => s.type === 'video' && s.status === 'ready' && s.filename
+      && !s.thumbnailPending && !store.slideFileExists(folder, s.thumbnail));
+    for (const s of videos) {
+      s.thumbnailPending = true;
+      delete s.thumbnail;
+      delete s.thumbnailError;
+    }
+    return videos;
+  });
+  for (const s of missing) enqueueThumbnail({ folder, slideId: s.id, filename: s.filename });
+  logger.info('Missing video thumbnails queued', { folder, count: missing.length });
+  res.status(202).json({ queued: missing.length });
+}));
 
 // PUT /api/slideshows/:folder/slides/reorder
 // Body: { order: ['id1', 'id2', ...] }
-router.put('/reorder', async (req, res, next) => {
-  try {
-    const { folder } = req.params;
-    const { order } = req.body;
-    if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array of slide IDs' });
+router.put('/reorder', route(async (req, res) => {
+  const { folder } = req.params;
+  const { order } = req.body;
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array of slide IDs' });
 
-    const reordered = await withSlideshowLock(folder, async () => {
-      const data = readSlideshowJson(folder);
-      const byId = Object.fromEntries(data.slides.map(s => [s.id, s]));
-
-      // Reorder: IDs in `order` come first (in given sequence), any remaining slides appended
-      const slides = [
-        ...order.filter(id => byId[id]).map(id => byId[id]),
-        ...data.slides.filter(s => !order.includes(s.id)),
-      ];
-
-      await writeConfig(slideshowJsonPath(folder), { ...data, slides });
-      return slides;
-    });
-    configService.emit('change');
-    broadcastPlaylist();   // the new order starts once the slide on screen has had its time
-    logger.info('Slides reordered', { folder });
-    res.json(reordered);
-  } catch (err) {
-    next(err);
-  }
-});
+  const reordered = await store.modifySlides(folder, (data) => {
+    const byId = Object.fromEntries(data.slides.map((s) => [s.id, s]));
+    // IDs in `order` come first (in given sequence), any remaining slides appended
+    data.slides = [
+      ...order.filter((id) => byId[id]).map((id) => byId[id]),
+      ...data.slides.filter((s) => !order.includes(s.id)),
+    ];
+    return data.slides;
+  });
+  configService.emit('change');
+  broadcastPlaylist();   // the new order starts once the slide on screen has had its time
+  logger.info('Slides reordered', { folder });
+  res.json(reordered);
+}));
 
 // Error handler for multer errors
 router.use((err, req, res, next) => {
