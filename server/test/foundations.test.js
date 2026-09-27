@@ -57,3 +57,24 @@ test('socket event names in the shared contract are the ones open screens use', 
     DISPLAY_SETTINGS: 'display:settings',
   });
 });
+
+// shared/index.js is an ES module for the web apps (built by Vite, which reads contract.json
+// itself), so it is loaded here with the contract written in
+async function sharedModule() {
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '../../shared/index.js'), 'utf8')
+    .replace(/^import contract from '\.\/contract\.json';$/m, `const contract = ${JSON.stringify(contract)};`);
+  return import(`data:text/javascript,${encodeURIComponent(source)}`);
+}
+
+test('the web apps make the same media URLs as the server, and use the same limits', async () => {
+  const shared = await sharedModule();
+  const { mediaUrl } = require('../utils/pathHelpers');
+  for (const [folder, file] of [['sample', '01-welcome.png'], ['my-slideshow', '1700000000000-a1b2.mp4'], ['x', 'thumb-1.jpg']]) {
+    assert.equal(shared.mediaUrl(folder, file), mediaUrl(folder, file));
+  }
+  assert.equal(shared.mediaUrl('my-slideshow', 'a.png'), '/media/my-slideshow/slides/a.png');
+  assert.deepEqual(shared.LIMITS, { passwordMinLength: 8, slideSeconds: { min: 1, max: 3600 } });
+  assert.deepEqual(shared.SOCKET_EVENTS, contract.socketEvents);
+});

@@ -1,7 +1,7 @@
 <script setup>
 // client/admin/src/components/ui/TagPill.vue — a small grey label, e.g. "Hidden" or "Sample".
 // The text goes in the slot; a title (tooltip) passes through.
-// Used by: SlideshowsView, SlideshowDetailView
+// Used by: SlideshowsView, SlideshowDetailView (the header)
 </script>
 
 <template>

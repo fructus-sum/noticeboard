@@ -2,7 +2,7 @@
 // client/admin/src/components/ui/PublishToggle.vue — the "Disable" (red) / "Publish" (green) button
 // Props: published (what it is now), busy (a change is on its way: disabled), small (the slideshow
 // page's size). Click handlers pass through.
-// Used by: SlideshowsView (and the slideshow page's settings card)
+// Used by: SlideshowsView, slideshow/SlideshowSettingsCard
 defineProps({
   published: Boolean,
   busy: Boolean,

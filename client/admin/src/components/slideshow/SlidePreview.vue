@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { mediaUrl } from '@shared/index.js';
 
 // A larger view of one slide, over the slide list. Hovering shows it while the pointer stays
 // on the thumbnail; clicking or tapping pins it until closed (✕, Esc, or a click outside).
@@ -12,7 +13,7 @@ const props = defineProps({
 });
 defineEmits(['close']);
 
-const media = (name) => (name ? `/media/${props.folder}/slides/${name}` : null);
+const media = (name) => (name ? mediaUrl(props.folder, name) : null);
 const src = computed(() => media(props.slide.filename));
 const thumb = computed(() => media(props.slide.thumbnail));
 </script>

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
-import { api } from '../composables/useApi.js';
-import ModalDialog from './ui/ModalDialog.vue';
+import { api } from '../../composables/useApi.js';
+import ModalDialog from '../ui/ModalDialog.vue';
 
 // Shown when MAC filtering is switched on: once it's saved, only approved devices can open the
 // displays and the admin panel, so a device that isn't on the list locks itself out.

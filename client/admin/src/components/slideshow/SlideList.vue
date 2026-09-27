@@ -1,0 +1,260 @@
+<script setup>
+// client/admin/src/components/slideshow/SlideList.vue — a slideshow's slides on its page
+//
+// Responsibilities
+//   Uploading (several files at once), the rows with a thumbnail, type, file name and status,
+//   moving a slide up or down, deleting one, making missing video thumbnails, and the larger
+//   preview (hover shows it, a click or tap pins it; Esc or ✕ closes it). While a slide is being
+//   processed or its thumbnail made, the list reloads every 2 seconds until none is.
+//
+// Props: folder. v-model:slides, the list as the server returns it (the page loads it first).
+//
+// Used by: views/SlideshowDetailView
+// Uses: useApi (the slides routes), SlidePreview; mediaUrl from @shared
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { mediaUrl } from '@shared/index.js';
+import { api } from '../../composables/useApi.js';
+import SlidePreview from './SlidePreview.vue';
+
+const props = defineProps({ folder: { type: String, required: true } });
+const slides = defineModel('slides', { type: Array, required: true });
+
+async function loadSlides() {
+  slides.value = await api.get(`/slideshows/${props.folder}/slides`);
+}
+
+// Larger preview of a slide: hover shows it, click/tap pins it
+const preview = ref(null);   // { slide, position, pinned }
+let hoverTimer = null;
+
+function hoverStart(slide, i) {
+  if (preview.value?.pinned) return;
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(() => { preview.value = { slide, position: i + 1, pinned: false }; }, 250);
+}
+function hoverEnd() {
+  clearTimeout(hoverTimer);
+  if (!preview.value?.pinned) preview.value = null;
+}
+function pinPreview(slide, i) {
+  clearTimeout(hoverTimer);
+  preview.value = { slide, position: i + 1, pinned: true };
+}
+function closePreview() {
+  clearTimeout(hoverTimer);
+  preview.value = null;
+}
+function onKey(e) {
+  if (e.key === 'Escape' && preview.value) closePreview();
+}
+
+// Videos without a thumbnail (uploaded before thumbnails existed): the server makes them
+const missingThumbnails = computed(() => slides.value.filter(s =>
+  s.type === 'video' && s.status === 'ready' && !s.thumbnail && !s.thumbnailPending));
+const thumbnailsFailed = computed(() => missingThumbnails.value.some(s => s.thumbnailError));
+const creatingThumbs = ref(false);
+const thumbMsg = ref('');
+
+async function createThumbnails() {
+  creatingThumbs.value = true;
+  thumbMsg.value = '';
+  try {
+    await api.post(`/slideshows/${props.folder}/slides/thumbnails`);
+    await loadSlides();
+  } catch (e) {
+    thumbMsg.value = e.message;
+  } finally {
+    creatingThumbs.value = false;
+  }
+}
+
+// Upload
+const fileInput    = ref(null);
+const uploading    = ref(false);
+const uploadErr    = ref('');
+const uploadCount  = ref(0);
+
+async function uploadFile(e) {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  uploadErr.value = '';
+  uploading.value = true;
+  uploadCount.value = files.length;
+  const fd = new FormData();
+  for (const file of files) fd.append('files', file);
+  try {
+    const newSlides = await api.upload(`/slideshows/${props.folder}/slides`, fd);
+    slides.value.push(...newSlides);
+  } catch (err) {
+    uploadErr.value = err.message;
+  } finally {
+    uploading.value = false;
+    uploadCount.value = 0;
+    if (fileInput.value) fileInput.value.value = '';
+  }
+}
+
+// Polling while any slide is processing
+let pollTimer = null;
+const hasProcessing = computed(() => slides.value.some(s => s.status === 'processing' || s.thumbnailPending));
+
+watch(hasProcessing, (v) => {
+  if (v && !pollTimer) {
+    pollTimer = setInterval(async () => {
+      await loadSlides().catch(() => {});
+      if (!hasProcessing.value) { clearInterval(pollTimer); pollTimer = null; }
+    }, 2000);
+  }
+}, { immediate: true });
+
+async function deleteSlide(id) {
+  if (!confirm('Delete this slide?')) return;
+  try {
+    await api.del(`/slideshows/${props.folder}/slides/${id}`);
+    slides.value = slides.value.filter(s => s.id !== id);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function move(index, dir) {
+  const newSlides = [...slides.value];
+  const target = index + dir;
+  if (target < 0 || target >= newSlides.length) return;
+  [newSlides[index], newSlides[target]] = [newSlides[target], newSlides[index]];
+  slides.value = newSlides;
+  await api.put(`/slideshows/${props.folder}/slides/reorder`, { order: newSlides.map(s => s.id) }).catch(() => {});
+}
+
+onMounted(() => window.addEventListener('keydown', onKey));
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer);
+  clearTimeout(hoverTimer);
+  window.removeEventListener('keydown', onKey);
+});
+</script>
+
+<template>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 style="margin:0">Slides ({{ slides.length }})</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
+        <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
+          {{ uploading ? `Uploading${uploadCount > 1 ? ` ${uploadCount} files` : ''}…` : '+ Upload' }}
+          <input ref="fileInput" type="file" accept="image/*,video/*" multiple style="display:none" :disabled="uploading" @change="uploadFile" />
+        </label>
+      </div>
+    </div>
+
+    <p v-if="!slides.length" style="color:var(--text-muted)">No slides yet. Upload an image or video.</p>
+    <p v-else style="color:var(--text-muted);font-size:12px;margin-bottom:6px">
+      Hover over a thumbnail, or click or tap it, for a larger view. Large videos take a while to process after
+      uploading: carry on setting up meanwhile, and they appear by themselves when they’re ready.
+    </p>
+
+    <div v-if="missingThumbnails.length" class="thumb-note">
+      <span>
+        {{ missingThumbnails.length }} video{{ missingThumbnails.length > 1 ? 's have' : ' has' }} no thumbnail{{ thumbnailsFailed ? ' (the last try failed)' : '' }}.
+        The noticeboard can make {{ missingThumbnails.length > 1 ? 'them' : 'one' }} from a frame of each video.
+      </span>
+      <button class="btn-ghost" style="font-size:12px;padding:4px 10px" :disabled="creatingThumbs" @click="createThumbnails">
+        {{ creatingThumbs ? 'Starting…' : 'Create thumbnails' }}
+      </button>
+      <span v-if="thumbMsg" class="error-msg">{{ thumbMsg }}</span>
+    </div>
+
+    <div v-for="(slide, i) in slides" :key="slide.id" class="slide-row">
+      <button
+        type="button"
+        class="slide-thumb"
+        :aria-label="`Show slide ${i + 1} larger`"
+        @mouseenter="hoverStart(slide, i)"
+        @mouseleave="hoverEnd"
+        @click="pinPreview(slide, i)"
+      >
+        <img v-if="slide.type === 'image' && slide.status === 'ready'" :src="slide.filename ? mediaUrl(folder, slide.filename) : ''" alt="" />
+        <template v-else-if="slide.type === 'video'">
+          <img v-if="slide.thumbnail" :src="mediaUrl(folder, slide.thumbnail)" alt="" />
+          <span class="slide-thumb__play" aria-hidden="true">▶</span>
+        </template>
+        <div v-else class="slide-thumb__icon">?</div>
+      </button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:var(--text-muted)">
+          {{ slide.type }}<template v-if="slide.thumbnailPending"> · making a thumbnail…</template>
+        </div>
+        <div style="font-size:12px;word-break:break-all">{{ slide.filename ?? '—' }}</div>
+      </div>
+      <span class="badge" :class="`badge--${slide.status}`">{{ slide.status }}</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :disabled="i === 0" @click="move(i, -1)">↑</button>
+        <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :disabled="i === slides.length - 1" @click="move(i, 1)">↓</button>
+        <button class="btn-danger" style="padding:4px 8px;font-size:12px" @click="deleteSlide(slide.id)">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <SlidePreview
+    v-if="preview"
+    :slide="preview.slide"
+    :folder="folder"
+    :position="preview.position"
+    :pinned="preview.pinned"
+    @close="closePreview"
+  />
+</template>
+
+<style scoped>
+.slide-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;   /* on a narrow screen the buttons go under, making the row taller */
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.slide-row:last-child { border-bottom: none; }
+
+.slide-thumb {
+  position: relative;
+  width: 72px;
+  height: 48px;
+  padding: 0;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: zoom-in;
+}
+.slide-thumb:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.slide-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.slide-thumb__icon { font-size: 16px; color: var(--text-muted); }
+.slide-thumb__play {
+  position: absolute;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 13px;
+}
+</style>

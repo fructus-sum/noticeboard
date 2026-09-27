@@ -1,31 +1,33 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import { api } from '../composables/useApi.js';
-import { useBranding } from '../composables/useBranding.js';
-
+// client/admin/src/components/settings/LogoSettings.vue — Settings → Logo
+//
 // The logo shown above "No slideshow published" on the displays and above the title in this
-// sidebar. Uploads are scaled down to fit 500 × 500 px on the server: never stretched and
-// never enlarged.
+// sidebar: show or hide it, upload one, or go back to the default. Uploads are scaled down to fit
+// 500 × 500 px on the server: never stretched and never enlarged.
+//
+// Used by: views/SettingsView
+// Uses: useApi (PUT /settings, /settings/logo), useBranding (the logo, shared with the sidebar),
+//   useFlash, FlashMessage
+import { ref, onMounted } from 'vue';
+import { api } from '../../composables/useApi.js';
+import { useBranding } from '../../composables/useBranding.js';
+import { useFlash } from '../../composables/useFlash.js';
+import FlashMessage from '../ui/FlashMessage.vue';
+
 const { logo, refreshLogo } = useBranding();
 const busy = ref(false);
-const message = ref('');
-const isError = ref(false);
+const msg = useFlash();
 const fileInput = ref(null);
-
-function say(text, error = false) {
-  message.value = text;
-  isError.value = error;
-}
 
 async function setEnabled(enabled) {
   busy.value = true;
-  say('');
+  msg.clear();
   try {
     await api.put('/settings', { display: { logo: { enabled } } });
     await refreshLogo();
-    say(enabled ? 'The logo is shown.' : 'The logo is hidden.');
+    msg.ok(enabled ? 'The logo is shown.' : 'The logo is hidden.');
   } catch (e) {
-    say(e.message, true);
+    msg.error(e.message);
   } finally {
     busy.value = false;
   }
@@ -35,15 +37,15 @@ async function upload(e) {
   const file = e.target.files?.[0];
   if (!file) return;
   busy.value = true;
-  say('');
+  msg.clear();
   const form = new FormData();
   form.append('logo', file);
   try {
     await api.upload('/settings/logo', form);
     await refreshLogo();
-    say('New logo saved.');
+    msg.ok('New logo saved.');
   } catch (err) {
-    say(err.message, true);
+    msg.error(err.message);
   } finally {
     busy.value = false;
     if (fileInput.value) fileInput.value.value = '';
@@ -52,13 +54,13 @@ async function upload(e) {
 
 async function useDefault() {
   busy.value = true;
-  say('');
+  msg.clear();
   try {
     await api.del('/settings/logo');
     await refreshLogo();
-    say('Back to the default logo.');
+    msg.ok('Back to the default logo.');
   } catch (e) {
-    say(e.message, true);
+    msg.error(e.message);
   } finally {
     busy.value = false;
   }
@@ -93,7 +95,7 @@ onMounted(refreshLogo);
           </label>
           <button v-if="logo.custom" type="button" class="btn-ghost" :disabled="busy" @click="useDefault">Use the default logo</button>
         </div>
-        <p v-if="message" :class="isError ? 'error-msg' : 'success-msg'">{{ message }}</p>
+        <FlashMessage :flash="msg" tag="p" />
       </div>
     </div>
     <p v-else class="muted">Loading…</p>

@@ -1,6 +1,6 @@
 <script setup>
 // client/admin/src/components/ui/StatusBadge.vue — "Published" (green) or "Disabled" (grey)
-// Used by: SlideshowsView (and the slideshow page's settings card)
+// Used by: SlideshowsView, slideshow/SlideshowSettingsCard
 defineProps({ published: Boolean });
 </script>
 

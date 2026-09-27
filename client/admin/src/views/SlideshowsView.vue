@@ -2,8 +2,8 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
-import UpdateNotice from '../components/UpdateNotice.vue';
-import InstallerNotice from '../components/InstallerNotice.vue';
+import UpdateNotice from '../components/updates/UpdateNotice.vue';
+import InstallerNotice from '../components/updates/InstallerNotice.vue';
 import StatusBadge from '../components/ui/StatusBadge.vue';
 import PublishToggle from '../components/ui/PublishToggle.vue';
 import TagPill from '../components/ui/TagPill.vue';

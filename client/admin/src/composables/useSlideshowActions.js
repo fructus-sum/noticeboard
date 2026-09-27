@@ -10,7 +10,7 @@
 //   The server's rules apply (only an unpublished slideshow can be hidden); its message is shown
 //   in an alert, as it always has been.
 //
-// Used by: SlideshowsView (and the slideshow page's settings card)
+// Used by: SlideshowsView, slideshow/SlideshowSettingsCard
 import { ref } from 'vue';
 import { api } from './useApi.js';
 

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { installerCommand } from '@shared/index.js';
-import { api } from '../composables/useApi.js';
+import { api } from '../../composables/useApi.js';
 
 // Updates can't change what only the installer sets up (kiosk scripts, system services, desktop
 // shortcuts), so when this version needs a newer installer run than the Pi had, say so here.

@@ -8,7 +8,7 @@
 // Attributes and listeners (e.g. @submit on a form, a class) go to the card, not the overlay.
 // A user's scoped styles reach the card with :deep(.dialog).
 //
-// Used by: MacFilterWarning (and the Software updates confirmations)
+// Used by: settings/MacFilterWarning, updates/SwitchDialogs
 import { onMounted, onUnmounted } from 'vue';
 
 defineOptions({ inheritAttrs: false });

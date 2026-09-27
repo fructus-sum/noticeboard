@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { api } from '../composables/useApi.js';
+import { api } from '../../composables/useApi.js';
 
 // A notice from the updater, e.g. the branch this noticeboard followed was merged into main
 // so it went back to main. It stays, for every admin, until someone closes it.
