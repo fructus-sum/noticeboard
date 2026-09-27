@@ -120,6 +120,7 @@ const { io } = require(path.join(MODULES, 'socket.io-client'));
   await v.until(`!!document.querySelector('.info-list dd')`);
   const popup = await v.evaluate(`document.querySelector('.info-popup').innerText`);
   check('the pop-up is titled as the server\'s address and says how to use it', /Noticeboard server/.test(popup) && /From another device/.test(popup) && popup.includes(String(env.port)), popup.replace(/\n/g, ' | ').slice(0, 140));
+  check('the pop-up gives only the viewer\'s address, not the admin panel (open-bugs 1)', !/\/admin|admin panel/i.test(popup), popup.replace(/\n/g, ' | ').slice(0, 200));
   v.close();
 
   // ── Admin ──

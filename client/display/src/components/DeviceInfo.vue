@@ -78,9 +78,9 @@ onUnmounted(() => {
         <dt>Port</dt>
         <dd>{{ info.port }}</dd>
       </dl>
+      <!-- Only how to reach the viewer: the pop-up is on a public screen, so it doesn't point to the admin panel -->
       <p v-if="info.addresses.length" class="info-hint">
-        From another device on this network, open <strong>http://{{ info.addresses[0].ip }}:{{ info.port }}</strong>
-        (add <strong>/admin</strong> for the admin panel).
+        From another device on this network, open <strong>http://{{ info.addresses[0].ip }}:{{ info.port }}</strong>.
       </p>
     </template>
   </ScreenDialog>
