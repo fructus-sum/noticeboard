@@ -1,0 +1,34 @@
+// /api/settings (general): the settings themselves, and the devices involved
+const express = require('express');
+const settingsService = require('../../../services/settingsService');
+const { route } = require('../../../middleware/asyncRoute');
+const { lanInterfaces } = require('../../../utils/network');
+const logger = require('../../../utils/logger');
+
+const router = express.Router();
+
+router.get('/', (req, res) => {
+  res.json(settingsService.publicSettings());
+});
+
+router.put('/', route(async (req, res) => {
+  const result = await settingsService.applyPatch(req.body);
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  logger.info('Settings updated', { keys: result.keys });
+  res.json(result.settings);
+}));
+
+// This Pi's IP and MAC addresses, for the admin home page
+router.get('/device', (req, res) => {
+  res.json({ interfaces: lanInterfaces() });
+});
+
+// The MAC address of the device using the admin panel, as the server sees it, for the warning
+// when MAC filtering is turned on. null if it can't be found (e.g. across a router); local:
+// the admin panel is open on the server Pi itself, which is always allowed.
+router.get('/my-device', (req, res) => {
+  const local = req.clientMac === 'localhost';
+  res.json({ local, mac: local ? null : req.clientMac || null });
+});
+
+module.exports = router;
