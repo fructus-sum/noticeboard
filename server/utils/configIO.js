@@ -46,9 +46,4 @@ function readJsonFile(filePath) {
   }
 }
 
-function readConfigSync(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf8');
-  return JSON5.parse(raw);
-}
-
-module.exports = { readConfig, writeConfig, writeFileAtomic, readJsonFile, readConfigSync };
+module.exports = { readConfig, writeConfig, writeFileAtomic, readJsonFile };

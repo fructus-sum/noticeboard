@@ -1,15 +1,23 @@
+// server/routes/index.js — every URL the server answers, mounted in order
+//
+// The order matters (OLD_SYSTEM_DESIGN §3.3): media, the user guide and the logo come before
+// the admin panel's catch-all; the API before the viewer's catch-all at /. Everything except
+// /api/auth, /api/device and the admin API is behind the MAC filter here; the API sets its own
+// guards (routes/api/index.js). The URLs are a contract with kiosk scripts, help shortcuts and
+// open browser tabs: they must not change.
 const express = require('express');
 const path = require('path');
 const macFilter = require('../middleware/macFilter');
-const adminAuth = require('../middleware/adminAuth');
-const displayRouter = require('./display');
-const adminRouter = require('./admin');
+const { route } = require('../middleware/asyncRoute');
+const { spaFallback } = require('./spa');
 const { slideshowsDir, guidePath, logoPath, displayDistDir, adminDistDir } = require('../utils/pathHelpers');
 const { hasCustomLogo, placeholderLogo } = require('../services/brandingService');
 const { SERVED_EXTENSIONS } = require('../services/mediaTypes');
 
 const DISPLAY_DIST = displayDistDir();
 const ADMIN_DIST = adminDistDir();
+const displayRouter = spaFallback(DISPLAY_DIST, { title: 'Noticeboard Display', background: '#000', name: 'Display' });
+const adminRouter = spaFallback(ADMIN_DIST, { title: 'Noticeboard Admin', background: '#1a1a2e', name: 'Admin' });
 
 // `frontends` is only set by npm run dev: Vite then serves the two web apps (with hot reload)
 // instead of their built copies, on this same port
@@ -39,15 +47,11 @@ function mountRoutes(app, frontends = null) {
 
   // The logo, for the displays and the admin sidebar — MAC filtered like the display.
   // Its URL carries a version, so it can be cached for good.
-  app.get('/branding/logo', macFilter, async (req, res, next) => {
-    try {
-      res.set('Cache-Control', req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
-      if (hasCustomLogo()) return res.type('png').sendFile(logoPath());
-      res.type('png').send(await placeholderLogo());
-    } catch (err) {
-      next(err);
-    }
-  });
+  app.get('/branding/logo', macFilter, route(async (req, res) => {
+    res.set('Cache-Control', req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
+    if (hasCustomLogo()) return res.type('png').sendFile(logoPath());
+    res.type('png').send(await placeholderLogo());
+  }));
 
   if (frontends) {
     // 2–3 (development). Vite expects the full /admin/… path, so this isn't mounted at /admin

@@ -33,4 +33,4 @@ function isMacApproved(mac) {
   );
 }
 
-module.exports = { resolveRequest, isMacApproved, getClientIp };
+module.exports = { resolveRequest, isMacApproved };
