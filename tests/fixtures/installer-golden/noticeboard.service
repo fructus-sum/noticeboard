@@ -1,0 +1,17 @@
+[Unit]
+Description=Noticeboard server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/noticeboard
+EnvironmentFile=/opt/noticeboard/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

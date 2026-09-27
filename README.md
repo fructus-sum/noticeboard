@@ -96,9 +96,19 @@ Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumb
 ```bash
 npm install
 npm run dev        # the server, with both web apps served live on the same port
-npm test           # the display's slide timing tests
 npm run build      # production builds, into client/display/dist and client/admin/dist
+npm test           # unit tests: slide timing, installer versions, the Node.js version rule
+npm run test:all   # everything below, in turn (build first)
 ```
+
+The other test groups each run a throwaway copy of the app, never this folder's `data/`:
+
+- **`test:api`:** the HTTP and socket contract (compared with `tests/fixtures/api-contract.json`), uploads, branch switching and shutdown.
+- **`test:browser`:** the admin panel and viewer in a real Chrome, including the reliability scenarios. It starts a headless Chrome itself (`CHROME_PATH` to choose one).
+- **`test:installers`:** the installer and `update.sh` with stand-ins for systemd, apt and GitHub, including the files the installer writes (compared with `tests/fixtures/installer-golden/`).
+- **`test:upgrade`:** an installed baseline takes the current code through its own `update.sh`, and nothing may change.
+
+Video tests need ffmpeg: on the `PATH`, or set `FFMPEG_PATH` and `FFPROBE_PATH`. The installer tests need bash (Git Bash on Windows).
 
 `npm run dev` serves everything on `http://localhost:3000`, with hot reload: the viewer at `/`, the admin panel at `/admin`, exactly as in production.
 

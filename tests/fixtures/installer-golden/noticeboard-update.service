@@ -1,0 +1,10 @@
+[Unit]
+Description=Noticeboard auto-update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+ExecStart=/bin/bash /opt/noticeboard/installers/update.sh
+TimeoutStartSec=60min

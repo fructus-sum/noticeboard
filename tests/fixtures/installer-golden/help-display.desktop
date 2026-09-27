@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Link
+Name=Noticeboard Help
+Comment=The Noticeboard user guide
+Icon=help-browser
+URL=http://192.168.1.10:3000/admin/help

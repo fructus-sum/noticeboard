@@ -1,0 +1,727 @@
+{
+  "viewer page": {
+    "method": "GET",
+    "path": "/",
+    "status": 200,
+    "type": "text/html",
+    "content": "text/html, non-empty"
+  },
+  "viewer SPA route": {
+    "method": "GET",
+    "path": "/some/page",
+    "status": 200,
+    "type": "text/html",
+    "content": "text/html, non-empty"
+  },
+  "admin page": {
+    "method": "GET",
+    "path": "/admin/",
+    "status": 200,
+    "type": "text/html",
+    "content": "text/html, non-empty"
+  },
+  "admin SPA route": {
+    "method": "GET",
+    "path": "/admin/settings",
+    "status": 200,
+    "type": "text/html",
+    "content": "text/html, non-empty"
+  },
+  "user guide": {
+    "method": "GET",
+    "path": "/admin/help",
+    "status": 200,
+    "type": "text/html",
+    "content": "text/html, non-empty"
+  },
+  "logo": {
+    "method": "GET",
+    "path": "/branding/logo",
+    "status": 200,
+    "type": "image/png",
+    "content": "image/png, non-empty"
+  },
+  "logo, versioned": {
+    "method": "GET",
+    "path": "/branding/logo?v=1",
+    "status": 200,
+    "type": "image/png",
+    "content": "image/png, non-empty"
+  },
+  "logo cache headers": {
+    "content": [
+      "no-cache",
+      "public, max-age=31536000, immutable"
+    ]
+  },
+  "media: not an allowed type": {
+    "method": "GET",
+    "path": "/media/x/slideshow.json",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "auth status, logged out": {
+    "method": "GET",
+    "path": "/api/auth/status",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"authenticated\":false}"
+  },
+  "settings, logged out": {
+    "method": "GET",
+    "path": "/api/settings",
+    "status": 401,
+    "type": "application/json",
+    "content": "{\"error\":\"Not authenticated\"}"
+  },
+  "slideshows, logged out": {
+    "method": "GET",
+    "path": "/api/slideshows",
+    "status": 401,
+    "type": "application/json",
+    "content": "{\"error\":\"Not authenticated\"}"
+  },
+  "device info": {
+    "method": "GET",
+    "path": "/api/device",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "addresses": [
+        {
+          "ip": "string",
+          "name": "string"
+        }
+      ],
+      "port": "number"
+    }
+  },
+  "kiosk exit claim, none asked": {
+    "method": "POST",
+    "path": "/api/device/kiosk-exit/claim",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"exit\":false}"
+  },
+  "kiosk exit request": {
+    "method": "POST",
+    "path": "/api/device/kiosk-exit",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"ok\":true}"
+  },
+  "kiosk exit claim, asked": {
+    "method": "POST",
+    "path": "/api/device/kiosk-exit/claim",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"exit\":true}"
+  },
+  "kiosk exit claim, taken": {
+    "method": "POST",
+    "path": "/api/device/kiosk-exit/claim",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"exit\":false}"
+  },
+  "login, wrong password": {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "status": 401,
+    "type": "application/json",
+    "content": "{\"error\":\"Invalid password\"}"
+  },
+  "login, no password": {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Password required\"}"
+  },
+  "login": {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"ok\":true}"
+  },
+  "login cookie attributes": {
+    "content": [
+      "Expires=…",
+      "HttpOnly",
+      "Max-Age=604800",
+      "Path=/",
+      "SameSite=Strict",
+      "nb_admin_token"
+    ]
+  },
+  "auth status, logged in": {
+    "method": "GET",
+    "path": "/api/auth/status",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"authenticated\":true}"
+  },
+  "settings": {
+    "method": "GET",
+    "path": "/api/settings",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "display": {
+        "defaultSlideDurationSeconds": "number"
+      },
+      "macFiltering": {
+        "approved": [],
+        "enabled": "boolean"
+      },
+      "port": "number",
+      "sampleSlideshow": {
+        "folder": "string",
+        "signature": "string"
+      },
+      "slideshows": [
+        {
+          "addedAt": "string",
+          "enabled": "boolean",
+          "folder": "string",
+          "hidden": "boolean",
+          "name": "string",
+          "priority": "number",
+          "schedule": {
+            "type": "string"
+          },
+          "slideDurationSeconds": "number"
+        }
+      ]
+    }
+  },
+  "settings: server device": {
+    "method": "GET",
+    "path": "/api/settings/device",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "interfaces": [
+        {
+          "ip": "string",
+          "mac": "string",
+          "name": "string"
+        }
+      ]
+    }
+  },
+  "settings: my device": {
+    "method": "GET",
+    "path": "/api/settings/my-device",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"local\":true,\"mac\":null}"
+  },
+  "settings: security": {
+    "method": "GET",
+    "path": "/api/settings/security",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"defaultPassword\":true}"
+  },
+  "settings: logo": {
+    "method": "GET",
+    "path": "/api/settings/logo",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "custom": "boolean",
+      "enabled": "boolean",
+      "maxSize": "number",
+      "url": "string"
+    }
+  },
+  "settings: bad duration": {
+    "method": "PUT",
+    "path": "/api/settings",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"The slide duration must be a whole number of seconds from 1 to 3600\"}"
+  },
+  "settings: nothing to change": {
+    "method": "PUT",
+    "path": "/api/settings",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"No valid fields to update\"}"
+  },
+  "settings: display saved": {
+    "method": "PUT",
+    "path": "/api/settings",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "display": {
+        "defaultSlideDurationSeconds": "number",
+        "showDeviceInfo": "boolean"
+      },
+      "macFiltering": {
+        "approved": [],
+        "enabled": "boolean"
+      },
+      "port": "number",
+      "sampleSlideshow": {
+        "folder": "string",
+        "signature": "string"
+      },
+      "slideshows": [
+        {
+          "addedAt": "string",
+          "enabled": "boolean",
+          "folder": "string",
+          "hidden": "boolean",
+          "name": "string",
+          "priority": "number",
+          "schedule": {
+            "type": "string"
+          },
+          "slideDurationSeconds": "number"
+        }
+      ]
+    }
+  },
+  "password: wrong current": {
+    "method": "PUT",
+    "path": "/api/settings/password",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"Current password is incorrect\"}"
+  },
+  "password: too short": {
+    "method": "PUT",
+    "path": "/api/settings/password",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Password must be at least 8 characters\"}"
+  },
+  "password: missing": {
+    "method": "PUT",
+    "path": "/api/settings/password",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"current and newPassword are required\"}"
+  },
+  "updates: info": {
+    "method": "GET",
+    "path": "/api/settings/updates",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "autoUpdates": "boolean",
+      "available": "boolean",
+      "branch": "string",
+      "busy": "boolean",
+      "commit": "string",
+      "configuredBranch": "string",
+      "instant": "boolean",
+      "lastCheck": "null",
+      "pending": "boolean",
+      "status": "null"
+    }
+  },
+  "updates: notice": {
+    "method": "GET",
+    "path": "/api/settings/updates/notice",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"notice\":null}"
+  },
+  "updates: installer": {
+    "method": "GET",
+    "path": "/api/settings/updates/installer",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "branch": "string",
+      "changes": [],
+      "displays": "boolean",
+      "installed": "null",
+      "needed": "boolean",
+      "required": "number"
+    }
+  },
+  "updates: version": {
+    "method": "GET",
+    "path": "/api/settings/version",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "version": {
+        "branch": "string",
+        "commit": "string",
+        "date": "string",
+        "installedAt": "null"
+      }
+    }
+  },
+  "updates: branches": {
+    "method": "GET",
+    "path": "/api/settings/updates/branches",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "branches": [
+        "string"
+      ]
+    }
+  },
+  "updates: check, invalid name": {
+    "method": "POST",
+    "path": "/api/settings/updates/check",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"That isn't a valid branch name. Branch names use letters, numbers, and . _ / -\"}"
+  },
+  "updates: check, missing branch": {
+    "method": "POST",
+    "path": "/api/settings/updates/check",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"There's no branch called \\\"no-such-branch-xyz\\\" on GitHub.\"}"
+  },
+  "updates: verify, wrong password": {
+    "method": "POST",
+    "path": "/api/settings/updates/verify-password",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"Incorrect password. The switch was cancelled and nothing was changed.\"}"
+  },
+  "updates: switch, no token": {
+    "method": "POST",
+    "path": "/api/settings/updates/switch",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"The password check has expired. Nothing was changed; start the switch again.\"}"
+  },
+  "slideshow: create": {
+    "method": "POST",
+    "path": "/api/slideshows",
+    "status": 201,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "enabled": "boolean",
+      "folder": "string",
+      "name": "string",
+      "priority": "number",
+      "schedule": {
+        "type": "string"
+      }
+    }
+  },
+  "slideshow: create, no name": {
+    "method": "POST",
+    "path": "/api/slideshows",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"name is required\"}"
+  },
+  "slideshows: list": {
+    "method": "GET",
+    "path": "/api/slideshows",
+    "status": 200,
+    "type": "application/json",
+    "content": [
+      {
+        "addedAt": "string",
+        "enabled": "boolean",
+        "folder": "string",
+        "hidden": "boolean",
+        "name": "string",
+        "priority": "number",
+        "sample": "boolean",
+        "schedule": {
+          "type": "string"
+        },
+        "slideCount": "number",
+        "slideDurationSeconds": "number"
+      }
+    ]
+  },
+  "slideshow: get": {
+    "method": "GET",
+    "path": "/api/slideshows/contract-test",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "enabled": "boolean",
+      "folder": "string",
+      "name": "string",
+      "priority": "number",
+      "sample": "boolean",
+      "schedule": {
+        "type": "string"
+      },
+      "slideCount": "number"
+    }
+  },
+  "slideshow: get, missing": {
+    "method": "GET",
+    "path": "/api/slideshows/no-such-show",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Slideshow not found\"}"
+  },
+  "slideshow: bad duration": {
+    "method": "PUT",
+    "path": "/api/slideshows/contract-test",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"The slide duration must be a whole number of seconds from 1 to 3600\"}"
+  },
+  "slideshow: hide while published": {
+    "method": "PUT",
+    "path": "/api/slideshows/contract-test",
+    "status": 409,
+    "type": "application/json",
+    "content": "{\"error\":\"Only unpublished slideshows can be hidden. Disable it first.\"}"
+  },
+  "slideshow: update": {
+    "method": "PUT",
+    "path": "/api/slideshows/contract-test",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "enabled": "boolean",
+      "folder": "string",
+      "name": "string",
+      "priority": "number",
+      "schedule": {
+        "type": "string"
+      },
+      "slideDurationSeconds": "number"
+    }
+  },
+  "slides: list, empty": {
+    "method": "GET",
+    "path": "/api/slideshows/contract-test/slides",
+    "status": 200,
+    "type": "application/json",
+    "content": "[]"
+  },
+  "slides: list, missing slideshow": {
+    "method": "GET",
+    "path": "/api/slideshows/no-such-show/slides",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Slideshow not found\"}"
+  },
+  "slides: upload nothing": {
+    "method": "POST",
+    "path": "/api/slideshows/contract-test/slides",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"No files uploaded\"}"
+  },
+  "slides: upload unsupported": {
+    "method": "POST",
+    "path": "/api/slideshows/contract-test/slides",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Unsupported file type\"}"
+  },
+  "slides: upload": {
+    "method": "POST",
+    "path": "/api/slideshows/contract-test/slides",
+    "status": 202,
+    "type": "application/json",
+    "content": [
+      {
+        "addedAt": "string",
+        "duration": "null",
+        "filename": "null",
+        "id": "string",
+        "status": "string",
+        "type": "string"
+      }
+    ]
+  },
+  "slides: list, ready": {
+    "method": "GET",
+    "path": "/api/slideshows/contract-test/slides",
+    "status": 200,
+    "type": "application/json",
+    "content": [
+      {
+        "addedAt": "string",
+        "duration": "null",
+        "filename": "string",
+        "id": "string",
+        "status": "string",
+        "type": "string"
+      }
+    ]
+  },
+  "media: slide image": {
+    "method": "GET",
+    "path": "/media/contract-test/slides/:id.png",
+    "status": 200,
+    "type": "image/png",
+    "content": "image/png, non-empty"
+  },
+  "media headers": {
+    "content": [
+      "bytes"
+    ]
+  },
+  "slides: reorder, bad body": {
+    "method": "PUT",
+    "path": "/api/slideshows/contract-test/slides/reorder",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"order must be an array of slide IDs\"}"
+  },
+  "slides: reorder": {
+    "method": "PUT",
+    "path": "/api/slideshows/contract-test/slides/reorder",
+    "status": 200,
+    "type": "application/json",
+    "content": [
+      {
+        "addedAt": "string",
+        "duration": "null",
+        "filename": "string",
+        "id": "string",
+        "status": "string",
+        "type": "string"
+      }
+    ]
+  },
+  "slides: thumbnails": {
+    "method": "POST",
+    "path": "/api/slideshows/contract-test/slides/thumbnails",
+    "status": 202,
+    "type": "application/json",
+    "content": "{\"queued\":0}"
+  },
+  "socket events": {
+    "content": [
+      "display:build",
+      "display:settings",
+      "playlist:update"
+    ]
+  },
+  "socket: display:build": {
+    "content": "string"
+  },
+  "socket: display:settings": {
+    "content": {
+      "logo": {
+        "url": "string"
+      },
+      "showDeviceInfo": "boolean"
+    }
+  },
+  "socket: playlist:update": {
+    "content": {
+      "slides": [
+        {
+          "duration": "number",
+          "slideshow": "string",
+          "type": "string",
+          "url": "string"
+        }
+      ]
+    }
+  },
+  "playlist slide values": {
+    "content": {
+      "type": "image",
+      "url": "/media/contract-test/slides/FILE",
+      "duration": 7
+    }
+  },
+  "slide: delete": {
+    "method": "DELETE",
+    "path": "/api/slideshows/contract-test/slides/:id",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"ok\":true}"
+  },
+  "slide: delete, missing": {
+    "method": "DELETE",
+    "path": "/api/slideshows/contract-test/slides/:id",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Slide not found\"}"
+  },
+  "slideshow: delete": {
+    "method": "DELETE",
+    "path": "/api/slideshows/contract-test",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"ok\":true}"
+  },
+  "slideshow: delete, missing": {
+    "method": "DELETE",
+    "path": "/api/slideshows/contract-test",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Slideshow not found\"}"
+  },
+  "MAC denied: viewer": {
+    "method": "GET",
+    "path": "/",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "MAC denied: admin": {
+    "method": "GET",
+    "path": "/admin/",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "MAC denied: guide": {
+    "method": "GET",
+    "path": "/admin/help",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "MAC denied: api status": {
+    "method": "GET",
+    "path": "/api/auth/status",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "MAC denied: api settings": {
+    "method": "GET",
+    "path": "/api/settings",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "MAC denied: media": {
+    "method": "GET",
+    "path": "/media/x/slides/a.png",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "MAC filter on, localhost still allowed": {
+    "method": "GET",
+    "path": "/api/auth/status",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"authenticated\":false}"
+  },
+  "logout": {
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"ok\":true}"
+  }
+}

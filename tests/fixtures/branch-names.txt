@@ -1,0 +1,24 @@
+# Branch names the updater (installers/update.sh valid_branch) and the server
+# (validBranchName in the updates service) must both accept (valid) or both refuse (invalid).
+valid main
+valid QALife-updates
+valid refactor/architecture
+valid feature/good
+valid v1.2
+valid a_b
+valid x
+invalid HEAD
+invalid -x
+invalid /x
+invalid x/
+invalid .x
+invalid x.
+invalid a..b
+invalid a//b
+invalid a/.b
+invalid a.lock
+invalid has space
+invalid semi;colon
+invalid dollar$x
+invalid back\slash
+invalid quote"x
