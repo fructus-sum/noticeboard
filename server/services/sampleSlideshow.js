@@ -1,11 +1,23 @@
+// server/services/sampleSlideshow.js — the "Sample slideshow", kept in step with sample-data/
+//
+// Provides
+//   syncSampleSlideshow()   at start-up: creates it once, and when the sample files change (a new
+//                           version brought new examples) replaces its slides with them. The
+//                           admin's own choices (published, hidden, schedule…) are kept.
+//
+// Used by
+//   server/index.js (an error is logged, never stops the server)
+//
+// Uses
+//   services/slideshowStore, services/configService (sampleSlideshow), services/uploadQueue (its
+//   video's thumbnail), services/mediaTypes, utils/slugify, utils/pathHelpers
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const configService = require('./configService');
-const { writeConfig } = require('../utils/configIO');
-const { sampleDataDir, slidesDir, slideshowJsonPath } = require('../utils/pathHelpers');
+const store = require('./slideshowStore');
+const { sampleDataDir, slidesDir } = require('../utils/pathHelpers');
 const { uniqueSlug } = require('../utils/slugify');
-const { withSlideshowLock } = require('../utils/slideshowLock');
 const { enqueueThumbnail } = require('./uploadQueue');
 const logger = require('../utils/logger');
 
@@ -14,8 +26,7 @@ const NAME = 'Sample slideshow';
 // taken from sample.json; the admin's own choices (published, hidden, schedule...) are kept.
 const MANIFEST = 'sample.json';
 const MANIFEST_SETTINGS = ['slideDurationSeconds'];
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i;
-const VIDEO_EXT = /\.(mp4|webm)$/i;
+const { SAMPLE_IMAGE_EXT: IMAGE_EXT, SAMPLE_VIDEO_EXT: VIDEO_EXT } = require('./mediaTypes');
 
 // The files in sample-data/sample-slideshow/, in name order (01-…, 02-…)
 function sampleFiles() {
@@ -72,23 +83,19 @@ function copyAsSlides(files, folder) {
 }
 
 // Replace every slide in the sample slideshow with the current sample files. It's a demo,
-// so anything added to it is replaced too.
+// so anything added to it is replaced too. The new list is saved before the old files are
+// deleted, so slideshow.json never points at files that are gone.
 async function replaceSlides(folder, files) {
-  await withSlideshowLock(folder, async () => {
-    let old = { slides: [] };
-    try { old = JSON.parse(fs.readFileSync(slideshowJsonPath(folder), 'utf8')); } catch { /* none yet */ }
-    const slides = copyAsSlides(files, folder);
-    await writeConfig(slideshowJsonPath(folder), { ...old, slides });
-    for (const slide of old.slides || []) {
-      for (const name of [slide.filename, slide.thumbnail]) {
-        if (name) fs.rmSync(path.join(slidesDir(folder), name), { force: true });
-      }
-    }
-    // Thumbnails for the sample's videos, made in the background like an upload's
-    for (const slide of slides.filter((s) => s.type === 'video')) {
-      enqueueThumbnail({ folder, slideId: slide.id, filename: slide.filename });
-    }
+  const { previous, slides } = await store.modifySlides(folder, (data) => {
+    const before = data.slides;
+    data.slides = copyAsSlides(files, folder);
+    return { previous: before, slides: data.slides };
   });
+  for (const slide of previous) store.removeSlideFiles(folder, slide);
+  // Thumbnails for the sample's videos, made in the background like an upload's
+  for (const slide of slides.filter((s) => s.type === 'video')) {
+    enqueueThumbnail({ folder, slideId: slide.id, filename: slide.filename });
+  }
 }
 
 // The sample.json settings, applied to the sample's entry in config.json
@@ -114,10 +121,10 @@ async function syncSampleSlideshow() {
   let state = configService.get('sampleSlideshow');   // { folder, signature }
   if (!state && configService.get('sampleSlideshowAdded')) {
     // Added by an earlier version that didn't record its folder: find it by name
-    const found = (configService.get('slideshows') || []).find((s) => s.name === NAME);
+    const found = store.list().find((s) => s.name === NAME);
     state = { folder: found ? found.folder : null, signature: null };
   }
-  const slideshows = configService.get('slideshows') || [];
+  const slideshows = store.list();
   const stillThere = !!state?.folder && slideshows.some((s) => s.folder === state.folder);
   if (stillThere && state.signature === signature) return;
 
@@ -126,29 +133,24 @@ async function syncSampleSlideshow() {
     const folder = uniqueSlug(NAME);
     const returning = !!state;
     await replaceSlides(folder, files);
-    await configService.update({
-      slideshows: [...slideshows, withManifest({
-        folder,
-        name: NAME,
-        priority: slideshows.length + 1,
-        schedule: { type: 'always' },
-        enabled: false,
-        ...(returning ? { hidden: true } : {}),
-        addedAt: new Date().toISOString(),
-      })],
-      sampleSlideshow: { folder, signature },
-      sampleSlideshowAdded: undefined,
-    });
+    await store.commitEntries([...slideshows, withManifest({
+      folder,
+      name: NAME,
+      priority: slideshows.length + 1,
+      schedule: { type: 'always' },
+      enabled: false,
+      ...(returning ? { hidden: true } : {}),
+      addedAt: new Date().toISOString(),
+    })], { sampleSlideshow: { folder, signature }, sampleSlideshowAdded: undefined });
     logger.info(returning ? 'Sample slideshow restored (hidden)' : 'Sample slideshow added (not published)', { folder, slides: files.length });
     return;
   }
 
   await replaceSlides(state.folder, files);
-  await configService.update({
-    slideshows: slideshows.map((s) => (s.folder === state.folder ? withManifest(s) : s)),
-    sampleSlideshow: { folder: state.folder, signature },
-    sampleSlideshowAdded: undefined,
-  });
+  await store.commitEntries(
+    slideshows.map((s) => (s.folder === state.folder ? withManifest(s) : s)),
+    { sampleSlideshow: { folder: state.folder, signature }, sampleSlideshowAdded: undefined },
+  );
   logger.info('Sample slideshow updated with the new sample files', { folder: state.folder, slides: files.length });
 }
 

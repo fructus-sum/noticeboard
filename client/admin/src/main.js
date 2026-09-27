@@ -1,4 +1,7 @@
+// client/admin/src/main.js — starts the admin panel: the global styles, the router, then App.vue
+// Mounted only once the first page is known (see below). Used by: client/admin/index.html
 import { createApp } from 'vue';
+import './styles/base.css';
 import App from './App.vue';
 import router from './router/index.js';
 

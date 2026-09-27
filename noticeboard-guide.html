@@ -742,6 +742,7 @@
       </table>
 
       <p>When you make a change in the admin panel, the display screens update automatically within seconds — no page refresh required.</p>
+      <p>Every image and video is shown whole, as large as fits the screen, in its own shape: never cut off and never stretched, whether the screen is landscape or portrait. Any space left around it (for example, at the sides of a portrait picture on a landscape screen) is filled with the background colour, black unless you choose another (see <a href="#logo" style="color:var(--blue)">Branding</a>).</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
@@ -769,12 +770,13 @@
 
       <p>A display only ever reloads once it has checked that the server answers, so a screen is never left on a browser error page. The slide timing has been tested over a simulated 30 days of running, with outages, sleep and missed timers along the way.</p>
 
-      <h3 id="viewer" style="scroll-margin-top:80px">On the screen: the pin, the exit button and the cursor</h3>
+      <h3 id="viewer" style="scroll-margin-top:80px">On the screen: the pin, the exit button, the warning mark and the cursor</h3>
       <table>
         <thead><tr><th>What</th><th>What it does</th></tr></thead>
         <tbody>
-          <tr><td><strong>Location pin</strong> (faint, top-left corner)</td><td>Tap or click it to see the <em>Noticeboard server's</em> address: the IP address and port to open on another device (add <code>/admin</code> for the admin panel). It's always the server's address, never the address of the screen or computer you're looking at. The pin can be turned off in <strong>Settings → Display</strong>. The pop-up closes with its ✕, or by itself after 90 seconds.</td></tr>
+          <tr><td><strong>Location pin</strong> (faint, top-left corner)</td><td>Tap or click it to see the <em>Noticeboard server's</em> address: the IP address and port to open on another device. It's always the server's address, never the address of the screen or computer you're looking at. The pin can be turned off in <strong>Settings → Display</strong>. The pop-up closes with its ✕, or by itself after 90 seconds.</td></tr>
           <tr><td><strong>Exit button</strong> (top-right corner)</td><td>Appears while the mouse moves (or on a tap or key press) and hides again after 3 seconds of stillness. It takes <em>this screen</em> out of full-screen kiosk mode: after you confirm, the full-screen browser closes and the slideshow opens again in a normal browser window, so you can use the browser, minimise or close it, or get to the Raspberry Pi desktop. Nothing else changes: the server keeps running, other screens carry on, and nothing is unpublished. The screen goes back to full screen the next time it starts up.</td></tr>
+          <tr><td><strong>Warning mark</strong> (small red triangle, bottom-right corner)</td><td>Shown on every screen while the installer needs running again on the server Pi. Tapping or clicking it shows <em>Please check the Admin panel for details.</em>: the admin panel says what to do (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>). It goes away by itself once the installer has run.</td></tr>
           <tr><td><strong>Mouse cursor</strong></td><td>Hides over the slideshow after 3 seconds without movement; moving the mouse brings it back straight away, along with the exit button.</td></tr>
         </tbody>
       </table>
@@ -1366,7 +1368,7 @@
       </div>
 
       <h3>What happens when no slideshows are active</h3>
-      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows the words <em>No slideshow published</em> on a black screen, with the logo above them (see <a href="#logo" style="color:var(--blue)">Logo</a>). This is not an error: publish a slideshow, or check its schedule, and the display switches to it within seconds. A black screen with only a faint pulsing dot means something else: the display can't reach the server.</p>
+      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows the words <em>No slideshow published</em> on the background colour (black unless you choose another), with the logo above them (see <a href="#logo" style="color:var(--blue)">Branding</a>). This is not an error: publish a slideshow, or check its schedule, and the display switches to it within seconds. A black screen with only a faint pulsing dot means something else: the display can't reach the server.</p>
     </div>
 
     <!-- ── 08 Ordering & Priority ── -->
@@ -1480,9 +1482,9 @@
             <td>On</td>
           </tr>
           <tr>
-            <td><strong>Logo</strong></td>
-            <td>The logo on the <em>No slideshow published</em> screen and in the admin sidebar, and whether it's shown. See <a href="#logo" style="color:var(--blue)">Logo</a>.</td>
-            <td>On, the Noticeboard logo</td>
+            <td><strong>Branding</strong></td>
+            <td>The logo on the <em>No slideshow published</em> screen and in the admin sidebar, and whether it's shown; and the background colour around slides that don't fill the screen. See <a href="#logo" style="color:var(--blue)">Branding</a>.</td>
+            <td>On, the Noticeboard logo; black</td>
           </tr>
           <tr>
             <td><strong>Change password</strong></td>
@@ -1507,13 +1509,15 @@
         </tbody>
       </table>
 
-      <h3 id="logo" style="scroll-margin-top:80px">Logo</h3>
-      <p>The <strong>Logo</strong> card in Settings sets the logo shown above <em>No slideshow published</em> on every screen when nothing is on, and above the title in the admin sidebar.</p>
+      <h3 id="logo" style="scroll-margin-top:80px">Branding</h3>
+      <p>The <strong>Branding</strong> card in Settings sets the logo and the background colour of the screens.</p>
+      <p>The <strong>logo</strong> is shown above <em>No slideshow published</em> on every screen when nothing is on, and above the title in the admin sidebar.</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
         <li><strong>Upload a logo…</strong> takes a PNG, JPEG, GIF or WebP image. If it's bigger than 500 × 500 pixels, it's scaled down, by its larger side, to fit. Its shape is kept, it's never stretched, and a smaller image is never enlarged.</li>
         <li><strong>Use the default logo</strong> goes back to the Noticeboard logo.</li>
         <li><strong>Show the logo</strong> turns it on or off, on the screens and in the sidebar together.</li>
       </ul>
+      <p>The <strong>background colour</strong> fills the screen around a slide that doesn't fill it, and behind the logo when nothing is published. Pick a colour, or type its code (<code>#</code> and six digits or letters a–f, for example <code>#000000</code> for black or <code>#ffffff</code> for white), then <strong>Save</strong>. Every screen changes within a few seconds; the logo preview shows it on the chosen colour.</p>
 
       <h3>Restarting the server service</h3>
       <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the server. Run this command on the Pi via SSH or a terminal:</p>
@@ -1548,7 +1552,7 @@
       </table>
 
       <h3 id="installer-needed" style="scroll-margin-top:80px">When the installer needs running again</h3>
-      <p>Updates change the Noticeboard app, but not what only the installer sets up on the Pi: the kiosk that shows the slideshow full screen, the system services, the desktop shortcuts and system packages. When a new version (or a branch you switch to) changes one of those, an amber box at the top of the admin panel's <strong>Slideshows</strong> page says <strong>Run the installer again on this Pi</strong>. It lists what running it brings and shows the command to run, with a <strong>Copy</strong> button. The command is for the branch the Pi follows.</p>
+      <p>Updates change the Noticeboard app, but not what only the installer sets up on the Pi: the kiosk that shows the slideshow full screen, the system services, the desktop shortcuts and system packages. When a new version (or a branch you switch to) changes one of those, an amber box at the top of every admin page says <strong>Run the installer again on this Pi</strong>. It lists what running it brings and shows the command to run, with a <strong>Copy</strong> button. The command is for the branch the Pi follows. Until the installer has been run, every screen also shows a small red warning triangle in its bottom-right corner (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</p>
       <p>Run it in a terminal on the server Pi, or over SSH. It keeps your answers (press Enter), slideshows and settings, and offers to restart at the end. The box goes away once the installer has run; there's nothing to close. Until then the noticeboard works as before, just without what the box lists. If the box says so, run the installer on each remote display Pi too.</p>
       <p>Before you switch branch, the check tells you if that branch will need the installer run again (see <a href="#branches" style="color:var(--blue)">Switching branch</a>).</p>
 
@@ -1588,7 +1592,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">⤴</div>
-        <div class="callout-body"><strong>When the branch is merged into main, the noticeboard goes back to main by itself.</strong> A branch is usually temporary: once its features are finished, they're merged into <em>main</em>. When all of the branch's work is part of <em>main</em>, the next update check (within 15 minutes) switches the noticeboard back to <em>main</em>, so it gets <em>main</em>'s updates again. This happens whether the branch was merged, squashed or rebased, and also if it was deleted after being merged. A branch deleted <em>without</em> being merged is left alone, because its features aren't in <em>main</em>. When the noticeboard has gone back, a notice at the top of the admin panel's Slideshows page says so. It stays there until someone closes it with ✕. If going back fails, it's undone like any other switch, and tried again once <em>main</em> has a new version.</div>
+        <div class="callout-body"><strong>When the branch is merged into main, the noticeboard goes back to main by itself.</strong> A branch is usually temporary: once its features are finished, they're merged into <em>main</em>. When all of the branch's work is part of <em>main</em>, the next update check (within 15 minutes) switches the noticeboard back to <em>main</em>, so it gets <em>main</em>'s updates again. This happens whether the branch was merged, squashed or rebased, and also if it was deleted after being merged. A branch deleted <em>without</em> being merged is left alone, because its features aren't in <em>main</em>. When the noticeboard has gone back, a notice at the top of every admin page says so. It stays until someone closes it with ✕, which closes it on every page. If going back fails, it's undone like any other switch, and tried again once <em>main</em> has a new version.</div>
       </div>
 
       <h3 id="branch-software" style="scroll-margin-top:80px">Software a branch needs</h3>
@@ -1669,11 +1673,6 @@
             <td>Server not running</td>
             <td>Can you open the admin panel? Is the URL reachable?</td>
             <td>Run <code>sudo systemctl restart noticeboard</code></td>
-          </tr>
-          <tr>
-            <td>NODE_ENV not set to production</td>
-            <td>Run <code>cat /opt/noticeboard/.env</code> — does it contain <code>NODE_ENV=production</code>?</td>
-            <td>Run: <code>echo "NODE_ENV=production" >> /opt/noticeboard/.env</code> then restart the service</td>
           </tr>
         </tbody>
       </table>

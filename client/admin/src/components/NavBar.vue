@@ -1,7 +1,16 @@
 <script setup>
+// client/admin/src/components/NavBar.vue — the sidebar
+//
+// The logo and title, the pages, Help (the user guide at /admin/help), the project on GitHub, the
+// version with when this noticeboard installed it ("Last updated"), and Log out. Collapsible to
+// icons, each named in its tooltip.
+//
+// Used by: App.vue
+// Uses: useApi (GET /settings/version, POST /auth/logout), useBranding, useNav, NavIcon,
+//   PROJECT_URL from @shared
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { PROJECT_URL } from '@shared/constants.js';
+import { PROJECT_URL } from '@shared/index.js';
 import { api } from '../composables/useApi.js';
 import { useBranding } from '../composables/useBranding.js';
 import { useNav } from '../composables/useNav.js';

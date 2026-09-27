@@ -1,0 +1,22 @@
+{
+  "/": {
+    "status": 200,
+    "type": "text/html",
+    "body": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">\n<title>Noticeboard Display</title>\n<style>body{margin:0;background:#000;color:#fff;font-family:sans-serif;\ndisplay:flex;align-items:center;justify-content:center;height:100vh;}</style>\n</head><body><p>Display app not yet built — run <code>npm run build</code></p></body></html>"
+  },
+  "/some/page": {
+    "status": 200,
+    "type": "text/html",
+    "body": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">\n<title>Noticeboard Display</title>\n<style>body{margin:0;background:#000;color:#fff;font-family:sans-serif;\ndisplay:flex;align-items:center;justify-content:center;height:100vh;}</style>\n</head><body><p>Display app not yet built — run <code>npm run build</code></p></body></html>"
+  },
+  "/admin/": {
+    "status": 200,
+    "type": "text/html",
+    "body": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">\n<title>Noticeboard Admin</title>\n<style>body{margin:0;background:#1a1a2e;color:#fff;font-family:sans-serif;\ndisplay:flex;align-items:center;justify-content:center;height:100vh;}</style>\n</head><body><p>Admin app not yet built — run <code>npm run build</code></p></body></html>"
+  },
+  "/admin/settings": {
+    "status": 200,
+    "type": "text/html",
+    "body": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">\n<title>Noticeboard Admin</title>\n<style>body{margin:0;background:#1a1a2e;color:#fff;font-family:sans-serif;\ndisplay:flex;align-items:center;justify-content:center;height:100vh;}</style>\n</head><body><p>Admin app not yet built — run <code>npm run build</code></p></body></html>"
+  }
+}

@@ -1,3 +1,17 @@
+// server/routes/api/index.js — the /api router: a rate limit, then each API behind its guard
+//
+// Responsibilities
+//   At most 120 requests a minute per IP for everything under /api, then:
+//     /auth, /device    the MAC filter only (logging in; the location pin and the kiosk exit)
+//     /settings         adminAuth
+//     /slideshows       adminAuth, once: the slides API is mounted inside it (…/:folder/slides)
+//
+// Used by
+//   routes/index.js
+//
+// Change impact
+//   The URLs, status codes and JSON shapes are a contract with open admin panels, the kiosk scripts
+//   and update.sh's health check (SYSTEM_DESIGN §4.1, §15).
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const macFilter = require('../../middleware/macFilter');
@@ -24,9 +38,12 @@ router.use('/auth', macFilter, authRouter);
 // Display info pop-up: MAC filter only, like the display itself
 router.use('/device', macFilter, deviceRouter);
 
-// Protected: MAC + JWT
+// Protected: MAC + JWT. The slides routes sit inside the slideshows API, so each request is
+// checked once (mounted side by side, a slide request was checked twice).
 router.use('/settings', adminAuth, settingsRouter);
-router.use('/slideshows', adminAuth, slideshowsRouter);
-router.use('/slideshows/:folder/slides', adminAuth, slidesRouter);
+const slideshowsApi = express.Router();
+slideshowsApi.use('/:folder/slides', slidesRouter);
+slideshowsApi.use('/', slideshowsRouter);
+router.use('/slideshows', adminAuth, slideshowsApi);
 
 module.exports = router;

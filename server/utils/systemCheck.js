@@ -1,8 +1,16 @@
+// server/utils/systemCheck.js — this machine against a branch's system-requirements.json
+//
+// The list comes from a branch, so only plain program names and version flags from a fixed set
+// are ever run (e.g. "ffmpeg -version").
+//
+// Provides
+//   checkRequirements(list) → { results: [{ name, ok, installed, found, required, … }], missing }
+//   satisfies(version, range), describe(range), parseVersion(text)
+//
+// Used by
+//   services/updates (checkBranch), server/test/node-version.test.js
 const { execFile, exec } = require('child_process');
 
-// Checks this machine against a branch's system-requirements.json: whether each program it
-// lists is installed, in a version the branch accepts. The list comes from a branch, so only
-// plain program names and version flags from a fixed set are ever run (e.g. "ffmpeg -version").
 
 const SAFE_COMMAND = /^[A-Za-z0-9][A-Za-z0-9._-]{0,40}$/;
 const SAFE_ARGS = new Set(['--version', '-version', '-v', '-V', 'version']);

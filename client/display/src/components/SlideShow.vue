@@ -1,8 +1,25 @@
 <script setup>
+// client/display/src/components/SlideShow.vue — the slides on screen, one after another
+//
+// Responsibilities
+//   Shows what the slide clock asks for, fading each new slide in over the previous one (without
+//   Vue's <Transition>: its leave step waits for animation frames, which a hidden page doesn't
+//   produce). Retries straight away when the server is back, checks the clock when the page wakes,
+//   and reloads the page as a last resort when it seems broken.
+//
+// Props
+//   slides (the playlist), connected
+//
+// Used by
+//   App.vue
+//
+// Uses
+//   slideshowClock.js, SlideFrame, usePageWake, recovery.js (recoverByReloading)
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import SlideFrame from './SlideFrame.vue';
 import { createSlideshowClock } from '../slideshowClock.js';
 import { recoverByReloading } from '../recovery.js';
+import { usePageWake } from '../composables/usePageWake.js';
 
 const props = defineProps({
   slides: { type: Array, required: true },
@@ -34,30 +51,18 @@ watch(() => props.slides, (slides) => clock.setSlides(slides), { immediate: true
 // Server reachable again: retry at once instead of waiting out a failure pause
 watch(() => props.connected, (up) => { if (up) clock.resume(); });
 
-// A hidden, frozen or sleeping page can miss timers: check as soon as it's back. This doesn't
-// depend on what the page reports about its own visibility (browsers can get that wrong), and
-// it's harmless if nothing is overdue.
-function resume() {
-  clock.resume();
-}
-const PAGE_EVENTS = [
-  [document, 'visibilitychange'],
-  [document, 'resume'],   // Page Lifecycle: the page was frozen
-  [window, 'pageshow'],
-  [window, 'focus'],
-  [window, 'online'],
-];
+// A hidden, frozen or sleeping page can miss timers: check as soon as it's back (or back
+// online). It's harmless if nothing is overdue.
+usePageWake(() => clock.resume(), { online: true });
 
 onMounted(() => {
   clock.start();
-  PAGE_EVENTS.forEach(([target, name]) => target.addEventListener(name, resume));
   // Read-only diagnostic, e.g. from remote DevTools: window.noticeboard.slideshow()
   window.noticeboard = { slideshow: () => clock.state() };
 });
 onUnmounted(() => {
   clock.stop();
   clearTimeout(removeOld);
-  PAGE_EVENTS.forEach(([target, name]) => target.removeEventListener(name, resume));
   delete window.noticeboard;
 });
 </script>
@@ -83,7 +88,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  background: #000;
+  background: var(--nb-background, #000);
   overflow: hidden;
 }
 

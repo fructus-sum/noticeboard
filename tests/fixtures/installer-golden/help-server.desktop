@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Link
+Name=Noticeboard Help
+Comment=The Noticeboard user guide
+Icon=help-browser
+URL=file:///opt/noticeboard/noticeboard-guide.html

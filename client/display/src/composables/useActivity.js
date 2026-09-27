@@ -1,3 +1,10 @@
+// client/display/src/composables/useActivity.js — whether someone is using the mouse, keyboard or touchscreen
+//
+// Provides
+//   useActivity() → { active }: true while someone is, false after 3 s of stillness. The controls
+//   show while it's true, and the cursor hides when it isn't.
+//
+// Used by: App.vue
 import { ref, onMounted, onUnmounted } from 'vue';
 
 // Whether someone is using the mouse, keyboard or touchscreen right now. Controls show while

@@ -1,7 +1,26 @@
+// server/services/brandingService.js — the logo, and what each display needs to know about its own look
+//
+// Provides
+//   saveLogo(path), removeLogo(), hasCustomLogo(), placeholderLogo() (the placeholder, scaled once
+//   per version), logoVersion() (changes with the logo, for cache-busting), MAX_SIZE (500)
+//   logoEnabled()     whether the logo is shown (Settings → Branding)
+//   backgroundColour() → the viewer's background colour: the saved one, else the default
+//
+// Used by
+//   routes/index.js (/branding/logo), routes/api/settings/logo.js, services/displaySettings
+//
+// Uses
+//   sharp, services/configService (display settings), utils/pathHelpers, shared/contract.json
+//   (the default background and the colour's form)
+//
+// Change impact
+//   The logo URL and the colour go to open screens in the display:settings payload
+//   (services/displaySettings; SYSTEM_DESIGN §15).
 const fs = require('fs');
 const sharp = require('sharp');
 const configService = require('./configService');
 const { brandingDir, logoPath, defaultLogoPath } = require('../utils/pathHelpers');
+const { display: DISPLAY } = require('../../shared/contract.json');
 
 // The logo, shown above "No slideshow published" on the displays and above the title in the
 // admin sidebar. An uploaded logo replaces the placeholder that ships in sample-data/.
@@ -57,13 +76,12 @@ function logoEnabled() {
   return configService.get('display')?.logo?.enabled !== false;
 }
 
-// What every display needs to know about its own look, sent over the socket
-function displaySettings() {
-  return {
-    showDeviceInfo: configService.get('display')?.showDeviceInfo !== false,
-    logo: logoEnabled() ? { url: `/branding/logo?v=${logoVersion()}` } : null,
-  };
+// Fills the screen around a slide that doesn't fill it, and behind the waiting screen
+function backgroundColour() {
+  const saved = configService.get('display')?.backgroundColor;
+  return typeof saved === 'string' && new RegExp(DISPLAY.colourPattern).test(saved) ? saved : DISPLAY.defaultBackground;
 }
+
 
 module.exports = {
   MAX_SIZE,
@@ -73,5 +91,5 @@ module.exports = {
   placeholderLogo,
   logoVersion,
   logoEnabled,
-  displaySettings,
+  backgroundColour,
 };

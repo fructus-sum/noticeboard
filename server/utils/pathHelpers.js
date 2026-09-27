@@ -1,3 +1,16 @@
+// server/utils/pathHelpers.js — every file and folder the server uses, in one place
+//
+// Provides
+//   ROOT; data/ (config, slideshows, branding, the update files); logs/; tmp/ (uploads); the built
+//   apps; the guide; sample-data/; what the installer set up (installer.json, the server kiosk
+//   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); mediaUrl(folder, file)
+//
+// Used by
+//   most server modules (never a hard-coded path elsewhere)
+//
+// Change impact
+//   Installed Pis, update.sh and the kiosk scripts rely on these names (SYSTEM_DESIGN §6,
+//   §15). mediaUrl must match shared/index.js (a unit test checks).
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -6,11 +19,11 @@ function dataDir() { return path.join(ROOT, 'data'); }
 function slideshowsDir() { return path.join(ROOT, 'data', 'slideshows'); }
 function slideshowDir(folderName) { return path.join(slideshowsDir(), folderName); }
 function slidesDir(folderName) { return path.join(slideshowDir(folderName), 'slides'); }
-function audioPath(folderName) { return path.join(slideshowDir(folderName), 'audio.mp3'); }
 function slideshowJsonPath(folderName) { return path.join(slideshowDir(folderName), 'slideshow.json'); }
 function configPath() { return path.join(dataDir(), 'config.json'); }
 function logsDir() { return path.join(ROOT, 'logs'); }
 function displayDistDir() { return path.join(ROOT, 'client', 'display', 'dist'); }
+function adminDistDir() { return path.join(ROOT, 'client', 'admin', 'dist'); }
 function guidePath() { return path.join(ROOT, 'noticeboard-guide.html'); }
 // Software updates (installers/update.sh reads and writes the same files)
 function updateBranchPath() { return path.join(dataDir(), 'update-branch.env'); }
@@ -33,7 +46,6 @@ function logoPath() { return path.join(brandingDir(), 'logo.png'); }
 function defaultLogoPath() { return path.join(sampleDataDir(), 'sample-logo.png'); }
 
 function mediaUrl(folderName, filename) { return `/media/${folderName}/slides/${filename}`; }
-function audioUrl(folderName) { return `/media/${folderName}/audio.mp3`; }
 
 module.exports = {
   ROOT,
@@ -41,11 +53,11 @@ module.exports = {
   slideshowsDir,
   slideshowDir,
   slidesDir,
-  audioPath,
   slideshowJsonPath,
   configPath,
   logsDir,
   displayDistDir,
+  adminDistDir,
   guidePath,
   updateBranchPath,
   updateStatusPath,
@@ -62,5 +74,4 @@ module.exports = {
   logoPath,
   defaultLogoPath,
   mediaUrl,
-  audioUrl,
 };

@@ -1,4 +1,17 @@
-const { lookupMac, isLocalhost, normalizeIp } = require('../utils/macLookup');
+// server/services/macService.js — which device a request comes from, and whether it's approved
+//
+// Provides
+//   resolveRequest(req) → { mac, ip, approved }; this Pi itself counts as 'localhost', approved
+//   isMacApproved(mac)  → approved when MAC filtering is off, for localhost, or when on the list
+//
+// Used by
+//   middleware/access.js
+//
+// Uses
+//   utils/macLookup (isLocalhost, lookupMac), utils/network (plainAddress), services/configService
+//   (macFiltering), utils/logger (a debug line per lookup)
+const { lookupMac, isLocalhost } = require('../utils/macLookup');
+const { plainAddress } = require('../utils/network');
 const configService = require('./configService');
 const logger = require('../utils/logger');
 
@@ -8,7 +21,7 @@ function getClientIp(req) {
 
 async function resolveRequest(req) {
   const ip = getClientIp(req);
-  const normalized = normalizeIp(ip);
+  const normalized = plainAddress(ip);
 
   if (isLocalhost(normalized)) {
     return { mac: 'localhost', ip: normalized, approved: true };
@@ -32,4 +45,4 @@ function isMacApproved(mac) {
   );
 }
 
-module.exports = { resolveRequest, isMacApproved, getClientIp };
+module.exports = { resolveRequest, isMacApproved };

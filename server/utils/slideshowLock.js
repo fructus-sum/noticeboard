@@ -1,7 +1,14 @@
-// Runs read-modify-write updates of a slideshow's slideshow.json one at a time.
-// Without it, two updates that overlap (e.g. two uploads finishing together) each read
-// the file, change their own slide and save it, and the later save wipes out the earlier.
-// Wrap the whole read → change → writeConfig step, and never nest it for the same folder.
+// server/utils/slideshowLock.js — one read-modify-write of a slideshow.json at a time
+//
+// Without it, two updates that overlap (e.g. two uploads finishing together) each read the file,
+// change their own slide and save it, and the later save wipes out the earlier. Wrap the whole
+// read → change → write step, and never nest it for the same folder.
+//
+// Provides
+//   withSlideshowLock(folder, fn) → fn's result, run after any earlier one for that folder
+//
+// Used by
+//   services/slideshowStore (modifySlides)
 const tails = new Map();   // folder -> promise that settles when its queued updates finish
 
 function withSlideshowLock(folder, fn) {

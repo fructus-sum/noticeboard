@@ -8,10 +8,14 @@
     "client/admin"
   ],
   "scripts": {
-    "dev": "npm -w noticeboard-server run dev",
     "build": "npm -w noticeboard-display run build && npm -w noticeboard-admin run build",
     "start": "node server/index.js",
-    "test": "node --test \"client/display/test/*.test.mjs\" \"server/test/*.test.js\"",
+    "test": "node tests/run.js unit",
+    "test:api": "node tests/run.js api",
+    "test:browser": "node tests/run.js browser",
+    "test:installers": "node tests/run.js installers",
+    "test:upgrade": "node tests/run.js upgrade",
+    "test:all": "node tests/run.js all",
     "install:all": "npm install"
   },
   "devDependencies": {

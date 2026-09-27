@@ -1,16 +1,21 @@
+// server/services/mediaService.js — converting uploads into slides
+//
+// Provides
+//   processImage(input, outDir, id) → a PNG
+//   processVideo(input, outDir, id) → an H.264 MP4 the Pi's browser plays
+//   getVideoDuration(file), createThumbnail(video, outDir, id) → a still for the admin panel
+//
+// Used by
+//   services/uploadQueue
+//
+// Uses
+//   sharp, fluent-ffmpeg (ffmpeg and ffprobe: FFMPEG_PATH / FFPROBE_PATH, else the PATH), utils/logger
 const path = require('path');
 const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
 const logger = require('../utils/logger');
 
-const IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
-const VIDEO_MIME = new Set(['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg']);
-
-function typeFromMime(mime) {
-  if (IMAGE_MIME.has(mime)) return 'image';
-  if (VIDEO_MIME.has(mime)) return 'video';
-  return null;
-}
+// Which files are images or videos: services/mediaTypes.js
 
 async function processImage(inputPath, outDir, slideId) {
   const outFilename = `${slideId}.png`;
@@ -79,4 +84,4 @@ async function createThumbnail(videoPath, outDir, slideId) {
   return outFilename;
 }
 
-module.exports = { typeFromMime, processImage, processVideo, getVideoDuration, createThumbnail, IMAGE_MIME, VIDEO_MIME };
+module.exports = { processImage, processVideo, getVideoDuration, createThumbnail };

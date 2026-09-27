@@ -1,9 +1,21 @@
 <script setup>
+// client/admin/src/views/SlideshowsView.vue — the home page: every slideshow (/admin/slideshows)
+//
+// Responsibilities
+//   The updater's notices, this Pi's IP and MAC addresses, the list with publish/disable and
+//   hide/unhide (hidden ones behind "Show hidden slideshows"), creating a slideshow, deleting one
+//   (never the sample), and opening one.
+//
+// Used by: router/index.js
+// Uses: useApi (/slideshows, /settings/device), useSlideshowActions, ui/StatusBadge,
+//   ui/PublishToggle, ui/TagPill
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
-import UpdateNotice from '../components/UpdateNotice.vue';
-import InstallerNotice from '../components/InstallerNotice.vue';
+import StatusBadge from '../components/ui/StatusBadge.vue';
+import PublishToggle from '../components/ui/PublishToggle.vue';
+import TagPill from '../components/ui/TagPill.vue';
+import { useSlideshowActions } from '../composables/useSlideshowActions.js';
 
 const router = useRouter();
 const slideshows = ref([]);
@@ -18,27 +30,24 @@ const createError = ref('');
 // Delete state
 const deletingFolder = ref(null);
 
-// Publish / disable toggle
-const togglingFolder = ref(null);
+// Publish / disable and hide / unhide (the folder being changed disables its buttons)
+const { toggling, hiding, setEnabled, setHidden: saveHidden } = useSlideshowActions();
+
+function applyFlags(folder, flags) {
+  const idx = slideshows.value.findIndex(s => s.folder === folder);
+  if (idx !== -1) slideshows.value[idx] = { ...slideshows.value[idx], ...flags };
+}
 
 // Hidden slideshows: kept exactly as they are, just out of the list until shown
 const showHidden = ref(false);
 const hiddenCount = computed(() => slideshows.value.filter(s => s.hidden).length);
 const visible = computed(() => slideshows.value.filter(s => !s.hidden || showHidden.value));
-const hidingFolder = ref(null);
 
 async function setHidden(ss, hidden) {
-  hidingFolder.value = ss.folder;
-  try {
-    const updated = await api.put(`/slideshows/${ss.folder}`, { hidden });
-    const idx = slideshows.value.findIndex(s => s.folder === ss.folder);
-    if (idx !== -1) slideshows.value[idx] = { ...slideshows.value[idx], hidden: updated.hidden === true };
-    if (!hiddenCount.value) showHidden.value = false;
-  } catch (e) {
-    alert(e.message);
-  } finally {
-    hidingFolder.value = null;
-  }
+  const updated = await saveHidden(ss.folder, hidden);
+  if (!updated) return;
+  applyFlags(ss.folder, { hidden: updated.hidden === true });
+  if (!hiddenCount.value) showHidden.value = false;
 }
 
 // This Pi's IP and MAC addresses, shown above the list
@@ -52,17 +61,9 @@ async function loadDevice() {
   }
 }
 
-async function toggleEnabled(folder, currentEnabled) {
-  togglingFolder.value = folder;
-  try {
-    const updated = await api.put(`/slideshows/${folder}`, { enabled: !currentEnabled });
-    const idx = slideshows.value.findIndex(s => s.folder === folder);
-    if (idx !== -1) slideshows.value[idx] = { ...slideshows.value[idx], enabled: updated.enabled };
-  } catch (e) {
-    alert(e.message);
-  } finally {
-    togglingFolder.value = null;
-  }
+async function toggleEnabled(ss) {
+  const updated = await setEnabled(ss.folder, ss.enabled === false);
+  if (updated) applyFlags(ss.folder, { enabled: updated.enabled });
 }
 
 async function load() {
@@ -108,9 +109,6 @@ onMounted(loadDevice);
 
 <template>
   <div>
-    <UpdateNotice />
-    <InstallerNotice />
-
     <div
       v-if="device?.interfaces?.length"
       class="card"
@@ -157,21 +155,9 @@ onMounted(loadDevice);
       <div class="ss-info" @click="router.push(`/slideshows/${ss.folder}`)">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-weight:600">{{ ss.name }}</span>
-          <span
-            :style="{
-              fontSize: '11px',
-              fontWeight: '600',
-              padding: '2px 7px',
-              borderRadius: '10px',
-              background: ss.enabled !== false ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)',
-              color:      ss.enabled !== false ? '#16a34a'              : 'var(--text-muted)',
-              border:     ss.enabled !== false ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(148,163,184,0.25)',
-              letterSpacing: '0.03em',
-              textTransform: 'uppercase',
-            }"
-          >{{ ss.enabled !== false ? 'Published' : 'Disabled' }}</span>
-          <span v-if="ss.hidden" class="tag">Hidden</span>
-          <span v-if="ss.sample" class="tag" title="Shows what the noticeboard can do. It's updated with new examples when the software is updated.">Sample</span>
+          <StatusBadge :published="ss.enabled !== false" />
+          <TagPill v-if="ss.hidden">Hidden</TagPill>
+          <TagPill v-if="ss.sample" title="Shows what the noticeboard can do. It's updated with new examples when the software is updated.">Sample</TagPill>
         </div>
         <div style="color:var(--text-muted);font-size:12px;margin-top:2px">
           {{ ss.slideCount }} slide{{ ss.slideCount !== 1 ? 's' : '' }} &nbsp;·&nbsp;
@@ -183,22 +169,12 @@ onMounted(loadDevice);
       <!-- Buttons wrap onto another line on a narrow screen, making the card taller -->
       <div class="ss-actions">
       <!-- Publish / Disable toggle (a hidden slideshow is unhidden first) -->
-      <button
+      <PublishToggle
         v-if="!ss.hidden"
-        :style="{
-          fontSize: '12px',
-          padding: '5px 12px',
-          borderRadius: 'var(--radius)',
-          border: 'none',
-          cursor: togglingFolder === ss.folder ? 'not-allowed' : 'pointer',
-          fontWeight: '600',
-          background: ss.enabled !== false ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)',
-          color:      ss.enabled !== false ? '#dc2626'              : '#16a34a',
-          outline:    ss.enabled !== false ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(34,197,94,0.3)',
-        }"
-        :disabled="togglingFolder === ss.folder"
-        @click.stop="toggleEnabled(ss.folder, ss.enabled !== false)"
-      >{{ ss.enabled !== false ? 'Disable' : 'Publish' }}</button>
+        :published="ss.enabled !== false"
+        :busy="toggling === ss.folder"
+        @click.stop="toggleEnabled(ss)"
+      />
 
       <button
         class="btn-ghost"
@@ -209,14 +185,14 @@ onMounted(loadDevice);
         v-if="ss.hidden"
         class="btn-ghost"
         style="font-size:12px;padding:5px 10px"
-        :disabled="hidingFolder === ss.folder"
+        :disabled="hiding === ss.folder"
         @click="setHidden(ss, false)"
       >Unhide</button>
       <button
         v-else
         class="btn-ghost"
         style="font-size:12px;padding:5px 10px"
-        :disabled="hidingFolder === ss.folder || ss.enabled !== false"
+        :disabled="hiding === ss.folder || ss.enabled !== false"
         :title="ss.enabled !== false ? 'Only unpublished slideshows can be hidden: disable it first' : 'Hide it from this list, keeping it exactly as it is'"
         @click="setHidden(ss, true)"
       >Hide</button>
@@ -237,17 +213,6 @@ onMounted(loadDevice);
 </template>
 
 <style scoped>
-.tag {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
 .card--hidden { opacity: 0.7; border-style: dashed; }
 .ss-row { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
 .ss-info { flex: 1 1 220px; min-width: 0; cursor: pointer; }

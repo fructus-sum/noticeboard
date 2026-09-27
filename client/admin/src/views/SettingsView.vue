@@ -1,226 +1,34 @@
 <script setup>
+// client/admin/src/views/SettingsView.vue — the Settings page (/admin/settings)
+//
+// One card per area, in this order: Display, MAC filtering, Branding, Change password (#password),
+// Software updates. The settings the first two show are loaded once here (GET /settings); the
+// other cards load what they need themselves.
+//
+// Used by: router/index.js
+// Uses: useApi, the cards in components/settings and components/updates
 import { ref, onMounted } from 'vue';
 import { api } from '../composables/useApi.js';
-import SoftwareUpdates from '../components/SoftwareUpdates.vue';
-import LogoSettings from '../components/LogoSettings.vue';
-import MacFilterWarning from '../components/MacFilterWarning.vue';
-import { useSecurity } from '../composables/useSecurity.js';
+import DisplaySettingsCard from '../components/settings/DisplaySettingsCard.vue';
+import MacFilterCard from '../components/settings/MacFilterCard.vue';
+import BrandingSettings from '../components/settings/BrandingSettings.vue';
+import PasswordCard from '../components/settings/PasswordCard.vue';
+import SoftwareUpdates from '../components/updates/SoftwareUpdates.vue';
 
-const { refreshSecurity } = useSecurity();
+const settings = ref(null);
 
-// --- Display settings ---
-const defaultDuration = ref(10);
-const showDeviceInfo  = ref(true);
-const displayMsg      = ref('');
-const displaySaving   = ref(false);
-
-// --- MAC filtering ---
-const macEnabled = ref(false);
-const macWarning = ref(false);   // the pop-up shown when MAC filtering is switched on
-const approved   = ref([]);
-const macMsg     = ref('');
-const macSaving  = ref(false);
-const newMac     = ref('');
-const newLabel   = ref('');
-
-// --- Password ---
-const currentPw  = ref('');
-const newPw      = ref('');
-const confirmPw  = ref('');
-const pwMsg      = ref('');
-const pwSaving   = ref(false);
-
-async function load() {
-  const s = await api.get('/settings');
-  defaultDuration.value = s.display?.defaultSlideDurationSeconds ?? 10;
-  showDeviceInfo.value  = s.display?.showDeviceInfo !== false;
-  macEnabled.value      = s.macFiltering?.enabled ?? false;
-  approved.value        = s.macFiltering?.approved ? JSON.parse(JSON.stringify(s.macFiltering.approved)) : [];
-}
-
-async function saveDisplay() {
-  displayMsg.value = '';
-  displaySaving.value = true;
-  try {
-    await api.put('/settings', { display: {
-      defaultSlideDurationSeconds: Number(defaultDuration.value),
-      showDeviceInfo: showDeviceInfo.value,
-    } });
-    displayMsg.value = 'Saved.';
-    setTimeout(() => { displayMsg.value = ''; }, 2000);
-  } catch (e) {
-    displayMsg.value = e.message;
-  } finally {
-    displaySaving.value = false;
-  }
-}
-
-async function saveMac() {
-  macMsg.value = '';
-  macSaving.value = true;
-  try {
-    await api.put('/settings', {
-      macFiltering: { enabled: macEnabled.value, approved: approved.value },
-    });
-    macMsg.value = 'Saved.';
-    setTimeout(() => { macMsg.value = ''; }, 2000);
-  } catch (e) {
-    macMsg.value = e.message;
-  } finally {
-    macSaving.value = false;
-  }
-}
-
-// Windows writes MAC addresses with dashes (1A-2B-…); the list uses colons
-const normaliseMac = (mac) => mac.trim().toLowerCase().replace(/-/g, ':');
-
-function addMac() {
-  const mac = normaliseMac(newMac.value);
-  if (!mac) return;
-  if (approved.value.find(a => a.mac === mac)) { macMsg.value = 'Already in list'; return; }
-  approved.value.push({ mac, label: newLabel.value.trim() || mac, addedAt: new Date().toISOString() });
-  newMac.value = '';
-  newLabel.value = '';
-}
-
-// Switching MAC filtering on: warn first, since a device that isn't on the list loses access
-function onMacToggle() {
-  if (macEnabled.value) macWarning.value = true;
-}
-function macWarningConfirmed() {
-  macWarning.value = false;
-  macMsg.value = 'MAC filtering starts once you click Save.';
-}
-function macWarningCancelled() {
-  macWarning.value = false;
-  macEnabled.value = false;
-}
-function addThisDevice(mac) {
-  const normalised = normaliseMac(mac);
-  if (!approved.value.find(a => a.mac === normalised)) {
-    approved.value.push({ mac: normalised, label: 'This device', addedAt: new Date().toISOString() });
-  }
-}
-
-function removeMac(mac) {
-  approved.value = approved.value.filter(a => a.mac !== mac);
-}
-
-async function changePassword() {
-  pwMsg.value = '';
-  if (newPw.value !== confirmPw.value) { pwMsg.value = 'Passwords do not match'; return; }
-  if (newPw.value.length < 8) { pwMsg.value = 'Minimum 8 characters'; return; }
-  pwSaving.value = true;
-  try {
-    await api.put('/settings/password', { current: currentPw.value, newPassword: newPw.value });
-    pwMsg.value = 'Password changed.';
-    refreshSecurity();   // clears the default-password warning
-    currentPw.value = ''; newPw.value = ''; confirmPw.value = '';
-    setTimeout(() => { pwMsg.value = ''; }, 3000);
-  } catch (e) {
-    pwMsg.value = e.message;
-  } finally {
-    pwSaving.value = false;
-  }
-}
-
-onMounted(load);
+onMounted(async () => {
+  settings.value = await api.get('/settings');
+});
 </script>
 
 <template>
   <div>
     <h1>Settings</h1>
-
-    <!-- Display -->
-    <div class="card">
-      <h2>Display</h2>
-      <form @submit.prevent="saveDisplay">
-        <div class="field" style="max-width:240px">
-          <label>Default image duration (seconds)</label>
-          <input v-model.number="defaultDuration" type="number" min="1" max="3600" />
-        </div>
-        <p style="color:var(--text-muted);font-size:12px;margin:-8px 0 14px">
-          Used by every slideshow that doesn't set its own duration. Videos always play to the end.
-        </p>
-        <div class="field" style="display:flex;align-items:flex-start;gap:8px">
-          <input id="show-pin" v-model="showDeviceInfo" type="checkbox" style="width:auto;margin-top:2px" />
-          <label for="show-pin" style="margin:0;font-size:13px;font-weight:400;color:var(--text)">
-            Show the location pin in the viewer's top-left corner. It shows the Noticeboard server's
-            address, so people can find the noticeboard from another device.
-          </label>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <button type="submit" class="btn-primary" :disabled="displaySaving">{{ displaySaving ? 'Saving…' : 'Save' }}</button>
-          <span :class="displayMsg.startsWith('Saved') ? 'success-msg' : 'error-msg'" v-if="displayMsg">{{ displayMsg }}</span>
-        </div>
-      </form>
-    </div>
-
-    <!-- MAC filtering -->
-    <div class="card">
-      <h2>MAC filtering</h2>
-      <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-        <input id="mac-toggle" type="checkbox" v-model="macEnabled" style="width:auto" @change="onMacToggle" />
-        <label for="mac-toggle" style="margin:0;font-size:13px;font-weight:400;color:var(--text)">
-          Enable MAC filter (only approved devices can connect)
-        </label>
-      </div>
-
-      <div style="margin-bottom:12px">
-        <div v-for="a in approved" :key="a.mac"
-          style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
-          <code style="font-size:12px;flex:0 0 140px">{{ a.mac }}</code>
-          <span style="flex:1;font-size:13px;color:var(--text-muted)">{{ a.label }}</span>
-          <button class="btn-ghost" style="padding:3px 8px;font-size:12px" :disabled="a.mac === 'localhost'" @click="removeMac(a.mac)">Remove</button>
-        </div>
-        <p v-if="!approved.length" style="color:var(--text-muted);font-size:13px">No approved devices.</p>
-      </div>
-
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <input v-model="newMac" type="text" placeholder="aa:bb:cc:dd:ee:ff" style="flex:1 1 160px" />
-        <input v-model="newLabel" type="text" placeholder="Label (optional)" style="flex:1 1 160px" />
-        <button type="button" class="btn-ghost" @click="addMac">Add</button>
-      </div>
-
-      <div style="display:flex;align-items:center;gap:10px">
-        <button class="btn-primary" :disabled="macSaving" @click="saveMac">{{ macSaving ? 'Saving…' : 'Save' }}</button>
-        <span :class="macMsg.startsWith('Saved') || macMsg.startsWith('MAC filtering starts') ? 'success-msg' : 'error-msg'" v-if="macMsg">{{ macMsg }}</span>
-      </div>
-    </div>
-
-    <MacFilterWarning
-      v-if="macWarning"
-      :approved="approved"
-      @confirm="macWarningConfirmed"
-      @cancel="macWarningCancelled"
-      @add="addThisDevice"
-    />
-
-    <LogoSettings />
-
-    <!-- Change password -->
-    <div id="password" class="card">
-      <h2>Change password</h2>
-      <form @submit.prevent="changePassword" style="max-width:320px">
-        <div class="field">
-          <label>Current password</label>
-          <input v-model="currentPw" type="password" autocomplete="current-password" required />
-        </div>
-        <div class="field">
-          <label>New password</label>
-          <input v-model="newPw" type="password" autocomplete="new-password" minlength="8" required />
-        </div>
-        <div class="field">
-          <label>Confirm new password</label>
-          <input v-model="confirmPw" type="password" autocomplete="new-password" required />
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <button type="submit" class="btn-primary" :disabled="pwSaving">{{ pwSaving ? 'Saving…' : 'Change password' }}</button>
-          <span :class="pwMsg.startsWith('Password changed') ? 'success-msg' : 'error-msg'" v-if="pwMsg">{{ pwMsg }}</span>
-        </div>
-      </form>
-    </div>
-
+    <DisplaySettingsCard :settings="settings" />
+    <MacFilterCard :settings="settings" />
+    <BrandingSettings :settings="settings" />
+    <PasswordCard />
     <SoftwareUpdates />
   </div>
 </template>

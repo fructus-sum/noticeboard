@@ -1,14 +1,26 @@
+// server/routes/api/device.js — /api/device: the location pin's addresses and the kiosk exit button
+//
+// Responsibilities
+//   GET  /                    this server's IP addresses and port (never the viewing device's), the
+//                             one the display used first. MAC addresses are admin-only (settings).
+//   POST /kiosk-exit          the viewer's exit button: this device asks to leave kiosk mode (60 s)
+//   POST /kiosk-exit/claim    the kiosk script on the same device collects it: {"exit":true} once
+//   Requests are kept per device (IP address; every loopback address is the server itself), so a
+//   screen can only ever affect itself.
+//
+// Used by
+//   routes/api/index.js (behind the MAC filter); the viewer (DeviceInfo, ExitKiosk); the kiosk scripts
+//
+// Uses
+//   utils/network (lanInterfaces, plainAddress, isLoopback)
+//
+// Change impact
+//   The claim must answer exactly {"exit":true}, without spaces: installed kiosk scripts compare the
+//   text (SYSTEM_DESIGN §15).
 const express = require('express');
-const { lanInterfaces } = require('../../utils/networkInfo');
+const { lanInterfaces, plainAddress, isLoopback } = require('../../utils/network');
 
 const router = express.Router();
-
-const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
-
-// The address a request came from or arrived at, without IPv4-in-IPv6 wrapping
-function plainAddress(address = '') {
-  return address.replace(/^::ffff:/, '');
-}
 
 // This server's IP addresses and port, for the display's location pin: how to reach the
 // Noticeboard server from another device. They're the server's own addresses (never the
@@ -32,7 +44,7 @@ const exitRequests = new Map();   // device -> expiry time
 
 function deviceOf(req) {
   const address = req.socket.remoteAddress || '';
-  return LOOPBACK.test(address) ? 'this-server' : plainAddress(address);
+  return isLoopback(address) ? 'this-server' : plainAddress(address);
 }
 
 router.post('/kiosk-exit', (req, res) => {

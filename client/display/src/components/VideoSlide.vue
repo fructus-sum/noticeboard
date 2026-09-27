@@ -1,5 +1,16 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+// client/display/src/components/VideoSlide.vue — a video slide, played muted to the end
+//
+// As large as fits the screen, whole and in its own shape (object-fit: contain), with the viewer's
+// background colour around it.
+//
+// Props: src. Emits: ready (playback started), progress (it moved forward), ended, error (it
+// can't play: refused by the autoplay policy, or unplayable).
+// Used by: SlideFrame
+// Uses: usePageWake (starts it again when the page wakes; the clock's stall deadline skips it if
+// it still won't play)
+import { ref, onMounted } from 'vue';
+import { usePageWake } from '../composables/usePageWake.js';
 
 defineProps({
   src: { type: String, required: true },
@@ -19,16 +30,11 @@ function play() {
 
 // A hidden, frozen or sleeping page can pause the video: start it again when the page wakes.
 // If it still won't play, the slide clock's stall deadline skips it.
-function wake() {
+usePageWake(() => {
   if (video.value?.paused && !video.value.ended) video.value.play()?.catch?.(() => {});
-}
-const PAGE_EVENTS = [[document, 'visibilitychange'], [document, 'resume'], [window, 'pageshow'], [window, 'focus']];
-
-onMounted(() => {
-  PAGE_EVENTS.forEach(([target, name]) => target.addEventListener(name, wake));
-  play();
 });
-onUnmounted(() => PAGE_EVENTS.forEach(([target, name]) => target.removeEventListener(name, wake)));
+
+onMounted(play);
 </script>
 
 <template>
@@ -52,7 +58,8 @@ onUnmounted(() => PAGE_EVENTS.forEach(([target, name]) => target.removeEventList
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: transparent;
   display: block;
 }
 </style>

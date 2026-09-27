@@ -54,7 +54,7 @@ It asks:
 4. **Whether `sudo` should ask for a password.** Raspberry Pi OS lets the desktop user run `sudo` without one. If you answer yes, the installer backs up the rule in `/etc/sudoers.d`, turns it off, and has you type your password once to prove it works before keeping the change. If the password doesn't work, the rule goes straight back, so you can't be locked out.
 5. **Firewall (optional):** at the end it offers to check or set up a firewall, and changes nothing unless you say yes. See the user guide for details.
 
-Running it again is safe: it offers your previous answers, so Enter keeps them, and it never touches your slideshows, slides or settings. It always runs its newest version: whichever copy you start, it first downloads the installer from the latest commit on GitHub `main` and runs that. When it's done, it offers to reboot (Enter = yes). To run a local copy exactly as it is, e.g. to test changes to it: `sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh`.
+Running it again is safe: it offers your previous answers, so Enter keeps them, and it never touches your slideshows, slides or settings. It always runs its newest version: whichever copy you start, it first downloads the installer from the latest commit of the branch the Pi follows on GitHub (`main`, unless it has been switched to another branch) and runs that. When it's done, it offers to reboot (Enter = yes). To run a local copy exactly as it is, e.g. to test changes to it: `sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh`.
 
 ### Server + display (hosts content, runs the server, acts as primary display)
 
@@ -91,18 +91,30 @@ The server Pi checks GitHub every 15 minutes and installs new versions by itself
 
 ## Development
 
-Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch. Its `installer.version` must match `INSTALLER_VERSION` in `installers/install.sh`: raise both (and add a line to `installer.changes`) whenever the installer changes what updates can't, such as the kiosk scripts or system services.
+Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch. Its `installer.version` must match `INSTALLER_VERSION` in `installers/install.sh`: raise both (and add a line to `installer.changes`) whenever the installer changes what updates can't, such as the kiosk scripts (`installers/kiosk/`) or system services.
+
+**How the code fits together** is in [`docs/design/SYSTEM_DESIGN.md`](docs/design/SYSTEM_DESIGN.md): the parts and what each owns, the files they share, and what installed Pis and open screens rely on, which must not change. Update it in the same commit as the code it describes.
 
 ```bash
 npm install
-npm run dev        # the server, with both web apps served live on the same port
-npm test           # the display's slide timing tests
-npm run build      # production builds, into client/display/dist and client/admin/dist
+npm run build      # both web apps, into client/display/dist and client/admin/dist
+npm start          # the server: the viewer at http://localhost:3000/, the admin panel at /admin
+npm test           # unit tests: slide timing, installer versions, the Node.js version rule
+npm run test:all   # everything below, in turn (build first)
 ```
 
-`npm run dev` serves everything on `http://localhost:3000`, with hot reload: the viewer at `/`, the admin panel at `/admin`, exactly as in production.
+The other test groups each run a throwaway copy of the app, never this folder's `data/`:
 
-Runtime settings live in `data/config.json` (created on first run); slideshows and their slides in `data/slideshows/`. `.env` sets `NODE_ENV=production` on the Pi, and `SECURE_COOKIES=true` only when serving over HTTPS.
+- **`test:api`:** the HTTP and socket contract (compared with `tests/fixtures/api-contract.json`), uploads, branch switching and shutdown.
+- **`test:browser`:** the admin panel and viewer in a real Chrome, including the reliability scenarios. It starts a headless Chrome itself (`CHROME_PATH` to choose one).
+- **`test:installers`:** the installer (with its parts in `installers/lib/`) and `update.sh` with stand-ins for systemd, apt and GitHub, including the files the installer writes (compared with `tests/fixtures/installer-golden/`).
+- **`test:upgrade`:** an installed baseline takes the current code through its own `update.sh`, and nothing may change.
+
+Video tests need ffmpeg: on the `PATH`, or set `FFMPEG_PATH` and `FFPROBE_PATH`. The installer tests need bash (Git Bash on Windows).
+
+There is one version of the software: run on a PC, it works exactly as on a Pi. After changing the viewer or the admin panel, run `npm run build` again; after changing the server, restart it. Changes are tried out on a GitHub branch, which a Pi can follow (Settings → Software updates).
+
+Runtime settings live in `data/config.json` (created on first run); slideshows and their slides in `data/slideshows/`. On a Pi, systemd loads `/opt/noticeboard/.env`: `SECURE_COOKIES=true` only when serving over HTTPS, and `NOTICEBOARD_LOG_LEVEL=debug` for more detail in the log when troubleshooting.
 
 ## License
 

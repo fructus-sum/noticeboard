@@ -1,8 +1,24 @@
+// server/routes/api/auth.js — /api/auth: logging in and out, and whether this browser is logged in
+//
+// Responsibilities
+//   POST /login (rate limited; 401 on a wrong password), POST /logout, GET /status. Only the MAC
+//   filter applies here (api/index.js).
+//
+// Used by
+//   routes/api/index.js; the admin panel (LoginView, the router's login check, NavBar); update.sh's
+//   health check (GET /status must answer 2xx after a restart)
+//
+// Uses
+//   services/adminPassword (verify), services/adminSession (the cookie), middleware/asyncRoute
+//
+// Change impact
+//   GET /api/auth/status is update.sh's health check on every installed Pi: it must keep answering
+//   2xx when the server is up (SYSTEM_DESIGN §15).
 const express = require('express');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
-const configService = require('../../services/configService');
+const adminPassword = require('../../services/adminPassword');
+const adminSession = require('../../services/adminSession');
+const { route } = require('../../middleware/asyncRoute');
 const logger = require('../../utils/logger');
 
 const router = express.Router();
@@ -15,50 +31,28 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts — try again in 15 minutes' },
 });
 
-const COOKIE = 'nb_admin_token';
-// SECURE_COOKIES=true only if serving over HTTPS; Pi installs run HTTP, so leave false
-const COOKIE_OPTS = {
-  httpOnly: true,
-  sameSite: 'strict',
-  secure: process.env.SECURE_COOKIES === 'true',
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
+router.post('/login', loginLimiter, route(async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: 'Password required' });
 
-router.post('/login', loginLimiter, async (req, res, next) => {
-  try {
-    const { password } = req.body;
-    if (!password) return res.status(400).json({ error: 'Password required' });
-
-    const hash = configService.get('passwordHash');
-    const match = await bcrypt.compare(password, hash);
-    if (!match) {
-      logger.warn('Admin login failed', { ip: req.ip });
-      return res.status(401).json({ error: 'Invalid password' });
-    }
-
-    const token = jwt.sign({ role: 'admin' }, configService.get('jwtSecret'), { expiresIn: '7d' });
-    res.cookie(COOKIE, token, COOKIE_OPTS);
-    logger.info('Admin login success', { ip: req.ip });
-    res.json({ ok: true });
-  } catch (err) {
-    next(err);
+  if (!(await adminPassword.verify(password))) {
+    logger.warn('Admin login failed', { ip: req.ip });
+    return res.status(401).json({ error: 'Invalid password' });
   }
-});
+
+  adminSession.issue(res);
+  logger.info('Admin login success', { ip: req.ip });
+  res.json({ ok: true });
+}));
 
 router.post('/logout', (req, res) => {
-  res.clearCookie(COOKIE, { httpOnly: true, sameSite: 'strict' });
+  adminSession.clear(res);
   res.json({ ok: true });
 });
 
+// Also update.sh's health check after a restart (GET /api/auth/status must answer 2xx)
 router.get('/status', (req, res) => {
-  const token = req.cookies[COOKIE];
-  if (!token) return res.json({ authenticated: false });
-  try {
-    jwt.verify(token, configService.get('jwtSecret'));
-    res.json({ authenticated: true });
-  } catch {
-    res.json({ authenticated: false });
-  }
+  res.json({ authenticated: adminSession.isLoggedIn(req) });
 });
 
 module.exports = router;

@@ -1,5 +1,6 @@
 <script setup>
-// Line icons for the sidebar, drawn in the text colour
+// client/admin/src/components/NavIcon.vue — the sidebar's line icons, drawn in the text colour
+// Props: name. Used by: NavBar
 defineProps({ name: { type: String, required: true } });
 
 const ICONS = {

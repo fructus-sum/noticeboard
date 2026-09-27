@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Noticeboard Kiosk
+Exec=/usr/local/bin/noticeboard-kiosk.sh
+Type=Application
+X-GNOME-Autostart-enabled=true

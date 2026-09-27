@@ -1,0 +1,9 @@
+[Unit]
+Description=Start a Noticeboard update when the admin panel asks for one
+
+[Path]
+PathExists=/opt/noticeboard/tmp/update-request
+Unit=noticeboard-update.service
+
+[Install]
+WantedBy=paths.target

@@ -1,6 +1,13 @@
 <script setup>
+// client/admin/src/views/LoginView.vue — the login page (/admin/login)
+//
+// A wrong password or "too many tries" shows on the page, never as a redirect; with no answer from
+// the server, "Could not reach server". Once logged in: the slideshows.
+// Used by: router/index.js
+// Uses: useApi (POST /auth/login with redirectOn401: false)
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { api } from '../composables/useApi.js';
 
 const router = useRouter();
 const password = ref('');
@@ -11,20 +18,12 @@ async function login() {
   error.value = '';
   loading.value = true;
   try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: password.value }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      error.value = data.error || 'Login failed';
-    } else {
-      router.push('/slideshows');
-    }
-  } catch {
-    error.value = 'Could not reach server';
+    // A wrong password is a 401 here: shown on this page, never a redirect
+    await api.post('/auth/login', { password: password.value }, { redirectOn401: false });
+    router.push('/slideshows');
+  } catch (e) {
+    // An answer from the server (wrong password, too many tries), or no answer at all
+    error.value = e.status ? (e.serverMessage || 'Login failed') : 'Could not reach server';
   } finally {
     loading.value = false;
   }

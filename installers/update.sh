@@ -16,6 +16,17 @@
 #   Retry a failed commit: bash /opt/noticeboard/installers/update.sh --force
 #   Try another branch:    NOTICEBOARD_BRANCH=my-branch bash /opt/noticeboard/installers/update.sh
 #                          (once: the next check goes back to the branch chosen in Settings)
+#
+# Used by
+#   noticeboard-update.service (its timer and path units), set up by install.sh
+# Uses
+#   installers/lib/branch.sh and lib/json.sh (loaded before main); git, npm, systemctl, curl; the
+#   files it shares with the server (SYSTEM_DESIGN §4.2); GET /api/auth/status after a
+#   restart
+# Change impact
+#   This file runs the next update on every Pi that installed it: a mistake here can stop updates
+#   everywhere. Its path is in every installed update unit, and after a rollback an older
+#   commit's update.sh must take over again (§9, §15). tests/upgrade proves both.
 set -euo pipefail
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,21 +43,29 @@ FAILED_FILE="$INSTALL_DIR/tmp/update-failed-commit"  # skipped until the branch 
 UPLOAD_DIR="$INSTALL_DIR/tmp/noticeboard-uploads"    # pathHelpers.tmpDir()
 # Another branch is only installed if its update.sh also follows the branch chosen in the admin
 # panel, i.e. mentions this file. An older branch would ignore that setting, so the Pi couldn't
-# be switched back from the admin panel. (server/services/updateService.js checks the same.)
+# be switched back from the admin panel. (server/services/updates/index.js checks the same.)
 BRANCH_SUPPORT_MARKER="update-branch.env"
 
 # Give up on a stalled download instead of hanging until systemd's timeout
 export GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=60
 
+# Shared with install.sh: the branch setting (valid_branch, read_branch_setting,
+# read_main_at_switch, write_branch_setting) and the JSON files (write_json). Loaded now, from
+# this commit, before a checkout can replace them. If they can't be, nothing is touched.
+for lib in branch json; do
+  # shellcheck source=lib/branch.sh
+  if ! source "$INSTALL_DIR/installers/lib/$lib.sh"; then
+    echo "Can't load installers/lib/$lib.sh, so nothing was updated. To repair this noticeboard, run the installer: curl -fsSL $INSTALLER_URL | sudo bash" >&2
+    exit 1
+  fi
+done
+
 # The branch to follow: NOTICEBOARD_BRANCH (a one-off test), else the admin panel's setting,
 # else main
-configured_branch() {
-  sed -n 's/^NOTICEBOARD_BRANCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true
-}
-BRANCH="${NOTICEBOARD_BRANCH:-$(configured_branch)}"
+BRANCH="${NOTICEBOARD_BRANCH:-$(read_branch_setting)}"
 BRANCH="${BRANCH:-main}"
 # main's commit when this Pi switched to its branch (see branch_merged)
-MAIN_AT_SWITCH=$(sed -n 's/^NOTICEBOARD_MAIN_AT_SWITCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true)
+MAIN_AT_SWITCH=$(read_main_at_switch)
 RETURNED_FROM=""     # the branch this run went back to main from, because it was merged
 PREVIOUS_BRANCH=""   # the branch and commit running before this update
 CURRENT=""
@@ -121,10 +140,10 @@ main() {
   fi
 
   # A branch whose work is all in main now isn't needed any more: go back to main
-  if [ -z "$switching" ] && [ "$BRANCH" != main ] && [ "$(configured_branch)" = "$BRANCH" ] && branch_merged; then
+  if [ -z "$switching" ] && [ "$BRANCH" != main ] && [ "$(read_branch_setting)" = "$BRANCH" ] && branch_merged; then
     echo "$BRANCH has been merged into main; going back to main."
     RETURNED_FROM=$BRANCH
-    set_branch_setting main
+    write_branch_setting main
     BRANCH=main
     switching=1
   fi
@@ -247,13 +266,6 @@ main() {
   echo "Updated to ${TARGET:0:7}."
 }
 
-# A name git accepts, and safe wherever it's used
-valid_branch() {
-  [[ "$1" =~ ^[A-Za-z0-9._/-]{1,100}$ ]] \
-    && [[ "$1" != -* && "$1" != /* && "$1" != */ && "$1" != .* && "$1" != *. && "$1" != HEAD \
-          && "$1" != *..* && "$1" != *//* && "$1" != */.* && "$1" != *.lock ]]
-}
-
 # Why TARGET mustn't be installed, printed; fails if it's fine. Its files replace the app's,
 # so it mustn't bring files where the noticeboard keeps its content and settings. And when
 # switching, it must be able to switch back (see BRANCH_SUPPORT_MARKER).
@@ -275,34 +287,26 @@ refuse_reason() {   # refuse_reason <switching>
 # running. Only if the setting still names the branch that was tried: a one-off
 # NOTICEBOARD_BRANCH test leaves the admin panel's setting alone.
 restore_branch_setting() {
-  if [ "$BRANCH" != "$PREVIOUS_BRANCH" ] && [ "$(configured_branch)" = "$BRANCH" ]; then
+  if [ "$BRANCH" != "$PREVIOUS_BRANCH" ] && [ "$(read_branch_setting)" = "$BRANCH" ]; then
     if [ -n "$RETURNED_FROM" ]; then
-      set_branch_setting "$RETURNED_FROM" "$MAIN_AT_SWITCH"
+      write_branch_setting "$RETURNED_FROM" "$MAIN_AT_SWITCH"
     else
-      set_branch_setting "$PREVIOUS_BRANCH"
+      write_branch_setting "$PREVIOUS_BRANCH"
     fi
   fi
-}
-
-set_branch_setting() {   # set_branch_setting <branch> [main's commit when switching to it]
-  {
-    printf 'NOTICEBOARD_BRANCH=%s\n' "$1"
-    if [ -n "${2:-}" ]; then printf 'NOTICEBOARD_MAIN_AT_SWITCH=%s\n' "$2"; fi
-  } > "$BRANCH_FILE.tmp"
-  mv "$BRANCH_FILE.tmp" "$BRANCH_FILE"
 }
 
 # After switching to a branch other than main, remember where main was: a new branch can
 # start out identical to main, so it only counts as merged once main has moved on
 remember_main() {
   local main=""
-  if [ "$BRANCH" = main ] || [ "$(configured_branch)" != "$BRANCH" ]; then
+  if [ "$BRANCH" = main ] || [ "$(read_branch_setting)" != "$BRANCH" ]; then
     return 0
   fi
   if git fetch --quiet --no-tags origin "+refs/heads/main:refs/remotes/origin/main" 2>/dev/null; then
     main=$(git rev-parse origin/main 2>/dev/null) || main=""
   fi
-  set_branch_setting "$BRANCH" "$main"
+  write_branch_setting "$BRANCH" "$main"
 }
 
 # Is all of the followed branch's work in main now (merged, squashed or rebased in)? For a
@@ -368,26 +372,6 @@ write_status() {   # write_status <state> <message>
 # The last check for updates (result: up-to-date, waiting, skipped, offline or error)
 write_check() {   # write_check <result> <message>
   write_json "$CHECK_FILE" result "$1" branch "$BRANCH" message "$2" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
-
-# A flat JSON object of strings, replaced in one step: write_json <file> <key> <value> ...
-write_json() {
-  local file=$1 json="" sep=""
-  shift
-  while [ $# -ge 2 ]; do
-    json+="$sep$(json_string "$1"):$(json_string "$2")"
-    sep=","
-    shift 2
-  done
-  printf '{%s}\n' "$json" > "$file.tmp"
-  mv "$file.tmp" "$file"
-}
-
-json_string() {
-  local s
-  s=$(printf '%s' "$1" | tr -d '\000-\037')
-  s=${s//\\/\\\\}
-  printf '"%s"' "${s//\"/\\\"}"
 }
 
 # Put a commit's files in place: code, dependencies and the built SPAs (as install.sh does).

@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { installerNeeds } = require('../services/updateService');
+const { installerNeeds } = require('../services/updates/installerVersion');
 
 const ROOT = path.resolve(__dirname, '../..');
 const list = JSON.parse(fs.readFileSync(path.join(ROOT, 'system-requirements.json'), 'utf8'));

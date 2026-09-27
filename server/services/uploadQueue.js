@@ -1,32 +1,39 @@
+// server/services/uploadQueue.js — processing uploads and making thumbnails, two at a time
+//
+// Provides
+//   enqueueProcessing({ folder, slideId, tmpPath, mime })
+//       converts the upload, marks the slide ready (or failed) and announces a new playlist
+//   enqueueThumbnail({ folder, slideId, filename })   a video's still, for the admin panel
+//   queueSize()
+//
+// Used by
+//   routes/api/slides.js, services/sampleSlideshow
+//
+// Uses
+//   services/mediaService, services/slideshowStore (modifySlides: locked), services/displayEvents,
+//   services/mediaTypes, utils/pathHelpers, utils/logger
+//
+// Change impact
+//   Uploads wait in tmp/noticeboard-uploads until processed: update.sh waits while it has a recent
+//   file, so the path must not change (SYSTEM_DESIGN §15).
 const PQueue = require('p-queue').default;
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const { writeConfig } = require('../utils/configIO');
-const { slideshowJsonPath, slidesDir } = require('../utils/pathHelpers');
-const { processImage, processVideo, getVideoDuration, createThumbnail, typeFromMime } = require('./mediaService');
-const configService = require('./configService');
-const { broadcastPlaylist } = require('../socket');
+const { slidesDir } = require('../utils/pathHelpers');
+const { processImage, processVideo, getVideoDuration, createThumbnail } = require('./mediaService');
+const { typeFromMime } = require('./mediaTypes');
+const store = require('./slideshowStore');
+const displayEvents = require('./displayEvents');
 const logger = require('../utils/logger');
-const { withSlideshowLock } = require('../utils/slideshowLock');
 
 const queue = new PQueue({ concurrency: 2 });
 
-function readSlideshowJson(folder) {
-  const p = slideshowJsonPath(folder);
-  if (!fs.existsSync(p)) return { slides: [] };
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return { slides: [] }; }
-}
-
-async function updateSlide(folder, slideId, patch) {
-  // Two slides can finish processing at once; the lock stops one save wiping out the other
-  await withSlideshowLock(folder, async () => {
-    const data = readSlideshowJson(folder);
-    const idx = data.slides.findIndex(s => s.id === slideId);
-    if (idx !== -1) {
-      data.slides[idx] = { ...data.slides[idx], ...patch };
-      await writeConfig(slideshowJsonPath(folder), data);
-    }
+// Two slides can finish processing at once; the store's lock stops one save wiping out the other.
+// A slide deleted meanwhile stays deleted.
+function updateSlide(folder, slideId, patch) {
+  return store.modifySlides(folder, (data) => {
+    const idx = data.slides.findIndex((s) => s.id === slideId);
+    if (idx !== -1) data.slides[idx] = { ...data.slides[idx], ...patch };
   });
 }
 
@@ -51,8 +58,7 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
       }
 
       await updateSlide(folder, slideId, { filename, duration, status: 'ready', ...(thumbnail ? { thumbnail } : {}) });
-      configService.emit('change');
-      broadcastPlaylist();
+      displayEvents.playlistChanged();
       logger.info('Slide ready', { folder, slideId, type });
     } catch (err) {
       await updateSlide(folder, slideId, { status: 'error', error: err.message });

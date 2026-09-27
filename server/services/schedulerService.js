@@ -1,5 +1,20 @@
+// server/services/schedulerService.js — which slideshows are on the screens now
+//
+// Provides
+//   init()        recomputes on every config change and every 60 s
+//   getActive()   the active slideshows: published, not hidden, in their schedule, by priority,
+//                 at most 5
+//   'update'      emitted with the new list when the active set changes
+//   stop()
+//
+// Used by
+//   server/index.js, realtime/displaySocket (sends a new playlist on 'update')
+//
+// Uses
+//   services/slideshowStore (list), services/configService ('change'), utils/logger
 const EventEmitter = require('events');
 const configService = require('./configService');
+const store = require('./slideshowStore');
 const logger = require('../utils/logger');
 
 class SchedulerService extends EventEmitter {
@@ -27,7 +42,7 @@ class SchedulerService extends EventEmitter {
   }
 
   computeActive() {
-    const slideshows = configService.get('slideshows') || [];
+    const slideshows = store.list();
     const now = new Date();
 
     const candidates = slideshows

@@ -1,21 +1,10 @@
-const macService = require('../services/macService');
-const logger = require('../utils/logger');
+// server/middleware/macFilter.js — only approved devices (MAC filtering) reach the displays, media, logo, guide and admin pages
+//
+// The check itself is middleware/access.js (requireApprovedDevice('Display'), which logs a denial
+// as "Display: MAC denied").
+//
+// Used by
+//   routes/index.js, routes/api/index.js (/auth, /device)
+const { requireApprovedDevice } = require('./access');
 
-function macFilter(req, res, next) {
-  macService
-    .resolveRequest(req)
-    .then(({ mac, ip, approved }) => {
-      if (!approved) {
-        logger.warn('Display: MAC denied', { ip, mac });
-        return res.status(404).send('Not Found');
-      }
-      req.clientMac = mac;
-      next();
-    })
-    .catch((err) => {
-      logger.error('MAC filter error', { err: err.message });
-      res.status(404).send('Not Found');
-    });
-}
-
-module.exports = macFilter;
+module.exports = requireApprovedDevice('Display');

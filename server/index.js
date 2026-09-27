@@ -1,10 +1,27 @@
+// server/index.js — the server process: start-up in order, listening, graceful shutdown
+//
+// Responsibilities
+//   configService.init → the sample slideshow sync (an error is logged, start-up carries on) →
+//   the Express app → the display socket → the scheduler → listen on config.port (3000 if unset).
+//   SIGTERM or SIGINT stops the scheduler and closes the sockets (forced exit after 5 s).
+//
+// Used by
+//   systemd (noticeboard.service runs node server/index.js), npm start, update.sh (restarts it),
+//   the test harnesses
+//
+// Uses
+//   services/configService, services/sampleSlideshow, app.js, realtime/displaySocket,
+//   services/schedulerService, utils/logger
+//
+// Change impact
+//   The path server/index.js is in every installed service unit (SYSTEM_DESIGN §15). The
+//   order matters: the socket must exist before the scheduler first announces (§3.2).
 const http = require('http');
 const configService = require('./services/configService');
 const schedulerService = require('./services/schedulerService');
 const { syncSampleSlideshow } = require('./services/sampleSlideshow');
 const createApp = require('./app');
-const { initSocket } = require('./socket');
-const { createDevFrontends } = require('./utils/devFrontends');
+const { initDisplaySocket } = require('./realtime/displaySocket');
 const logger = require('./utils/logger');
 
 async function main() {
@@ -13,16 +30,10 @@ async function main() {
   await syncSampleSlideshow().catch((err) => logger.error('Could not set up the sample slideshow', { err: err.message }));
 
   const port = configService.get('port') || 3000;
-  // npm run dev fills these in once Vite is ready (see utils/devFrontends.js)
-  const frontends = process.env.NOTICEBOARD_DEV === '1' ? {} : null;
-  const app = createApp({ frontends });
+  const app = createApp();
   const server = http.createServer(app);
-  if (frontends) {
-    Object.assign(frontends, await createDevFrontends(server));
-    logger.info('Development: Vite serves the viewer and the admin panel on this port');
-  }
 
-  const io = initSocket(server);
+  const io = initDisplaySocket(server);
   schedulerService.init();
 
   server.listen(port, () => {

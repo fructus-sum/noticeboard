@@ -1,10 +1,19 @@
 <script setup>
+// client/display/src/components/ExitKiosk.vue — the exit button: leaves kiosk mode on this screen only
+//
+// The kiosk script on this device (installers/kiosk/*.sh) collects the request
+// (POST /api/device/kiosk-exit) within a few seconds, closes its full-screen browser and opens a
+// normal window instead. The server, the other displays and the published slideshows are not
+// affected; the screen returns to kiosk mode when it restarts. Its pop-up closes by itself after
+// 60 seconds.
+//
+// Props: visible (while the mouse, keyboard or touchscreen is in use)
+// Used by: App.vue (kiosk only)
+// Uses: CornerButton, ScreenDialog
 import { ref, onUnmounted } from 'vue';
+import CornerButton from './CornerButton.vue';
+import ScreenDialog from './ScreenDialog.vue';
 
-// Leaves full-screen kiosk mode on this screen only. The kiosk script on this device (see
-// installers/install.sh) collects the request within a few seconds, closes its full-screen
-// browser and opens a normal browser window instead. The server, the other displays and the
-// published slideshows are not affected. The screen returns to kiosk mode when it restarts.
 defineProps({
   visible: Boolean,   // shown while the mouse (or keyboard, or touchscreen) is being used
 });
@@ -44,9 +53,11 @@ onUnmounted(() => clearTimeout(closeTimer));
 </script>
 
 <template>
-  <button
+  <CornerButton
     v-show="visible || step"
-    type="button"
+    corner="right"
+    :opacity="0.5"
+    :hover-opacity="0.9"
     class="exit-button"
     aria-label="Leave full screen on this screen"
     title="Leave full screen on this screen"
@@ -55,9 +66,9 @@ onUnmounted(() => clearTimeout(closeTimer));
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M9 4v5H4v2h7V4H9zm6 0h-2v7h7V9h-5V4zM4 13v2h5v5h2v-7H4zm9 0v7h2v-5h5v-2h-7z" />
     </svg>
-  </button>
+  </CornerButton>
 
-  <div v-if="step" class="exit-popup" role="dialog" aria-labelledby="exit-title">
+  <ScreenDialog v-if="step" class="exit-popup" aria-labelledby="exit-title">
     <template v-if="step === 'confirm'">
       <h2 id="exit-title" class="exit-title">Leave full screen on this screen?</h2>
       <p>This screen's browser becomes a normal window, so you can use it, minimise or close it, or get back to the desktop.</p>
@@ -78,48 +89,16 @@ onUnmounted(() => clearTimeout(closeTimer));
         <button type="button" class="exit-cancel" @click="close">Close</button>
       </div>
     </template>
-  </div>
+  </ScreenDialog>
 </template>
 
 <style scoped>
-/* Matches the location pin, in the opposite corner */
-.exit-button {
-  position: fixed;
-  top: 5px;
-  right: 5px;
-  z-index: 1000;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-  opacity: 0.5;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s;
-}
-.exit-button:hover,
-.exit-button:focus-visible { opacity: 0.9; }
-.exit-button svg { width: 14px; height: 14px; fill: currentColor; }
-
+/* The button itself: CornerButton (top right, a little less faint than the pin). The pop-up:
+   ScreenDialog, with its size and text here */
 .exit-popup {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1001;
   width: min(560px, 90vw);
   padding: clamp(20px, 3vw, 36px);
-  background: #111827;
   color: #e5e7eb;
-  border: 1px solid #374151;
-  border-radius: 12px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
-  font-family: system-ui, -apple-system, sans-serif;
   font-size: clamp(15px, 1.6vw, 19px);
   line-height: 1.5;
 }
