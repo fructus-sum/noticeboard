@@ -120,13 +120,18 @@ async function getInfo() {
   };
 }
 
-// The installed version, for the admin panel's "Last updated": its commit and when that commit
-// was made (the same on every Pi running it). null if this copy isn't a git clone.
+// The installed version, for the admin panel's "Last updated": its commit, when that commit was
+// made (date), and when this noticeboard installed it (installedAt: the time of the last update
+// in Software updates, if that update installed the version running now; else null, e.g. on a
+// copy the updater and installer never updated). null if this copy isn't a git clone.
 async function versionInfo() {
   try {
     const [commit, date] = (await git(['log', '-1', '--format=%H%x00%cI'])).split('\0');
     const branch = await git(['symbolic-ref', '--short', '-q', 'HEAD']).catch(() => '');
-    return { commit, date, branch: branch || null };
+    const status = await readJson(updateStatusPath());
+    const installedAt = status?.state === 'updated' && status.commit === commit && !Number.isNaN(Date.parse(status.time))
+      ? status.time : null;
+    return { commit, date, installedAt, branch: branch || null };
   } catch {
     return null;
   }

@@ -12,12 +12,13 @@ const { logo, refreshLogo } = useBranding();
 // Collapsed: icons only, each named in its tooltip
 const { collapsed, toggle } = useNav();
 
-// When the installed version was made (its commit date), not when this page loaded
+// When this noticeboard installed the version it runs (the same time as "Last update" in
+// Software updates), not when this page loaded. Without that, when the version was made.
 const version = ref(null);
-const lastUpdated = computed(() => version.value
-  && new Date(version.value.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }));
+const dateTime = (iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const lastUpdated = computed(() => version.value && dateTime(version.value.installedAt || version.value.date));
 const versionTitle = computed(() => version.value
-  && `Version ${version.value.commit.slice(0, 7)}${version.value.branch ? ` from ${version.value.branch}` : ''}. Opens the project on GitHub.`);
+  && `Version ${version.value.commit.slice(0, 7)}${version.value.branch ? ` from ${version.value.branch}` : ''}, made ${dateTime(version.value.date)}. Opens the project on GitHub.`);
 
 onMounted(async () => {
   refreshLogo();
