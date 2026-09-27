@@ -9,7 +9,7 @@
 //   most server modules (never a hard-coded path elsewhere)
 //
 // Change impact
-//   Installed Pis, update.sh and the kiosk scripts rely on these names (CURRENT_SYSTEM_DESIGN §6,
+//   Installed Pis, update.sh and the kiosk scripts rely on these names (SYSTEM_DESIGN §6,
 //   §15). mediaUrl must match shared/index.js (a unit test checks).
 const path = require('path');
 

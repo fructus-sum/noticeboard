@@ -3,7 +3,7 @@
 // Responsibilities
 //   Loading config.json (JSON5, so an admin may add comments), creating it with defaults on the
 //   first start, and saving every change as a whole. If it can't be parsed, the defaults are
-//   written in its place (as always: see CURRENT_SYSTEM_DESIGN §16 #16).
+//   written in its place (SYSTEM_DESIGN §16 #8).
 //
 // Provides (a singleton EventEmitter)
 //   init()               creates data/ and data/slideshows/, then loads or creates config.json
@@ -16,7 +16,7 @@
 // Used by
 //   nearly every server module, and the installer (installers/lib/server.sh), which runs
 //   `node -e "require('./server/services/configService').init()"` on a first install. That path
-//   and init() must not change (CURRENT_SYSTEM_DESIGN §15).
+//   and init() must not change (SYSTEM_DESIGN §15).
 //
 // Uses
 //   utils/configIO, utils/pathHelpers, config/defaults, config/passwordDefaults, bcrypt, logger

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
-# The upgrade rehearsal (CURRENT_SYSTEM_DESIGN §17): proves an installed Pi takes the code under test
+# The upgrade rehearsal (SYSTEM_DESIGN §17): proves an installed Pi takes the code under test
 # through its normal update and keeps working, with nothing but the update.
 #
 #   1. An "installed Pi" on the baseline (NB_BASELINE, default fc4ba53) with realistic data made

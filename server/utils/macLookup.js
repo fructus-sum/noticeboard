@@ -14,7 +14,7 @@ const { plainAddress } = require('./network');
 const getMAC = promisify(arp.getMAC);
 
 // "This Pi itself" for MAC filtering: exactly these, including an empty address (unlike
-// network.isLoopback, which is used for kiosk exits). Kept as it is on purpose (CURRENT_SYSTEM_DESIGN §14 D6).
+// network.isLoopback, which is used for kiosk exits). Kept as it is on purpose (SYSTEM_DESIGN §14 D6).
 const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost', '']);
 
 function isLocalhost(ip) {

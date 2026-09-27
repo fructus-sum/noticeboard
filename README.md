@@ -93,7 +93,7 @@ The server Pi checks GitHub every 15 minutes and installs new versions by itself
 
 Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch. Its `installer.version` must match `INSTALLER_VERSION` in `installers/install.sh`: raise both (and add a line to `installer.changes`) whenever the installer changes what updates can't, such as the kiosk scripts (`installers/kiosk/`) or system services.
 
-**How the code fits together** is in [`docs/design/CURRENT_SYSTEM_DESIGN.md`](docs/design/CURRENT_SYSTEM_DESIGN.md): the parts and what each owns, the files they share, and what installed Pis and open screens rely on, which must not change. Update it in the same commit as the code it describes.
+**How the code fits together** is in [`docs/design/SYSTEM_DESIGN.md`](docs/design/SYSTEM_DESIGN.md): the parts and what each owns, the files they share, and what installed Pis and open screens rely on, which must not change. Update it in the same commit as the code it describes.
 
 ```bash
 npm install

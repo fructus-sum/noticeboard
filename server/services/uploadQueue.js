@@ -15,7 +15,7 @@
 //
 // Change impact
 //   Uploads wait in tmp/noticeboard-uploads until processed: update.sh waits while it has a recent
-//   file, so the path must not change (CURRENT_SYSTEM_DESIGN §15).
+//   file, so the path must not change (SYSTEM_DESIGN §15).
 const PQueue = require('p-queue').default;
 const fs = require('fs');
 const path = require('path');

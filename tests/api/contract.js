@@ -1,4 +1,4 @@
-// The HTTP and socket contract (CURRENT_SYSTEM_DESIGN §4, §15): every route's status code, content
+// The HTTP and socket contract (SYSTEM_DESIGN §4, §15): every route's status code, content
 // type and JSON shape, plus the exact texts that other programs compare (the MAC-denied page, the
 // kiosk-exit answer, the login cookie). The first run on the baseline records
 // tests/fixtures/api-contract.json (or NB_UPDATE_SNAPSHOT=1 records it again); every later run must

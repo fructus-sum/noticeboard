@@ -2,7 +2,7 @@
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
 # The branch-name rule exists twice: in bash (installers/lib/branch.sh, for update.sh and
 # install.sh) and in JavaScript for the server's
-# branch switch (see CURRENT_SYSTEM_DESIGN §14 D26). Both must accept and refuse exactly the same names:
+# branch switch (see SYSTEM_DESIGN §14 D26). Both must accept and refuse exactly the same names:
 # tests/fixtures/branch-names.txt.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FIXTURE="$REPO/tests/fixtures/branch-names.txt"

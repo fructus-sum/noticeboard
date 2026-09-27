@@ -11,7 +11,7 @@
 //
 // Change impact
 //   The URLs, status codes and JSON shapes are a contract with open admin panels, the kiosk scripts
-//   and update.sh's health check (CURRENT_SYSTEM_DESIGN §4.1, §15).
+//   and update.sh's health check (SYSTEM_DESIGN §4.1, §15).
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const macFilter = require('../../middleware/macFilter');

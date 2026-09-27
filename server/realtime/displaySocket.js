@@ -22,7 +22,7 @@
 //
 // Change impact
 //   /socket.io, the event names and their payloads are a contract with screens already open,
-//   which run the old viewer until they reload (CURRENT_SYSTEM_DESIGN §15). A display reloads when
+//   which run the old viewer until they reload (SYSTEM_DESIGN §15). A display reloads when
 //   display:build changes.
 const { Server } = require('socket.io');
 const schedulerService = require('../services/schedulerService');

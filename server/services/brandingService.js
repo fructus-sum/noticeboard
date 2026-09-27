@@ -13,7 +13,7 @@
 //
 // Change impact
 //   displaySettings() is the display:settings payload, a contract with open screens
-//   (CURRENT_SYSTEM_DESIGN §15).
+//   (SYSTEM_DESIGN §15).
 const fs = require('fs');
 const sharp = require('sharp');
 const configService = require('./configService');

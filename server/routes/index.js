@@ -1,6 +1,6 @@
 // server/routes/index.js — every URL the server answers, mounted in order
 //
-// The order matters (CURRENT_SYSTEM_DESIGN §3.3): media, the user guide and the logo come before
+// The order matters (SYSTEM_DESIGN §3.3): media, the user guide and the logo come before
 // the admin panel's catch-all; the API before the viewer's catch-all at /. Everything except
 // /api/auth, /api/device and the admin API is behind the MAC filter here; the API sets its own
 // guards (routes/api/index.js).
@@ -14,7 +14,7 @@
 //
 // Change impact
 //   The URLs are a contract with kiosk scripts, help shortcuts and open browser tabs: they must
-//   not change (CURRENT_SYSTEM_DESIGN §15).
+//   not change (SYSTEM_DESIGN §15).
 const express = require('express');
 const path = require('path');
 const macFilter = require('../middleware/macFilter');

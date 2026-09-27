@@ -16,7 +16,7 @@
 //
 // Change impact
 //   The playlist is the viewer's contract, including screens still running an older viewer
-//   (CURRENT_SYSTEM_DESIGN §15): keep its shape. The viewer compares whole playlists to decide
+//   (SYSTEM_DESIGN §15): keep its shape. The viewer compares whole playlists to decide
 //   whether anything changed.
 const configService = require('./configService');
 const store = require('./slideshowStore');

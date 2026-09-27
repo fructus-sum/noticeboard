@@ -22,7 +22,7 @@
 //
 // Change impact
 //   The event names are a contract with screens already open, which run the old viewer until
-//   they reload: they must never change (CURRENT_SYSTEM_DESIGN §15). The /media URLs are served by
+//   they reload: they must never change (SYSTEM_DESIGN §15). The /media URLs are served by
 //   the server and used in open admin pages.
 import contract from './contract.json';
 

@@ -23,7 +23,7 @@
 # Change impact
 #   What it installs that updates can't change (kiosk scripts, units, shortcuts, packages) only
 #   reaches a Pi when the installer runs again: raise INSTALLER_VERSION with such a change
-#   (CURRENT_SYSTEM_DESIGN §8, §15). tests/installers compares what it writes with golden files.
+#   (SYSTEM_DESIGN §8, §15). tests/installers compares what it writes with golden files.
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────

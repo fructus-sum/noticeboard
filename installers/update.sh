@@ -21,7 +21,7 @@
 #   noticeboard-update.service (its timer and path units), set up by install.sh
 # Uses
 #   installers/lib/branch.sh and lib/json.sh (loaded before main); git, npm, systemctl, curl; the
-#   files it shares with the server (CURRENT_SYSTEM_DESIGN §4.2); GET /api/auth/status after a
+#   files it shares with the server (SYSTEM_DESIGN §4.2); GET /api/auth/status after a
 #   restart
 # Change impact
 #   This file runs the next update on every Pi that installed it: a mistake here can stop updates

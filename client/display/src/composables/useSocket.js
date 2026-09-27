@@ -10,7 +10,7 @@
 // Uses: socket.io-client, SOCKET_EVENTS from @shared, recovery.js (reloadSoon)
 //
 // Change impact
-//   The event names and payloads are a contract with the server (CURRENT_SYSTEM_DESIGN §3.4, §15).
+//   The event names and payloads are a contract with the server (SYSTEM_DESIGN §3.4, §15).
 import { ref, onUnmounted } from 'vue';
 import { io } from 'socket.io-client';
 import { SOCKET_EVENTS } from '@shared/index.js';

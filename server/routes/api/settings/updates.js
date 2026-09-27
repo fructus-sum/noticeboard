@@ -11,7 +11,7 @@
 //
 // Change impact
 //   The admin panel of the running version reads these; update.sh never calls them (it shares
-//   files with the server instead: CURRENT_SYSTEM_DESIGN §4.2).
+//   files with the server instead: SYSTEM_DESIGN §4.2).
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const updateService = require('../../../services/updates');

@@ -16,7 +16,7 @@
 //
 // Change impact
 //   The claim must answer exactly {"exit":true}, without spaces: installed kiosk scripts compare the
-//   text (CURRENT_SYSTEM_DESIGN §15).
+//   text (SYSTEM_DESIGN §15).
 const express = require('express');
 const { lanInterfaces, plainAddress, isLoopback } = require('../../utils/network');
 

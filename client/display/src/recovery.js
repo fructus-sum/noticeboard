@@ -7,14 +7,15 @@
 //   reloadWhenServerUp()        reloads once the server answers
 //   reloadSoon(retryMs)         keeps trying until it does (e.g. a new build after an update)
 //   recoverByReloading(reason)  the last resort when the page seems broken; at most once per half
-//                               hour (localStorage noticeboard:lastRecoveryReload)
+//                               hour (sessionStorage noticeboard:lastRecoveryReload, which a reload
+//                               keeps)
 //   startDailyReload(isConnected)  after a day of running, once between 2 and 5 am while connected
 //
 // Used by
 //   App.vue, useSocket (reloadSoon), SlideShow (recoverByReloading)
 //
 // Change impact
-//   The localStorage key is kept by browsers across updates (CURRENT_SYSTEM_DESIGN §5.4).
+//   The storage key is listed in SYSTEM_DESIGN §5.4.
 const STARTED = Date.now();
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_CHECK_MS = 5 * 60 * 1000;

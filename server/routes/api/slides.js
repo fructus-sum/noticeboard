@@ -12,7 +12,7 @@
 //   middleware/uploads, middleware/asyncRoute, services/displayEvents (playlistChanged)
 //
 // Change impact
-//   The slide fields are read by the viewer's playlist and the admin panel (CURRENT_SYSTEM_DESIGN
+//   The slide fields are read by the viewer's playlist and the admin panel (SYSTEM_DESIGN
 //   §5.1, §6).
 const express = require('express');
 const crypto = require('crypto');

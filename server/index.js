@@ -14,7 +14,7 @@
 //   services/schedulerService, utils/logger
 //
 // Change impact
-//   The path server/index.js is in every installed service unit (CURRENT_SYSTEM_DESIGN §15). The
+//   The path server/index.js is in every installed service unit (SYSTEM_DESIGN §15). The
 //   order matters: the socket must exist before the scheduler first announces (§3.2).
 const http = require('http');
 const configService = require('./services/configService');
