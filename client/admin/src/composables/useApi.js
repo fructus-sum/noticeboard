@@ -7,7 +7,8 @@
 //   401, so that only a real logout leads to the login page.
 //
 // Provides
-//   api.get(path, options) / post(path, body, options) / put(path, body, options) / del(path, options)
+//   api.get(path, options) / post(path, body, options) / put(path, body, options) /
+//   patch(path, body, options) / del(path, options)
 //   api.upload(path, formData, options)   multipart (the browser sets the boundary)
 //     path is under /api. options.redirectOn401 = false: a 401 is thrown as an error instead of
 //     leaving the page (the login page and the router's login check use that).
@@ -51,6 +52,7 @@ export const api = {
   get: (path, options) => request('GET', path, options),
   post: (path, body, options) => request('POST', path, { ...options, body }),
   put: (path, body, options) => request('PUT', path, { ...options, body }),
+  patch: (path, body, options) => request('PATCH', path, { ...options, body }),
   del: (path, options) => request('DELETE', path, options),
   upload: (path, form, options) => request('POST', path, { ...options, form }),
 };

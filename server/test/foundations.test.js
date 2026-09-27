@@ -1,6 +1,6 @@
 // The shared foundations behave exactly like the copies they replaced (SYSTEM_DESIGN §14 D6, D7, D14,
 // D18): the address helpers, the "this Pi itself" rule for MAC filtering, the media type lists and
-// the socket event names.
+// the socket event names. Also the media name rule and what the admin panel shows as a name (D38).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { plainAddress, isLoopback, lanInterfaces } = require('../utils/network');
@@ -75,6 +75,32 @@ test('the web apps make the same media URLs as the server, and use the same limi
     assert.equal(shared.mediaUrl(folder, file), mediaUrl(folder, file));
   }
   assert.equal(shared.mediaUrl('my-slideshow', 'a.png'), '/media/my-slideshow/slides/a.png');
-  assert.deepEqual(shared.LIMITS, { passwordMinLength: 8, slideSeconds: { min: 1, max: 3600 } });
+  assert.deepEqual(shared.LIMITS, { passwordMinLength: 8, slideSeconds: { min: 1, max: 3600 }, mediaNameMax: 200 });
   assert.deepEqual(shared.SOCKET_EVENTS, contract.socketEvents);
+});
+
+test('media names: the rule the server stores names by (D38)', () => {
+  const { MAX_LENGTH, cleanName, nameFromUpload } = require('../services/mediaNames');
+  assert.equal(MAX_LENGTH, contract.limits.mediaNameMax);
+  assert.equal(cleanName('  Summer fair.jpg \n'), 'Summer fair.jpg');
+  assert.equal(cleanName('a\u0000b\u001fc\u007fd'), 'abcd');
+  assert.equal(cleanName(''), '');
+  assert.equal(cleanName(null), '');
+  assert.equal(cleanName('Café – 日本'), 'Café – 日本');
+  assert.equal(nameFromUpload('C:\\Users\\me\\Pictures\\poster.png'), 'poster.png');
+  assert.equal(nameFromUpload('dir/sub/poster.png'), 'poster.png');
+  assert.equal(nameFromUpload(''), null);
+  assert.equal(nameFromUpload(undefined), null);
+  assert.equal([...nameFromUpload('é'.repeat(300))].length, MAX_LENGTH);   // cut, never refused
+});
+
+test('mediaDisplayName: own name, else the uploaded name, else type and date added', async () => {
+  const { mediaDisplayName } = await sharedModule();
+  assert.equal(mediaDisplayName({ name: 'Front desk', originalName: 'IMG_1.png', type: 'image' }), 'Front desk');
+  assert.equal(mediaDisplayName({ originalName: 'IMG_1.png', type: 'image' }), 'IMG_1.png');
+  assert.equal(mediaDisplayName({ name: '', originalName: 'IMG_1.png', type: 'image' }), 'IMG_1.png');
+  const old = mediaDisplayName({ type: 'video', addedAt: '2026-03-12T14:02:00.000Z', originalName: null });
+  assert.match(old, /^Video, added .*2026/);
+  assert.equal(mediaDisplayName({ type: 'image' }), 'Image');
+  assert.equal(mediaDisplayName({ type: 'image', addedAt: 'not a date' }), 'Image');
 });

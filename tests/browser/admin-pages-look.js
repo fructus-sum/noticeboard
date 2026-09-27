@@ -3,10 +3,11 @@
 // the Software updates card with its branch check and switch dialog. Recorded in
 // tests/fixtures/admin-pages-look.json from the code before these pages were split into
 // components; they must look exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
+// The copy runs on a fixed branch name, so its texts are the same whichever branch the tests run from.
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, sleep, git } = require('../helpers/app.js');
 
 const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'admin-pages-look.json');
 const PROPS = ['display', 'position', 'width', 'height', 'margin', 'padding', 'border', 'border-radius', 'outline',
@@ -37,6 +38,7 @@ async function capture(c, map, prefix) {
 
 (async () => {
   const env = makeApp({ port: 3938, keepSample: true });
+  git(env.APP, 'checkout', '-q', '-B', 'feature/look-test');   // the Software updates card shows it
   // The updater's systemd units, so branch switching is available
   const units = path.join(env.T, 'systemd');
   fs.mkdirSync(path.join(units, 'timers.target.wants'), { recursive: true });

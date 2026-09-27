@@ -134,6 +134,9 @@ function lanAddress() {
   records['media headers'] = { content: [media.res.headers.get('accept-ranges')] };
   await a('slides: reorder, bad body', 'PUT', `/api/slideshows/${folder}/slides/reorder`, { body: { order: 'x' }, exact: true });
   await a('slides: reorder', 'PUT', `/api/slideshows/${folder}/slides/reorder`, { body: { order: [id] } });
+  await a('slide: rename', 'PATCH', `/api/slideshows/${folder}/slides/${id}`, { body: { name: 'Front desk' } });
+  await a('slide: rename, too long', 'PATCH', `/api/slideshows/${folder}/slides/${id}`, { body: { name: 'x'.repeat(201) }, exact: true });
+  await a('slide: rename, missing', 'PATCH', `/api/slideshows/${folder}/slides/no-such-slide`, { body: { name: 'x' }, exact: true });
   await a('slides: thumbnails', 'POST', `/api/slideshows/${folder}/slides/thumbnails`, { exact: true });
   await s.api('PUT', `/api/slideshows/${folder}`, { enabled: true });
 

@@ -2,17 +2,19 @@
 // client/admin/src/components/slideshow/SlideList.vue — a slideshow's slides on its page
 //
 // Responsibilities
-//   Uploading (several files at once), the rows with a thumbnail, type, file name and status,
-//   moving a slide up or down, deleting one, making missing video thumbnails, and the larger
-//   preview (hover shows it, a click or tap pins it; Esc or ✕ closes it). While a slide is being
-//   processed or its thumbnail made, the list reloads every 2 seconds until none is.
+//   Uploading (several files at once), the rows with a thumbnail, name, type, stored file name and
+//   status, renaming a slide (✎: Enter or leaving the field saves, Esc cancels; an empty name goes
+//   back to the uploaded file's name), moving a slide up or down, deleting one, making missing
+//   video thumbnails, and the larger preview (hover shows it, a click or tap pins it; Esc or ✕
+//   closes it). While a slide is being processed or its thumbnail made, the list reloads every 2
+//   seconds until none is.
 //
 // Props: folder. v-model:slides, the list as the server returns it (the page loads it first).
 //
 // Used by: views/SlideshowDetailView
-// Uses: useApi (the slides routes), SlidePreview; mediaUrl from @shared
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { mediaUrl } from '@shared/index.js';
+// Uses: useApi (the slides routes), SlidePreview; mediaUrl, mediaDisplayName and LIMITS from @shared
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { mediaUrl, mediaDisplayName, LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import SlidePreview from './SlidePreview.vue';
 
@@ -107,11 +109,41 @@ watch(hasProcessing, (v) => {
   }
 }, { immediate: true });
 
-async function deleteSlide(id) {
-  if (!confirm('Delete this slide?')) return;
+// Renaming: one slide at a time, in place of its name
+const renaming = ref(null);   // { id, value, saving, error }
+const renameInput = ref(null);
+
+async function startRename(slide) {
+  renaming.value = { id: slide.id, value: slide.name || slide.originalName || '', saving: false, error: '' };
+  await nextTick();
+  renameInput.value?.[0]?.select();
+}
+function cancelRename() {
+  renaming.value = null;
+}
+async function saveRename() {
+  const r = renaming.value;
+  if (!r || r.saving) return;
+  const slide = slides.value.find(s => s.id === r.id);
+  if (!slide) return cancelRename();
+  const name = r.value.trim();
+  if (name === (slide.name || slide.originalName || '') || (!name && !slide.name)) return cancelRename();
+  r.saving = true;
   try {
-    await api.del(`/slideshows/${props.folder}/slides/${id}`);
-    slides.value = slides.value.filter(s => s.id !== id);
+    const saved = await api.patch(`/slideshows/${props.folder}/slides/${r.id}`, { name });
+    slides.value = slides.value.map(s => (s.id === saved.id ? saved : s));
+    renaming.value = null;
+  } catch (e) {
+    r.saving = false;
+    r.error = e.message;
+  }
+}
+
+async function deleteSlide(slide) {
+  if (!confirm(`Delete “${mediaDisplayName(slide)}”?`)) return;
+  try {
+    await api.del(`/slideshows/${props.folder}/slides/${slide.id}`);
+    slides.value = slides.value.filter(s => s.id !== slide.id);
   } catch (e) {
     alert(e.message);
   }
@@ -168,7 +200,7 @@ onUnmounted(() => {
       <button
         type="button"
         class="slide-thumb"
-        :aria-label="`Show slide ${i + 1} larger`"
+        :aria-label="`Show “${mediaDisplayName(slide)}” larger`"
         @mouseenter="hoverStart(slide, i)"
         @mouseleave="hoverEnd"
         @click="pinPreview(slide, i)"
@@ -180,17 +212,32 @@ onUnmounted(() => {
         </template>
         <div v-else class="slide-thumb__icon">?</div>
       </button>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;color:var(--text-muted)">
-          {{ slide.type }}<template v-if="slide.thumbnailPending"> · making a thumbnail…</template>
+      <div class="slide-info">
+        <template v-if="renaming?.id === slide.id">
+          <input
+            ref="renameInput"
+            v-model="renaming.value"
+            class="slide-name-input"
+            :maxlength="LIMITS.mediaNameMax"
+            :disabled="renaming.saving"
+            aria-label="Slide name"
+            @keydown.enter.prevent="saveRename"
+            @keydown.esc.stop="cancelRename"
+            @blur="saveRename"
+          />
+          <div v-if="renaming.error" class="error-msg" style="font-size:12px">{{ renaming.error }}</div>
+        </template>
+        <div v-else class="slide-name">{{ mediaDisplayName(slide) }}</div>
+        <div class="slide-detail">
+          {{ slide.type }}<template v-if="slide.filename"> · {{ slide.filename }}</template><template v-if="slide.thumbnailPending"> · making a thumbnail…</template>
         </div>
-        <div style="font-size:12px;word-break:break-all">{{ slide.filename ?? '—' }}</div>
       </div>
       <span class="badge" :class="`badge--${slide.status}`">{{ slide.status }}</span>
       <div style="display:flex;gap:4px">
+        <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :aria-label="`Rename “${mediaDisplayName(slide)}”`" title="Rename" :disabled="renaming?.id === slide.id" @click="startRename(slide)">✎</button>
         <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :disabled="i === 0" @click="move(i, -1)">↑</button>
         <button class="btn-ghost" style="padding:4px 8px;font-size:12px" :disabled="i === slides.length - 1" @click="move(i, 1)">↓</button>
-        <button class="btn-danger" style="padding:4px 8px;font-size:12px" @click="deleteSlide(slide.id)">✕</button>
+        <button class="btn-danger" style="padding:4px 8px;font-size:12px" @click="deleteSlide(slide)">✕</button>
       </div>
     </div>
   </div>
@@ -215,6 +262,11 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--border);
 }
 .slide-row:last-child { border-bottom: none; }
+
+.slide-info { flex: 1; min-width: 0; }
+.slide-name { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.slide-name-input { width: 100%; font-size: 14px; padding: 3px 6px; }
+.slide-detail { font-size: 12px; color: var(--text-muted); word-break: break-all; }
 
 .slide-thumb {
   position: relative;

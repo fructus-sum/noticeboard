@@ -540,6 +540,7 @@
         "duration": "null",
         "filename": "null",
         "id": "string",
+        "originalName": "string",
         "status": "string",
         "type": "string"
       }
@@ -556,6 +557,7 @@
         "duration": "null",
         "filename": "string",
         "id": "string",
+        "originalName": "string",
         "status": "string",
         "type": "string"
       }
@@ -591,10 +593,41 @@
         "duration": "null",
         "filename": "string",
         "id": "string",
+        "originalName": "string",
         "status": "string",
         "type": "string"
       }
     ]
+  },
+  "slide: rename": {
+    "method": "PATCH",
+    "path": "/api/slideshows/contract-test/slides/:id",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "duration": "null",
+      "filename": "string",
+      "id": "string",
+      "name": "string",
+      "originalName": "string",
+      "status": "string",
+      "type": "string"
+    }
+  },
+  "slide: rename, too long": {
+    "method": "PATCH",
+    "path": "/api/slideshows/contract-test/slides/:id",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"A name can be at most 200 characters\"}"
+  },
+  "slide: rename, missing": {
+    "method": "PATCH",
+    "path": "/api/slideshows/contract-test/slides/no-such-slide",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Slide not found\"}"
   },
   "slides: thumbnails": {
     "method": "POST",
