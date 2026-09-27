@@ -22,7 +22,7 @@ const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'u
 
 git(T, 'clone', '-q', REPO, 'app');
 copyChanges(APP);
-git(APP, 'add', '-A'); process.env.GIT_COMMITTER_DATE = '2026-03-04T05:06:07Z'; git(APP, 'checkout', '-q', '-B', 'main'); git(APP, 'commit', '-qm', 'sidebar'); delete process.env.GIT_COMMITTER_DATE;
+git(APP, 'add', '-A'); process.env.GIT_COMMITTER_DATE = '2026-03-04T05:06:07Z'; git(APP, 'checkout', '-q', '-B', 'main'); git(APP, 'commit', '-qm', 'sidebar', '--allow-empty'); delete process.env.GIT_COMMITTER_DATE;
 for (const d of ['client/admin/dist', 'client/display/dist']) fs.cpSync(path.join(REPO, d), path.join(APP, d), { recursive: true });
 fs.mkdirSync(path.join(APP, 'data/slideshows'), { recursive: true });
 fs.writeFileSync(path.join(APP, 'data/config.json'), JSON.stringify({
