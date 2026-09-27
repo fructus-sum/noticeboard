@@ -9,7 +9,7 @@ pass=0; fail=0
 # shellcheck source=/dev/null
 source <(sed '$d' "$REPO/installers/update.sh")
 js=$(cd "$REPO" && node -e "
-  const { validBranchName } = require('./server/services/updateService');
+  const { validBranchName } = require('./server/services/updates/branchName');
   const lines = require('fs').readFileSync(process.argv[1], 'utf8').split('\n').filter((l) => /^(valid|invalid) /.test(l));
   for (const l of lines) console.log(validBranchName(l.replace(/^\S+ /, '')) ? 'valid' : 'invalid');
 " "$FIXTURE")

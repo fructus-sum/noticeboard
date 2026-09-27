@@ -43,6 +43,8 @@ printf '#!/usr/bin/env bash\n/usr/bin/sleep 0.2\n' > "$T/bin/sleep"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$T/bin/xset"
 chmod +x "$T/bin/"*
 reset() { rm -f "$T"/curl.count "$T"/curl.log "$T"/launch.log "$T"/logger.log "$T"/crashed "$T"/exit-asked; }
+# The kiosk opens its normal window in the background (nohup … &) and ends at once, so the
+# launch is waited for, not just looked for
 waitfor() { for _ in $(seq 150); do grep -q -- "$2" "$1" 2>/dev/null && return 0; /usr/bin/sleep 0.1; done; return 1; }
 kiosk_launches() { grep -c -- "--kiosk" "$T/launch.log" 2>/dev/null || echo 0; }
 stray_kill() { for p in $(ps -ef | grep "/usr/bin/sleep 1000" | grep -v grep | awk '{print $2}'); do kill "$p" 2>/dev/null; done; }
@@ -61,7 +63,7 @@ before=$(kiosk_launches)
 touch "$T/exit-asked"
 if finished "$K"; then wait "$K"; rc=$?; else rc=running; fi
 [ "$rc" = 0 ] && ok "server kiosk: exit asked -> the script ends (no more restarts)" || bad "server exit (rc=$rc)"
-grep -q "LAUNCH --no-first-run http://localhost:3000/?kiosk=off" "$T/launch.log" && ! grep "kiosk=off" "$T/launch.log" | grep -q -- "--kiosk\|--user-data-dir" \
+waitfor "$T/launch.log" "LAUNCH --no-first-run http://localhost:3000/?kiosk=off" && ! grep "kiosk=off" "$T/launch.log" | grep -q -- "--kiosk\|--user-data-dir" \
   && ok "server kiosk: reopens the viewer in a normal window of the desktop browser" || { bad "server normal window"; cat "$T/launch.log"; }
 [ "$(kiosk_launches)" = "$before" ] && grep -q "Leaving kiosk mode" "$T/logger.log" && ok "server kiosk: logged, and the kiosk browser isn't relaunched" || bad "server no relaunch"
 [ -z "$(ps -ef | grep '/usr/bin/sleep 1000' | grep -v grep)" ] && ok "server kiosk: the full-screen browser was closed" || { bad "server browser still running"; stray_kill; }
@@ -80,7 +82,7 @@ grep "LAUNCH .*--kiosk http://192.168.1.10:3000" "$T/launch.log" | grep -q -- "-
 grep -q "http://192.168.1.10:3000/api/device/kiosk-exit/claim" "$T/curl.log" && ok "remote: asks its server about exit requests" || bad "remote polling"
 touch "$T/exit-asked"
 if finished "$K"; then wait "$K"; rc=$?; else rc=running; fi
-[ "$rc" = 0 ] && grep -q "LAUNCH --no-first-run http://192.168.1.10:3000/?kiosk=off" "$T/launch.log" && grep -q "Leaving kiosk mode" "$T/logger.log" \
+[ "$rc" = 0 ] && waitfor "$T/launch.log" "LAUNCH --no-first-run http://192.168.1.10:3000/?kiosk=off" && grep -q "Leaving kiosk mode" "$T/logger.log" \
   && ok "remote: exit asked -> normal window, script ends" || { bad "remote exit (rc=$rc)"; cat "$T/launch.log"; }
 stray_kill
 

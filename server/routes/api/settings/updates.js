@@ -3,7 +3,7 @@
 // final confirmation with that token. installers/update.sh does the actual update.
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const updateService = require('../../../services/updateService');
+const updateService = require('../../../services/updates');
 const adminPassword = require('../../../services/adminPassword');
 const { route, jsonRoute } = require('../../../middleware/asyncRoute');
 const logger = require('../../../utils/logger');

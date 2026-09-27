@@ -1,5 +1,5 @@
 # Branch names the updater (installers/update.sh valid_branch) and the server
-# (validBranchName in the updates service) must both accept (valid) or both refuse (invalid).
+# (validBranchName in server/services/updates/branchName.js) must both accept (valid) or both refuse (invalid).
 valid main
 valid QALife-updates
 valid refactor/architecture
