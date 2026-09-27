@@ -22,7 +22,7 @@ function lanAddress() {
   }
   const env = makeApp({ port: 3927 });
   const s = server(env);
-  await s.start({ NODE_ENV: 'development' });   // debug logging: one "MAC resolved" line per lookup
+  await s.start({ NOTICEBOARD_LOG_LEVEL: 'debug' });   // one "MAC resolved" line per lookup
   await s.login();
   const folder = (await s.api('POST', '/api/slideshows', { name: 'Checked once' })).data.folder;
   const log = path.join(env.APP, 'logs', 'app.log');

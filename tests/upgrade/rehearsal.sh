@@ -61,6 +61,7 @@ unlink_modules() {
 
 supervise() {   # systemd's Restart=always for noticeboard.service
   while [ ! -f "$MOCK/stop" ]; do
+    # NODE_ENV is for the baseline: code before stage 10b read it (the .env on a real Pi sets it)
     ( cd "$PI" && NODE_ENV=production exec node server/index.js ) >> "$MOCK/server.log" 2>&1 &
     echo $! > "$MOCK/pid"
     wait $!
@@ -106,6 +107,7 @@ git init -q --bare -b main "$T/origin.git"
 git -C "$REPO" push -q "$T/origin.git" "$BASELINE:refs/heads/main" || { bad "baseline $BASELINE not found"; exit 1; }
 git -c core.autocrlf=false clone -q "$REPO" "$T/cand"
 ( cd "$REPO" && git ls-files -z --modified --others --exclude-standard ) | while IFS= read -r -d '' f; do
+  [ -e "$REPO/$f" ] || continue   # deleted: removed below (git lists it as modified too)
   mkdir -p "$T/cand/$(dirname "$f")"; cp "$REPO/$f" "$T/cand/$f"
 done
 ( cd "$REPO" && git ls-files -z --deleted ) | while IFS= read -r -d '' f; do rm -f "$T/cand/$f"; done

@@ -10,7 +10,7 @@
 //   installedVersion()          → Promise<number | null>  the last installer run's version. Pis
 //                                 set up before the record existed are told apart by the kiosk
 //                                 script they got (with the exit button: 1, else 0). null: not set
-//                                 up by the installer (e.g. a development copy): nothing to say
+//                                 up by the installer (e.g. a copy on a PC): nothing to say
 //   installerNeeds(list, installed) → { required, installed, needed, changes, displays }
 //                                 for a version whose system-requirements.json is <list>; changes
 //                                 are only the versions this Pi missed; displays: remote display

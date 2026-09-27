@@ -21,7 +21,7 @@ if (process.env.NB_SHUTDOWN_CHILD) {
   const env = makeApp({ port: 3925 });
   const child = spawn(process.execPath, [__filename], {
     cwd: env.APP,
-    env: { ...process.env, NB_SHUTDOWN_CHILD: '1', NB_BASE: env.base, NODE_PATH: MODULES, NODE_ENV: 'production' },
+    env: { ...process.env, NB_SHUTDOWN_CHILD: '1', NB_BASE: env.base, NODE_PATH: MODULES },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   let out = '';

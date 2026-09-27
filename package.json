@@ -8,7 +8,6 @@
     "client/admin"
   ],
   "scripts": {
-    "dev": "npm -w noticeboard-server run dev",
     "build": "npm -w noticeboard-display run build && npm -w noticeboard-admin run build",
     "start": "node server/index.js",
     "test": "node tests/run.js unit",

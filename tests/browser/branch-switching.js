@@ -3,6 +3,7 @@
 // server restart to the result. Same throwaway setup as test-branch-api.js.
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
+const { copyChanges } = require('../helpers/app.js');
 const os = require('os');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
@@ -25,8 +26,7 @@ function setup() {
   git(T, 'init', '-q', '--bare', '-b', 'main', 'origin.git');
   git(T, 'clone', '-q', REPO, 'work');
   const work = path.join(T, 'work');
-  const changed = execFileSync('git', ['ls-files', '--modified', '--others', '--exclude-standard'], { cwd: REPO, encoding: 'utf8' }).split('\n').filter(Boolean);
-  for (const f of changed) { fs.mkdirSync(path.dirname(path.join(work, f)), { recursive: true }); fs.copyFileSync(path.join(REPO, f), path.join(work, f)); }
+  copyChanges(work);
   fs.writeFileSync(path.join(work, 'system-requirements.json'), JSON.stringify({ software: [
     { name: 'Node.js', commands: ['node'], versionArgs: ['--version'], versions: '>=20.19.0', neededFor: 'the server', install: 'the installer' },
     { name: 'Git', commands: ['git'], versionArgs: ['--version'], versions: '>=2.38.0', neededFor: 'updates', install: 'sudo apt install git' },
@@ -80,7 +80,7 @@ function runUpdater() {
 }
 let server;
 async function startServer() {
-  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_ENV: 'production', NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD }, stdio: 'ignore' });
+  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD }, stdio: 'ignore' });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + '/api/auth/status')).ok) return; } catch { /* not yet */ } await sleep(250); }
   throw new Error('server did not start');
 }

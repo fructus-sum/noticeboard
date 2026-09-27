@@ -2,6 +2,7 @@
 // kiosk script an older installer left), and the warning when checking a branch that needs it.
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
+const { copyChanges } = require('../helpers/app.js');
 const os = require('os');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
@@ -27,8 +28,7 @@ function setup() {
   git(T, 'init', '-q', '--bare', '-b', 'main', 'origin.git');
   git(T, 'clone', '-q', REPO, 'work');
   const work = path.join(T, 'work');
-  const changed = execFileSync('git', ['ls-files', '--modified', '--others', '--exclude-standard'], { cwd: REPO, encoding: 'utf8' }).split('\n').filter(Boolean);
-  for (const f of changed) { fs.mkdirSync(path.dirname(path.join(work, f)), { recursive: true }); fs.copyFileSync(path.join(REPO, f), path.join(work, f)); }
+  copyChanges(work);
   fs.writeFileSync(path.join(work, 'system-requirements.json'), requirements(1, [{ version: 1, change: 'The kiosk exit button', displays: true }]));
   git(work, 'checkout', '-q', '-B', 'main');
   git(work, 'add', '-A'); git(work, 'commit', '-qm', 'main');
@@ -65,7 +65,7 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
 
 (async () => {
   setup();
-  const server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_ENV: 'production', NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD }, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD }, stdio: 'ignore' });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + '/api/auth/status')).ok) break; } catch { /* not yet */ } await sleep(250); }
   check('logged out: the installer status needs a login', (await fetch(BASE + '/api/settings/updates/installer')).status === 401);
 

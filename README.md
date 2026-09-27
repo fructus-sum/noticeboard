@@ -95,8 +95,8 @@ Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumb
 
 ```bash
 npm install
-npm run dev        # the server, with both web apps served live on the same port
-npm run build      # production builds, into client/display/dist and client/admin/dist
+npm run build      # both web apps, into client/display/dist and client/admin/dist
+npm start          # the server: the viewer at http://localhost:3000/, the admin panel at /admin
 npm test           # unit tests: slide timing, installer versions, the Node.js version rule
 npm run test:all   # everything below, in turn (build first)
 ```
@@ -110,9 +110,9 @@ The other test groups each run a throwaway copy of the app, never this folder's 
 
 Video tests need ffmpeg: on the `PATH`, or set `FFMPEG_PATH` and `FFPROBE_PATH`. The installer tests need bash (Git Bash on Windows).
 
-`npm run dev` serves everything on `http://localhost:3000`, with hot reload: the viewer at `/`, the admin panel at `/admin`, exactly as in production.
+There is one version of the software: run on a PC, it works exactly as on a Pi. After changing the viewer or the admin panel, run `npm run build` again; after changing the server, restart it. Changes are tried out on a GitHub branch, which a Pi can follow (Settings → Software updates).
 
-Runtime settings live in `data/config.json` (created on first run); slideshows and their slides in `data/slideshows/`. `.env` sets `NODE_ENV=production` on the Pi, and `SECURE_COOKIES=true` only when serving over HTTPS.
+Runtime settings live in `data/config.json` (created on first run); slideshows and their slides in `data/slideshows/`. On a Pi, systemd loads `/opt/noticeboard/.env`: `SECURE_COOKIES=true` only when serving over HTTPS, and `NOTICEBOARD_LOG_LEVEL=debug` for more detail in the log when troubleshooting.
 
 ## License
 

@@ -3,6 +3,7 @@
 // without git: the Last updated line is simply absent.
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
+const { copyChanges } = require('../helpers/app.js');
 const os = require('os');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
@@ -20,9 +21,7 @@ const check = (name, pass, detail = '') => { ok &&= !!pass; console.log(`${pass 
 const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
 git(T, 'clone', '-q', REPO, 'app');
-for (const f of execFileSync('git', ['ls-files', '--modified', '--others', '--exclude-standard'], { cwd: REPO, encoding: 'utf8' }).split('\n').filter(Boolean)) {
-  fs.mkdirSync(path.dirname(path.join(APP, f)), { recursive: true }); fs.copyFileSync(path.join(REPO, f), path.join(APP, f));
-}
+copyChanges(APP);
 git(APP, 'add', '-A'); process.env.GIT_COMMITTER_DATE = '2026-03-04T05:06:07Z'; git(APP, 'checkout', '-q', '-B', 'main'); git(APP, 'commit', '-qm', 'sidebar', '--allow-empty'); delete process.env.GIT_COMMITTER_DATE;
 for (const d of ['client/admin/dist', 'client/display/dist']) fs.cpSync(path.join(REPO, d), path.join(APP, d), { recursive: true });
 fs.mkdirSync(path.join(APP, 'data/slideshows'), { recursive: true });
@@ -34,7 +33,7 @@ fs.writeFileSync(path.join(APP, 'data/config.json'), JSON.stringify({
 
 let server;
 async function startServer() {
-  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_ENV: 'production', NODE_PATH: MODULES }, stdio: 'ignore' });
+  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES }, stdio: 'ignore' });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + '/api/auth/status')).ok) return; } catch { /* not yet */ } await sleep(250); }
   throw new Error('server did not start');
 }

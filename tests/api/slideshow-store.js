@@ -65,7 +65,7 @@ if (process.env.NB_STORE_CHILD) {
 } else {
   const env = makeApp({ port: 3929 });
   const child = spawnSync(process.execPath, [__filename], {
-    cwd: env.APP, env: { ...process.env, NB_STORE_CHILD: '1', NODE_PATH: MODULES, NODE_ENV: 'production' }, encoding: 'utf8',
+    cwd: env.APP, env: { ...process.env, NB_STORE_CHILD: '1', NODE_PATH: MODULES }, encoding: 'utf8',
   });
   const line = (child.stdout || '').trim().split('\n').filter((l) => l.startsWith('[')).pop();
   const results = line ? JSON.parse(line) : [{ name: 'the child ran', pass: false, detail: (child.stderr || '').slice(-500) }];

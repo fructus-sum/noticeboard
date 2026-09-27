@@ -30,7 +30,7 @@ async function waitUp() {
   throw new Error('server did not start');
 }
 async function startServer() {
-  server = spawn(process.execPath, ['server/index.js'], { cwd: appDir, env: { ...process.env, NODE_ENV: 'production', NODE_PATH: modules }, stdio: 'ignore' });
+  server = spawn(process.execPath, ['server/index.js'], { cwd: appDir, env: { ...process.env, NODE_PATH: modules }, stdio: 'ignore' });
   await waitUp();
   await login();
 }

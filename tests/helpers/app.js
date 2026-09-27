@@ -13,10 +13,12 @@
 //   page(connect, size)        → a Chrome tab (cdp.js) with until/go/login/click/mouse helpers
 //   ffmpegEnv()                → { FFMPEG_PATH, FFPROBE_PATH } when ffmpeg is found, else {} (see hasFfmpeg)
 //   shot(name)                 → a path for a screenshot, outside the repository
+//   copyChanges(dest)          copies this working tree's uncommitted changes onto a clone of it
+//                                (changed and new files; deleted ones removed)
 //   check(name, pass, detail), done(env), sleep, git
 //
 // Used by
-//   tests/api/*, tests/browser/*
+//   tests/api/*, tests/browser/* (the branch tests build their own clone with copyChanges)
 //
 // Uses
 //   git (clone), the built apps in client/*/dist (run `npm run build` first), bcrypt from
@@ -62,15 +64,23 @@ function shot(name) {
   return path.join(SHOTS, name);
 }
 
-// The working tree as a git clone with one extra commit holding uncommitted changes
-function copyWorkingTree(dest) {
-  git(path.dirname(dest), 'clone', '-q', REPO, path.basename(dest));
+// This working tree's uncommitted changes, onto a clone of it at dest. git lists a deleted file as
+// modified too, so deleted files are removed rather than copied.
+function copyChanges(dest) {
   const list = (args) => execFileSync('git', args, { cwd: REPO, encoding: 'utf8' }).split('\n').filter(Boolean);
+  const deleted = new Set(list(['ls-files', '--deleted']));
   for (const f of list(['ls-files', '--modified', '--others', '--exclude-standard'])) {
+    if (deleted.has(f)) continue;
     fs.mkdirSync(path.dirname(path.join(dest, f)), { recursive: true });
     fs.copyFileSync(path.join(REPO, f), path.join(dest, f));
   }
-  for (const f of list(['ls-files', '--deleted'])) fs.rmSync(path.join(dest, f), { force: true });
+  for (const f of deleted) fs.rmSync(path.join(dest, f), { force: true });
+}
+
+// The working tree as a git clone with one extra commit holding uncommitted changes
+function copyWorkingTree(dest) {
+  git(path.dirname(dest), 'clone', '-q', REPO, path.basename(dest));
+  copyChanges(dest);
   git(dest, 'add', '-A');
   git(dest, 'commit', '-qm', 'working tree', '--allow-empty');
 }
@@ -115,7 +125,7 @@ function server(env) {
     async start(extraEnv = {}) {
       proc = spawn(process.execPath, ['server/index.js'], {
         cwd: env.APP,
-        env: { ...process.env, NODE_ENV: 'production', NODE_PATH: MODULES, ...ffmpegEnv(), ...extraEnv },
+        env: { ...process.env, NODE_PATH: MODULES, ...ffmpegEnv(), ...extraEnv },
         stdio: 'ignore',
       });
       running.add(proc);
@@ -168,6 +178,6 @@ function done(env) {
 }
 
 module.exports = {
-  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, copyWorkingTree,
+  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, copyWorkingTree, copyChanges,
   isOk: () => ok,
 };

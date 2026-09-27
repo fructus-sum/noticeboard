@@ -19,10 +19,8 @@ const ADMIN_DIST = adminDistDir();
 const displayRouter = spaFallback(DISPLAY_DIST, { title: 'Noticeboard Display', background: '#000', name: 'Display' });
 const adminRouter = spaFallback(ADMIN_DIST, { title: 'Noticeboard Admin', background: '#1a1a2e', name: 'Admin' });
 
-// `frontends` is only set by npm run dev: Vite then serves the two web apps (with hot reload)
-// instead of their built copies, on this same port
-function mountRoutes(app, frontends = null) {
-  const notReady = (res) => res.status(503).send('Starting…');
+// The two web apps are always their built copies (client/*/dist, made by npm run build)
+function mountRoutes(app) {
   // 1. Media files: images, videos, audio — MAC filtered, streaming-capable
   app.use(
     '/media',
@@ -53,33 +51,20 @@ function mountRoutes(app, frontends = null) {
     res.type('png').send(await placeholderLogo());
   }));
 
-  if (frontends) {
-    // 2–3 (development). Vite expects the full /admin/… path, so this isn't mounted at /admin
-    app.use((req, res, next) => {
-      if (req.path !== '/admin' && !req.path.startsWith('/admin/')) return next();
-      macFilter(req, res, () => (frontends.admin ? frontends.admin(req, res, next) : notReady(res)));
-    });
-  } else {
-    // 2. Admin static assets — MAC filtered; JWT is not required to download the SPA shell
-    app.use('/admin', macFilter, express.static(ADMIN_DIST));
+  // 2. Admin static assets — MAC filtered; JWT is not required to download the SPA shell
+  app.use('/admin', macFilter, express.static(ADMIN_DIST));
 
-    // 3. Admin SPA — serves index.html for all /admin/* Vue Router routes
-    app.use('/admin', macFilter, adminRouter);
-  }
+  // 3. Admin SPA — serves index.html for all /admin/* Vue Router routes
+  app.use('/admin', macFilter, adminRouter);
 
   // 4. API routes
   app.use('/api', require('./api'));
 
-  if (frontends) {
-    // 5–6 (development)
-    app.use('/', macFilter, (req, res, next) => (frontends.display ? frontends.display(req, res, next) : notReady(res)));
-  } else {
-    // 5. Display static assets — MAC filtered
-    app.use('/', macFilter, express.static(DISPLAY_DIST));
+  // 5. Display static assets — MAC filtered
+  app.use('/', macFilter, express.static(DISPLAY_DIST));
 
-    // 6. Display SPA catch-all — MAC filtered
-    app.use('/', macFilter, displayRouter);
-  }
+  // 6. Display SPA catch-all — MAC filtered
+  app.use('/', macFilter, displayRouter);
 }
 
 module.exports = mountRoutes;

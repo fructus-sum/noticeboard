@@ -35,9 +35,8 @@ const logger = require('../utils/logger');
 const { socketEvents: EVENTS } = require('../../shared/contract.json');
 
 function initDisplaySocket(httpServer) {
-  // The displays are always served from this server, so no cross-origin access is needed.
-  // In development, Vite's hot-reload connections share the port: leave those to Vite.
-  const io = new Server(httpServer, { destroyUpgrade: process.env.NOTICEBOARD_DEV !== '1' });
+  // The displays are always served from this server, so no cross-origin access is needed
+  const io = new Server(httpServer);
 
   // Sent on every connect: a display that sees it change reloads to pick up the new build
   const buildId = displayBuildId();

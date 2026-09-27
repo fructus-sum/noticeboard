@@ -453,10 +453,10 @@ install_server() {
     "
   fi
 
-  # ── Production .env ─────────────────────────────────────────────────────────
+  # ── .env (the service's environment; noticeboard.service needs the file) ───────
+  # An older install's file keeps its NODE_ENV=production line, which nothing reads any more
   if [ ! -f "$INSTALL_DIR/.env" ]; then
     cat > "$INSTALL_DIR/.env" <<ENV
-NODE_ENV=production
 SECURE_COOKIES=false
 ENV
   fi

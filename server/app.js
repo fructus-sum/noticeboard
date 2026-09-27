@@ -4,7 +4,7 @@ const helmet = require('helmet');
 const mountRoutes = require('./routes/index');
 const errorHandler = require('./middleware/errorHandler');
 
-function createApp({ frontends = null } = {}) {
+function createApp() {
   const app = express();
 
   app.use(
@@ -17,7 +17,7 @@ function createApp({ frontends = null } = {}) {
   app.use(express.json({ limit: '10mb' }));
   app.use(cookieParser());
 
-  mountRoutes(app, frontends);
+  mountRoutes(app);
 
   app.use(errorHandler);
 
