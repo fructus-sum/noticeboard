@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { api } from '../composables/useApi.js';
+import ModalDialog from './ui/ModalDialog.vue';
 
 // Shown when MAC filtering is switched on: once it's saved, only approved devices can open the
 // displays and the admin panel, so a device that isn't on the list locks itself out.
@@ -29,14 +30,13 @@ async function backToWarning() {
   confirmButton.value?.focus();
 }
 
-function onKey(e) {
-  if (e.key !== 'Escape') return;
+// Esc or a click outside: back to the warning from the how-to, else cancel
+function onClose() {
   if (view.value === 'howto') backToWarning();
   else emit('cancel');
 }
 
 onMounted(async () => {
-  window.addEventListener('keydown', onKey);
   confirmButton.value?.focus();
   try {
     myDevice.value = await api.get('/settings/my-device');
@@ -44,13 +44,16 @@ onMounted(async () => {
     // The warning works without it
   }
 });
-onUnmounted(() => window.removeEventListener('keydown', onKey));
 </script>
 
 <template>
-  <div class="overlay" @click.self="view === 'howto' ? backToWarning() : emit('cancel')">
+  <ModalDialog
+    :role="view === 'warn' ? 'alertdialog' : 'dialog'"
+    :labelledby="view === 'warn' ? 'mac-warn-title' : 'mac-howto-title'"
+    @close="onClose"
+  >
     <!-- First pop-up: the warning -->
-    <div v-if="view === 'warn'" class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="mac-warn-title">
+    <template v-if="view === 'warn'">
       <h2 id="mac-warn-title">Turn on MAC filtering?</h2>
       <p>
         Once this is saved, only the devices on the approved list can open the displays and this admin panel.
@@ -77,10 +80,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
         <button type="button" class="btn-ghost" @click="emit('cancel')">Cancel</button>
         <button ref="confirmButton" type="button" class="btn-primary" @click="emit('confirm')">Turn on MAC filtering</button>
       </div>
-    </div>
+    </template>
 
     <!-- Second pop-up: how to find a MAC address -->
-    <div v-else class="dialog" role="dialog" aria-modal="true" aria-labelledby="mac-howto-title">
+    <template v-else>
       <h2 id="mac-howto-title">How to find your MAC address</h2>
       <p>Use the address of the network connection the device uses to reach the noticeboard: Wi-Fi or wired (Ethernet).</p>
       <dl class="howto">
@@ -109,13 +112,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
       <div class="actions">
         <button ref="okButton" type="button" class="btn-primary" @click="backToWarning">OK</button>
       </div>
-    </div>
-  </div>
+    </template>
+  </ModalDialog>
 </template>
 
 <style scoped>
-.overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; }
-.dialog { background: var(--surface); border-radius: 8px; padding: 22px; width: 100%; max-width: 540px; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); font-size: 13px; line-height: 1.5; }
+/* The overlay and card are ModalDialog's; this pop-up's text is a little more spaced */
+:deep(.dialog) { line-height: 1.5; }
 .dialog p { margin-bottom: 10px; }
 .important { padding: 10px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); color: #92400e; }
 .mine { margin-bottom: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); }

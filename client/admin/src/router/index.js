@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { api } from '../composables/useApi.js';
 import LoginView from '../views/LoginView.vue';
 import SlideshowsView from '../views/SlideshowsView.vue';
 import SlideshowDetailView from '../views/SlideshowDetailView.vue';
@@ -22,12 +23,13 @@ const router = createRouter({
   },
 });
 
+// Every page but the login page needs a login. The check never redirects by itself, so it can't
+// loop: it only answers where to go.
 router.beforeEach(async (to) => {
   if (to.meta.public) return true;
   try {
-    const res = await fetch('/api/auth/status', { credentials: 'include' });
-    const { authenticated } = await res.json();
-    if (!authenticated) return '/login';
+    const status = await api.get('/auth/status', { redirectOn401: false });
+    if (!status?.authenticated) return '/login';
   } catch {
     return '/login';
   }
