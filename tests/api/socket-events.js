@@ -1,8 +1,7 @@
 // What a connected display receives, event by event, for each admin action: which events, how many,
-// and what they carry (the playlist's slides, the display settings). Refactor stage 4 moves the
-// playlist and the socket into their own modules; the sequence must stay exactly the same.
-// Recorded in tests/fixtures/socket-events.json from the code before stage 4
-// (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
+// and what they carry (the playlist's slides, the display settings). Recorded in
+// tests/fixtures/socket-events.json from the code before the playlist and the socket had their
+// own modules; the sequence must stay exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
 const fs = require('fs');
 const path = require('path');
 const { MODULES, makeApp, server, check, done, sleep } = require('../helpers/app.js');

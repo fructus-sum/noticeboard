@@ -1,3 +1,12 @@
+// client/admin/src/router/index.js — the admin panel's pages and its login check
+//
+// Provides
+//   the router, under /admin/: /login, /slideshows (/ goes there), /slideshows/:folder, /settings.
+//   Every page but /login needs a login (GET /auth/status, which never redirects by itself, so it
+//   can't loop). A link with #id (e.g. /settings#password) scrolls to that element.
+//
+// Used by: main.js
+// Uses: useApi, the views
 import { createRouter, createWebHistory } from 'vue-router';
 import { api } from '../composables/useApi.js';
 import LoginView from '../views/LoginView.vue';

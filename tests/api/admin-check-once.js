@@ -1,5 +1,5 @@
-// Every admin API request checks the device (a MAC lookup) and the login once. Before stage 2 the
-// slide routes checked twice (OLD_SYSTEM_DESIGN §16 #5). Counted from the server's debug log,
+// Every admin API request checks the device (a MAC lookup) and the login once. The slide routes
+// used to check twice (CURRENT_SYSTEM_DESIGN §16 #5). Counted from the server's debug log,
 // which records each lookup for a device that isn't this machine; so the requests are made to this
 // PC's network address.
 const fs = require('fs');

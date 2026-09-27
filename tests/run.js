@@ -8,7 +8,7 @@
 //   browser     tests/browser/*.js   as api, plus Chrome; a headless Chrome is started if none is
 //                                    listening on port 9222 (CHROME_PATH to choose one)
 //   installers  tests/installers/*.sh  bash with stand-ins for systemd, apt, git remotes…
-//   upgrade     tests/upgrade/*.sh     the upgrade rehearsal (see GOAL_SYSTEM_DESIGN §10)
+//   upgrade     tests/upgrade/*.sh     the upgrade rehearsal (see CURRENT_SYSTEM_DESIGN §17)
 //   all         every group in that order
 // filter: only files whose name contains it, e.g. node tests/run.js browser branch
 //

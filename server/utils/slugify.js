@@ -1,3 +1,11 @@
+// server/utils/slugify.js — folder names for new slideshows
+//
+// Provides
+//   slugify(name) → lower-case letters, digits and hyphens
+//   uniqueSlug(name) → a slug no existing folder in data/slideshows uses (adds -2, -3…)
+//
+// Used by
+//   services/slideshowStore (create), services/sampleSlideshow
 const fs = require('fs');
 const path = require('path');
 const { slideshowsDir } = require('./pathHelpers');

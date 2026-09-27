@@ -1,7 +1,11 @@
+// client/admin/src/composables/useNav.js — whether the sidebar is collapsed to icons
+//
+// Remembered in this browser (localStorage noticeboard:navCollapsed); on a phone-sized screen it
+// starts collapsed until the admin chooses otherwise.
+// Provides: useNav() → { collapsed, toggle() }
+// Used by: App.vue, NavBar
 import { ref, watch } from 'vue';
 
-// Whether the sidebar is collapsed to icons. Remembered in this browser; on a phone-sized
-// screen it starts collapsed until the admin chooses otherwise.
 const KEY = 'noticeboard:navCollapsed';
 
 function initial() {

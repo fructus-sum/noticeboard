@@ -1,10 +1,17 @@
 <script setup>
+// client/admin/src/components/slideshow/SlidePreview.vue — a larger view of one slide, over the slide list
+//
+// Hovering shows it while the pointer stays on the thumbnail; clicking or tapping pins it until
+// closed (✕, Esc, or a click outside). It fits within 500 × 500 px keeping its shape, and is never
+// enlarged beyond its own size.
+//
+// Props: slide, folder, position (1-based), pinned
+// Emits: close
+// Used by: slideshow/SlideList (which also closes it on Esc)
+// Uses: mediaUrl from @shared
 import { computed } from 'vue';
 import { mediaUrl } from '@shared/index.js';
 
-// A larger view of one slide, over the slide list. Hovering shows it while the pointer stays
-// on the thumbnail; clicking or tapping pins it until closed (✕, Esc, or a click outside).
-// It fits within 500 × 500 px keeping its shape, and is never enlarged beyond its own size.
 const props = defineProps({
   slide: { type: Object, required: true },
   folder: { type: String, required: true },

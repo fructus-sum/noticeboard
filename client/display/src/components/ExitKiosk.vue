@@ -1,12 +1,19 @@
 <script setup>
+// client/display/src/components/ExitKiosk.vue — the exit button: leaves kiosk mode on this screen only
+//
+// The kiosk script on this device (installers/kiosk/*.sh) collects the request
+// (POST /api/device/kiosk-exit) within a few seconds, closes its full-screen browser and opens a
+// normal window instead. The server, the other displays and the published slideshows are not
+// affected; the screen returns to kiosk mode when it restarts. Its pop-up closes by itself after
+// 60 seconds.
+//
+// Props: visible (while the mouse, keyboard or touchscreen is in use)
+// Used by: App.vue (kiosk only)
+// Uses: CornerButton, ScreenDialog
 import { ref, onUnmounted } from 'vue';
 import CornerButton from './CornerButton.vue';
 import ScreenDialog from './ScreenDialog.vue';
 
-// Leaves full-screen kiosk mode on this screen only. The kiosk script on this device (see
-// installers/install.sh) collects the request within a few seconds, closes its full-screen
-// browser and opens a normal browser window instead. The server, the other displays and the
-// published slideshows are not affected. The screen returns to kiosk mode when it restarts.
 defineProps({
   visible: Boolean,   // shown while the mouse (or keyboard, or touchscreen) is being used
 });

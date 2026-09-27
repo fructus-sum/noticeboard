@@ -1,9 +1,13 @@
 <script setup>
+// client/admin/src/components/DefaultPasswordWarning.vue — the red banner while the admin password is the default
+//
+// Shown on every admin page while the password is still the one every installation starts with,
+// with a link to Settings → Change password. It goes away once the password has been changed.
+// Used by: App.vue
+// Uses: useSecurity
 import { onMounted } from 'vue';
 import { useSecurity } from '../composables/useSecurity.js';
 
-// Shown on every admin page while the admin password is still the one every installation
-// starts with. It goes away once the password has been changed.
 const { defaultPassword, refreshSecurity } = useSecurity();
 
 onMounted(refreshSecurity);

@@ -1,9 +1,8 @@
 // How the admin panel looks, as the browser computes it: the login page, the slideshow list (a
 // published, an unpublished, a hidden and the sample slideshow), the Settings page and the MAC
-// filtering pop-up, on a desktop and on a phone. Refactor stages 9 and 10 move the global styles
-// into a stylesheet and the repeated pieces into shared components; they must look exactly the
-// same. Recorded in tests/fixtures/admin-look.json from the code before stage 9
-// (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
+// filtering pop-up, on a desktop and on a phone. Recorded in tests/fixtures/admin-look.json
+// from the code before the global styles moved into styles/base.css and the repeated pieces into
+// shared components; it must look exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');

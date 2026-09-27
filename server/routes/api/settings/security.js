@@ -1,5 +1,11 @@
-// /api/settings (security): the default-password warning and changing the password
-// (services/adminPassword.js)
+// server/routes/api/settings/security.js — the default-password warning, and changing the password
+//
+// Responsibilities
+//   GET /security   { defaultPassword }: whether the admin password is still the default one
+//   PUT /password   403 when the current password is wrong; the rules are services/adminPassword
+//
+// Used by
+//   routes/api/settings/index.js; the admin panel (useSecurity, PasswordCard)
 const express = require('express');
 const adminPassword = require('../../../services/adminPassword');
 const { route } = require('../../../middleware/asyncRoute');

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
-# The upgrade rehearsal (GOAL_SYSTEM_DESIGN §10): proves an installed Pi takes the code under test
+# The upgrade rehearsal (CURRENT_SYSTEM_DESIGN §17): proves an installed Pi takes the code under test
 # through its normal update and keeps working, with nothing but the update.
 #
 #   1. An "installed Pi" on the baseline (NB_BASELINE, default fc4ba53) with realistic data made
@@ -61,7 +61,7 @@ unlink_modules() {
 
 supervise() {   # systemd's Restart=always for noticeboard.service
   while [ ! -f "$MOCK/stop" ]; do
-    # NODE_ENV is for the baseline: code before stage 10b read it (the .env on a real Pi sets it)
+    # NODE_ENV is for the baseline: older code read it (the .env on a real Pi sets it)
     ( cd "$PI" && NODE_ENV=production exec node server/index.js ) >> "$MOCK/server.log" 2>&1 &
     echo $! > "$MOCK/pid"
     wait $!

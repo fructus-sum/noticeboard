@@ -24,7 +24,7 @@ if (process.env.NB_STORE_CHILD) {
     put('extra', JSON.stringify({ note: 'kept', slides: [{ id: 'a' }] }));
     t('other keys are kept', store.readSlides('extra').note === 'kept' && store.readSlides('extra').slides.length === 1);
     put('noslides', JSON.stringify({ note: 'x' }));
-    t('no slides list: no slides (decision B0)', Array.isArray(store.readSlides('noslides').slides) && store.readSlides('noslides').slides.length === 0);
+    t('no slides list: no slides', Array.isArray(store.readSlides('noslides').slides) && store.readSlides('noslides').slides.length === 0);
     put('array', '[1,2]');
     t('a file that is not an object: no slides', JSON.stringify(store.readSlides('array')) === '{"slides":[]}');
 

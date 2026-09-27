@@ -1,4 +1,11 @@
 <script setup>
+// client/display/src/components/VideoSlide.vue — a video slide, played muted to the end
+//
+// Props: src. Emits: ready (playback started), progress (it moved forward), ended, error (it
+// can't play: refused by the autoplay policy, or unplayable).
+// Used by: SlideFrame
+// Uses: usePageWake (starts it again when the page wakes; the clock's stall deadline skips it if
+// it still won't play)
 import { ref, onMounted } from 'vue';
 import { usePageWake } from '../composables/usePageWake.js';
 

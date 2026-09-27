@@ -1,6 +1,6 @@
 // The Node.js version rule exists twice: in the installer (installers/lib/system.sh node_new_enough,
 // which runs before the repository exists) and in system-requirements.json (checked by the server
-// before a branch switch). Both must accept and refuse the same versions (OLD_SYSTEM_DESIGN D29).
+// before a branch switch). Both must accept and refuse the same versions (CURRENT_SYSTEM_DESIGN §14 D29).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

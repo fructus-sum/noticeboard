@@ -1,3 +1,19 @@
+// server/services/brandingService.js — the logo, and what each display needs to know about its own look
+//
+// Provides
+//   saveLogo(path), removeLogo(), hasCustomLogo(), placeholderLogo() (the placeholder, scaled once
+//   per version), logoVersion() (changes with the logo, for cache-busting), MAX_SIZE (500)
+//   displaySettings() → { showDeviceInfo, logo: { url } | null }, sent to the displays
+//
+// Used by
+//   routes/index.js (/branding/logo), routes/api/settings/logo.js, realtime/displaySocket
+//
+// Uses
+//   sharp, services/configService (display settings), utils/pathHelpers
+//
+// Change impact
+//   displaySettings() is the display:settings payload, a contract with open screens
+//   (CURRENT_SYSTEM_DESIGN §15).
 const fs = require('fs');
 const sharp = require('sharp');
 const configService = require('./configService');

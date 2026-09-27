@@ -7,6 +7,9 @@
 // Provides
 //   DEFAULT_PASSWORD   'Admin@12345' (also in the README, the user guide and the installer's summary)
 //   HASH_ROUNDS        bcrypt cost for new password hashes
+//
+// Used by
+//   services/configService, services/adminPassword
 module.exports = {
   DEFAULT_PASSWORD: 'Admin@12345',
   HASH_ROUNDS: 10,

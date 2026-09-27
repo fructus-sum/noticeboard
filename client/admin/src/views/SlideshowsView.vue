@@ -1,4 +1,14 @@
 <script setup>
+// client/admin/src/views/SlideshowsView.vue — the home page: every slideshow (/admin/slideshows)
+//
+// Responsibilities
+//   The updater's notices, this Pi's IP and MAC addresses, the list with publish/disable and
+//   hide/unhide (hidden ones behind "Show hidden slideshows"), creating a slideshow, deleting one
+//   (never the sample), and opening one.
+//
+// Used by: router/index.js
+// Uses: useApi (/slideshows, /settings/device), useSlideshowActions, ui/StatusBadge,
+//   ui/PublishToggle, ui/TagPill, updates/UpdateNotice, updates/InstallerNotice
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';

@@ -1,7 +1,7 @@
 // How the viewer's own controls look: the location pin, the exit button and their pop-ups, as the
-// browser computes their styles (position, size, colours, fonts…). Refactor stage 8 moves them onto
-// shared components; they must look exactly the same. Recorded in tests/fixtures/viewer-look.json
-// from the code before stage 8 (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
+// browser computes their styles (position, size, colours, fonts…). Recorded in
+// tests/fixtures/viewer-look.json from the code before they moved onto shared components; they
+// must look exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');

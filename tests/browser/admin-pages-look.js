@@ -1,9 +1,8 @@
 // How the admin panel's larger pages look, as the browser computes it: the slideshow page (its
 // settings, the edit form with the schedule, the slide list, the preview), the Settings cards and
-// the Software updates card with its branch check and switch dialog. Refactor stage 10 splits these
-// pages into components; they must look exactly the same. Recorded in
-// tests/fixtures/admin-pages-look.json from the code before stage 10 (NB_UPDATE_SNAPSHOT=1 records
-// it again, only for a deliberate change).
+// the Software updates card with its branch check and switch dialog. Recorded in
+// tests/fixtures/admin-pages-look.json from the code before these pages were split into
+// components; they must look exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');

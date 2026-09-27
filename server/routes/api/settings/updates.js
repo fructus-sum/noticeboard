@@ -1,6 +1,17 @@
-// /api/settings (software updates): how updates went, and switching the GitHub branch.
-// A switch is: check the branch, then the admin password (which gives a one-time token), then a
-// final confirmation with that token. installers/update.sh does the actual update.
+// server/routes/api/settings/updates.js — software updates: how they went, and switching branch
+//
+// A switch is: check the branch, then the admin password (which gives a one-time token, rate
+// limited), then a final confirmation with that token. installers/update.sh does the updating.
+//
+// Used by
+//   routes/api/settings/index.js; the admin panel (components/updates, NavBar's version)
+//
+// Uses
+//   services/updates (every route's work), services/adminPassword, middleware/asyncRoute
+//
+// Change impact
+//   The admin panel of the running version reads these; update.sh never calls them (it shares
+//   files with the server instead: CURRENT_SYSTEM_DESIGN §4.2).
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const updateService = require('../../../services/updates');

@@ -1,9 +1,22 @@
-// Decides when the display moves on to the next slide. Built for screens that run unattended
-// for months: every slide has a deadline, and a watchdog moves on whenever that deadline
-// passes, whatever the reason (a lost timer, an image that never loads, a video that stalls,
-// a page that was hidden, frozen or asleep). Plain JavaScript with injectable timers so the
-// behaviour can be tested over simulated weeks.
-
+// client/display/src/slideshowClock.js — decides when the display moves on to the next slide
+//
+// Built for screens that run unattended for months: every slide has a deadline, and a watchdog
+// moves on whenever that deadline passes, whatever the reason (a lost timer, an image that never
+// loads, a video that stalls, a page that was hidden, frozen or asleep). Plain JavaScript with
+// injectable timers, so the behaviour can be tested over simulated weeks.
+//
+// Provides
+//   createSlideshowClock({ onChange, onStuck, now, timers }) → a clock: it calls onChange({ index,
+//   generation }) to show a slide, and onStuck after three whole rounds fail; the slide's events
+//   (ready, progress, ended, failed) and a playlist come in through its methods
+//   The timing constants (LOAD_TIMEOUT_MS, STALL_TIMEOUT_MS, GRACE_MS, RETRY_MS, OUTAGE_RETRY_MS,
+//   WATCHDOG_MS)
+//
+// Used by
+//   components/SlideShow.vue; client/display/test/slideshowClock.test.mjs
+//
+// Change impact
+//   All of the viewer's timing is here: change it with the tests (npm test), which simulate 30 days.
 export const LOAD_TIMEOUT_MS = 30_000;   // a slide that hasn't appeared by then is skipped
 export const STALL_TIMEOUT_MS = 30_000;  // a video that makes no progress for this long is skipped
 export const GRACE_MS = 5_000;           // watchdog slack on top of an image's own timer

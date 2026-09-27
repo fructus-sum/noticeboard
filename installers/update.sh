@@ -16,6 +16,17 @@
 #   Retry a failed commit: bash /opt/noticeboard/installers/update.sh --force
 #   Try another branch:    NOTICEBOARD_BRANCH=my-branch bash /opt/noticeboard/installers/update.sh
 #                          (once: the next check goes back to the branch chosen in Settings)
+#
+# Used by
+#   noticeboard-update.service (its timer and path units), set up by install.sh
+# Uses
+#   installers/lib/branch.sh and lib/json.sh (loaded before main); git, npm, systemctl, curl; the
+#   files it shares with the server (CURRENT_SYSTEM_DESIGN §4.2); GET /api/auth/status after a
+#   restart
+# Change impact
+#   This file runs the next update on every Pi that installed it: a mistake here can stop updates
+#   everywhere. Its path is in every installed update unit, and after a rollback an older
+#   commit's update.sh must take over again (§9, §15). tests/upgrade proves both.
 set -euo pipefail
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

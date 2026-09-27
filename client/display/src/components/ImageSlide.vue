@@ -1,5 +1,9 @@
 <script setup>
-// How long it shows is the slide clock's business (slideshowClock.js), not this component's
+// client/display/src/components/ImageSlide.vue — an image slide, filling the screen
+//
+// How long it shows is the slide clock's business (slideshowClock.js), not this component's.
+// Props: src. Emits: ready (loaded), error.
+// Used by: SlideFrame
 defineProps({
   src: { type: String, required: true },
 });

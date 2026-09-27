@@ -1,3 +1,16 @@
+// server/services/sampleSlideshow.js — the "Sample slideshow", kept in step with sample-data/
+//
+// Provides
+//   syncSampleSlideshow()   at start-up: creates it once, and when the sample files change (a new
+//                           version brought new examples) replaces its slides with them. The
+//                           admin's own choices (published, hidden, schedule…) are kept.
+//
+// Used by
+//   server/index.js (an error is logged, never stops the server)
+//
+// Uses
+//   services/slideshowStore, services/configService (sampleSlideshow), services/uploadQueue (its
+//   video's thumbnail), services/mediaTypes, utils/slugify, utils/pathHelpers
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

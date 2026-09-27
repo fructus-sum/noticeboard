@@ -1,3 +1,16 @@
+// server/utils/pathHelpers.js — every file and folder the server uses, in one place
+//
+// Provides
+//   ROOT; data/ (config, slideshows, branding, the update files); logs/; tmp/ (uploads); the built
+//   apps; the guide; sample-data/; what the installer set up (installer.json, the server kiosk
+//   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); mediaUrl(folder, file)
+//
+// Used by
+//   most server modules (never a hard-coded path elsewhere)
+//
+// Change impact
+//   Installed Pis, update.sh and the kiosk scripts rely on these names (CURRENT_SYSTEM_DESIGN §6,
+//   §15). mediaUrl must match shared/index.js (a unit test checks).
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../..');

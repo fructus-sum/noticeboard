@@ -16,7 +16,7 @@
 // Used by
 //   nearly every server module, and the installer (installers/lib/server.sh), which runs
 //   `node -e "require('./server/services/configService').init()"` on a first install. That path
-//   and init() must not change (OLD_SYSTEM_DESIGN §15).
+//   and init() must not change (CURRENT_SYSTEM_DESIGN §15).
 //
 // Uses
 //   utils/configIO, utils/pathHelpers, config/defaults, config/passwordDefaults, bcrypt, logger

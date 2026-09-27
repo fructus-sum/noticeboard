@@ -1,6 +1,19 @@
-// /api/slideshows/:folder/slides: a slideshow's slides: uploading, listing, deleting, reordering,
-// and making missing video thumbnails. Mounted inside the slideshows API (api/index.js), behind
-// its admin check. The data belongs to services/slideshowStore.js; processing to uploadQueue.
+// server/routes/api/slides.js — /api/slideshows/:folder/slides: a slideshow's slides
+//
+// Responsibilities
+//   Uploading (up to 50 files, 500 MB each), listing, deleting, reordering, and making missing
+//   video thumbnails. Mounted inside the slideshows API (api/index.js), behind its admin check.
+//
+// Used by
+//   routes/api/index.js; the admin panel (SlideList, SlideshowDetailView)
+//
+// Uses
+//   services/slideshowStore (the data), services/uploadQueue (processing), services/mediaTypes,
+//   middleware/uploads, middleware/asyncRoute, services/displayEvents (playlistChanged)
+//
+// Change impact
+//   The slide fields are read by the viewer's playlist and the admin panel (CURRENT_SYSTEM_DESIGN
+//   §5.1, §6).
 const express = require('express');
 const crypto = require('crypto');
 const multer = require('multer');

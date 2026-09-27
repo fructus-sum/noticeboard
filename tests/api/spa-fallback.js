@@ -1,7 +1,7 @@
 // The pages the server sends when the web apps haven't been built (e.g. an update's build failed
 // half way): the viewer's and the admin panel's "not yet built" pages, for any path. Recorded in
-// tests/fixtures/spa-fallback.json from the code before refactor stage 7 (NB_UPDATE_SNAPSHOT=1
-// records it again, only for a deliberate change).
+// tests/fixtures/spa-fallback.json from the code before routes/spa.js replaced the two separate
+// fallbacks (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
 const fs = require('fs');
 const path = require('path');
 const { makeApp, server, check, done } = require('../helpers/app.js');

@@ -1,3 +1,15 @@
+// server/services/mediaService.js — converting uploads into slides
+//
+// Provides
+//   processImage(input, outDir, id) → a PNG
+//   processVideo(input, outDir, id) → an H.264 MP4 the Pi's browser plays
+//   getVideoDuration(file), createThumbnail(video, outDir, id) → a still for the admin panel
+//
+// Used by
+//   services/uploadQueue
+//
+// Uses
+//   sharp, fluent-ffmpeg (ffmpeg and ffprobe: FFMPEG_PATH / FFPROBE_PATH, else the PATH), utils/logger
 const path = require('path');
 const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');

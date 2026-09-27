@@ -1,4 +1,20 @@
 <script setup>
+// client/display/src/components/SlideShow.vue — the slides on screen, one after another
+//
+// Responsibilities
+//   Shows what the slide clock asks for, fading each new slide in over the previous one (without
+//   Vue's <Transition>: its leave step waits for animation frames, which a hidden page doesn't
+//   produce). Retries straight away when the server is back, checks the clock when the page wakes,
+//   and reloads the page as a last resort when it seems broken.
+//
+// Props
+//   slides (the playlist), connected
+//
+// Used by
+//   App.vue
+//
+// Uses
+//   slideshowClock.js, SlideFrame, usePageWake, recovery.js (recoverByReloading)
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import SlideFrame from './SlideFrame.vue';
 import { createSlideshowClock } from '../slideshowClock.js';

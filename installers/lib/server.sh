@@ -25,7 +25,7 @@
 #
 # Change impact
 #   The units, .env, installer.json and update-status.json are read by systemd, update.sh and
-#   the server on every Pi: their names and formats must not change (OLD_SYSTEM_DESIGN §6).
+#   the server on every Pi: their names and formats must not change (CURRENT_SYSTEM_DESIGN §6).
 #   Changing what's written here that updates can't change means raising INSTALLER_VERSION.
 
 install_server() {

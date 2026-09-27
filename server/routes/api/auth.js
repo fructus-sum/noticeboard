@@ -1,6 +1,19 @@
-// /api/auth: logging in and out, and whether this browser is logged in. Only the MAC filter
-// applies here (api/index.js); the session itself is services/adminSession.js, the password
-// services/adminPassword.js.
+// server/routes/api/auth.js — /api/auth: logging in and out, and whether this browser is logged in
+//
+// Responsibilities
+//   POST /login (rate limited; 401 on a wrong password), POST /logout, GET /status. Only the MAC
+//   filter applies here (api/index.js).
+//
+// Used by
+//   routes/api/index.js; the admin panel (LoginView, the router's login check, NavBar); update.sh's
+//   health check (GET /status must answer 2xx after a restart)
+//
+// Uses
+//   services/adminPassword (verify), services/adminSession (the cookie), middleware/asyncRoute
+//
+// Change impact
+//   GET /api/auth/status is update.sh's health check on every installed Pi: it must keep answering
+//   2xx when the server is up (CURRENT_SYSTEM_DESIGN §15).
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const adminPassword = require('../../services/adminPassword');

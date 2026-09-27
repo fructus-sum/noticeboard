@@ -1,9 +1,15 @@
 <script setup>
+// client/display/src/components/SlideFrame.vue — one slide on screen: an image or a video
+//
+// Every event carries this slide's generation, so a late event from a slide that is already fading
+// out can't be mistaken for the slide that replaced it.
+//
+// Props: slide ({ type, url, … }), generation
+// Emits: ready, progress, ended, failed (each with the generation)
+// Used by: SlideShow
 import ImageSlide from './ImageSlide.vue';
 import VideoSlide from './VideoSlide.vue';
 
-// One slide on screen. Every event carries this slide's generation, so a late event from a
-// slide that is already fading out can't be mistaken for the slide that replaced it.
 defineProps({
   slide: { type: Object, required: true },
   generation: { type: Number, required: true },

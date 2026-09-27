@@ -1,3 +1,11 @@
+// server/app.js — the Express app
+//
+// Provides
+//   createApp() → the app: helmet (no CSP), JSON bodies up to 10 MB, cookies, every route
+//   (routes/index.js), then middleware/errorHandler
+//
+// Used by
+//   server/index.js, which serves it and the display socket on one HTTP server
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');

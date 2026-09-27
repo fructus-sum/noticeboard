@@ -1,11 +1,19 @@
 <script setup>
+// client/admin/src/components/settings/MacFilterWarning.vue — the warning before MAC filtering is switched on
+//
+// Once it's saved, only approved devices can open the displays and the admin panel, so a device
+// that isn't on the list locks itself out. It shows whether this device is approved
+// (GET /settings/my-device) and can add it. "How to find your MAC address" swaps in a second
+// pop-up; its OK comes back here. Esc or a click outside: back from the how-to, else cancel.
+//
+// Props: approved (the list being edited)
+// Emits: confirm, cancel, add(mac)
+// Used by: settings/MacFilterCard
+// Uses: useApi, ui/ModalDialog
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { api } from '../../composables/useApi.js';
 import ModalDialog from '../ui/ModalDialog.vue';
 
-// Shown when MAC filtering is switched on: once it's saved, only approved devices can open the
-// displays and the admin panel, so a device that isn't on the list locks itself out.
-// "How to find your MAC address" swaps in a second pop-up; its OK button comes back here.
 const props = defineProps({
   approved: { type: Array, default: () => [] },   // [{ mac, label }]
 });

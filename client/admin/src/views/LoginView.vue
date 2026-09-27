@@ -1,4 +1,10 @@
 <script setup>
+// client/admin/src/views/LoginView.vue — the login page (/admin/login)
+//
+// A wrong password or "too many tries" shows on the page, never as a redirect; with no answer from
+// the server, "Could not reach server". Once logged in: the slideshows.
+// Used by: router/index.js
+// Uses: useApi (POST /auth/login with redirectOn401: false)
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';

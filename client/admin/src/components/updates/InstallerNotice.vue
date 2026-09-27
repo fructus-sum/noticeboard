@@ -1,11 +1,17 @@
 <script setup>
+// client/admin/src/components/updates/InstallerNotice.vue — "Run the installer again on this Pi"
+//
+// Updates can't change what only the installer sets up (kiosk scripts, system services, desktop
+// shortcuts), so when this version needs a newer installer run than the Pi had, the Slideshows
+// page says so, with the command to copy. It stays until the installer has been run: there's
+// nothing to close.
+//
+// Used by: views/SlideshowsView
+// Uses: useApi (GET /settings/updates/installer), installerCommand from @shared
 import { ref, computed, onMounted } from 'vue';
 import { installerCommand } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 
-// Updates can't change what only the installer sets up (kiosk scripts, system services, desktop
-// shortcuts), so when this version needs a newer installer run than the Pi had, say so here.
-// It stays until the installer has been run: there's nothing to close.
 const status = ref(null);
 const copied = ref(false);
 

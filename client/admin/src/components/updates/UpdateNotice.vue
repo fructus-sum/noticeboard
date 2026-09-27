@@ -1,9 +1,13 @@
 <script setup>
+// client/admin/src/components/updates/UpdateNotice.vue — a notice from the updater
+//
+// E.g. the branch this noticeboard followed was merged into main, so it went back to main
+// (data/update-notice.json). It stays, for every admin, until someone closes it.
+// Used by: views/SlideshowsView
+// Uses: useApi (GET and DELETE /settings/updates/notice)
 import { ref, onMounted } from 'vue';
 import { api } from '../../composables/useApi.js';
 
-// A notice from the updater, e.g. the branch this noticeboard followed was merged into main
-// so it went back to main. It stays, for every admin, until someone closes it.
 const notice = ref(null);
 const closing = ref(false);
 const error = ref('');

@@ -1,4 +1,18 @@
 <script setup>
+// client/display/src/App.vue — the viewer: the slideshow, or the waiting screen, with the corner controls
+//
+// Responsibilities
+//   Shows SlideShow while there are slides, else WaitingScreen (the logo, or why nothing shows);
+//   the location pin (when turned on in Settings) and the exit button (kiosk only, while someone
+//   uses the mouse, keyboard or touchscreen); the nightly reload. ?kiosk=off (a screen that left
+//   kiosk mode) makes it an ordinary page: no exit button, no nightly reload.
+//
+// Used by
+//   main.js
+//
+// Uses
+//   useSocket (playlist, connection, display settings), useActivity, recovery.js
+//   (startDailyReload), SlideShow, WaitingScreen, DeviceInfo, ExitKiosk
 import { computed } from 'vue';
 import { useSocket } from './composables/useSocket.js';
 import { useActivity } from './composables/useActivity.js';

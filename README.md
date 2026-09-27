@@ -91,7 +91,9 @@ The server Pi checks GitHub every 15 minutes and installs new versions by itself
 
 ## Development
 
-Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch. Its `installer.version` must match `INSTALLER_VERSION` in `installers/install.sh`: raise both (and add a line to `installer.changes`) whenever the installer changes what updates can't, such as the kiosk scripts or system services.
+Requirements: Node.js 20.19+ (or 22.12+), FFmpeg (for video processing and thumbnails). `system-requirements.json` lists all the software a branch needs on the Pi; keep it up to date on every branch, in the same commit as the change that needs the software. The admin panel checks it before switching branch. Its `installer.version` must match `INSTALLER_VERSION` in `installers/install.sh`: raise both (and add a line to `installer.changes`) whenever the installer changes what updates can't, such as the kiosk scripts (`installers/kiosk/`) or system services.
+
+**How the code fits together** is in [`docs/design/CURRENT_SYSTEM_DESIGN.md`](docs/design/CURRENT_SYSTEM_DESIGN.md): the parts and what each owns, the files they share, and what installed Pis and open screens rely on, which must not change. Update it in the same commit as the code it describes.
 
 ```bash
 npm install
@@ -105,7 +107,7 @@ The other test groups each run a throwaway copy of the app, never this folder's 
 
 - **`test:api`:** the HTTP and socket contract (compared with `tests/fixtures/api-contract.json`), uploads, branch switching and shutdown.
 - **`test:browser`:** the admin panel and viewer in a real Chrome, including the reliability scenarios. It starts a headless Chrome itself (`CHROME_PATH` to choose one).
-- **`test:installers`:** the installer and `update.sh` with stand-ins for systemd, apt and GitHub, including the files the installer writes (compared with `tests/fixtures/installer-golden/`).
+- **`test:installers`:** the installer (with its parts in `installers/lib/`) and `update.sh` with stand-ins for systemd, apt and GitHub, including the files the installer writes (compared with `tests/fixtures/installer-golden/`).
 - **`test:upgrade`:** an installed baseline takes the current code through its own `update.sh`, and nothing may change.
 
 Video tests need ffmpeg: on the `PATH`, or set `FFMPEG_PATH` and `FFPROBE_PATH`. The installer tests need bash (Git Bash on Windows).

@@ -1,4 +1,4 @@
-// Stage 1 foundations behave exactly like the copies they replaced (OLD_SYSTEM_DESIGN D6, D7, D14,
+// The shared foundations behave exactly like the copies they replaced (CURRENT_SYSTEM_DESIGN §14 D6, D7, D14,
 // D18): the address helpers, the "this Pi itself" rule for MAC filtering, the media type lists and
 // the socket event names.
 const { test } = require('node:test');

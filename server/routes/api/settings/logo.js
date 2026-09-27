@@ -1,5 +1,15 @@
-// /api/settings/logo: the logo shown above "No slideshow published" and in the admin sidebar
-// (services/brandingService.js). Uploads are scaled down to fit 500 × 500, never enlarged.
+// server/routes/api/settings/logo.js — /api/settings/logo: upload, reset and describe the logo
+//
+// The logo is shown above "No slideshow published" and in the admin sidebar
+// (services/brandingService.js). Uploads are scaled down to fit 500 × 500, never enlarged; a
+// change tells the displays (displayEvents.displaySettingsChanged).
+//
+// Used by
+//   routes/api/settings/index.js; the admin panel (useBranding, LogoSettings)
+//
+// Uses
+//   services/brandingService, services/displayEvents, services/mediaTypes (LOGO_MIME),
+//   middleware/uploads
 const express = require('express');
 const fs = require('fs');
 const brandingService = require('../../../services/brandingService');

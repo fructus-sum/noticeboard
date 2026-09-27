@@ -13,6 +13,17 @@
 # scripts it installs in installers/kiosk/ (see load_modules). Older installers hand over by
 # downloading only this file, so it must keep its name, pass bash -n and keep the line
 # starting INSTALLER_VERSION=.
+#
+# Used by
+#   people (the README's command); older installers and other branches' installers, which hand
+#   over to it (use_latest_installer, use_branch_installer)
+# Uses
+#   installers/lib/*.sh and installers/kiosk/*.sh of the same commit (load_modules); GitHub's API
+#   and raw.githubusercontent.com
+# Change impact
+#   What it installs that updates can't change (kiosk scripts, units, shortcuts, packages) only
+#   reaches a Pi when the installer runs again: raise INSTALLER_VERSION with such a change
+#   (CURRENT_SYSTEM_DESIGN §8, §15). tests/installers compares what it writes with golden files.
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────

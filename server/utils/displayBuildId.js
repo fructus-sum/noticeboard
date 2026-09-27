@@ -1,3 +1,10 @@
+// server/utils/displayBuildId.js — which build of the viewer this server has
+//
+// Provides
+//   displayBuildId() → a short hash of client/display/dist/index.html, or null if not built
+//
+// Used by
+//   realtime/displaySocket (sent as display:build: an open screen that sees it change reloads)
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

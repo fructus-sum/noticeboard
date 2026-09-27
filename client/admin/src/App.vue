@@ -1,4 +1,7 @@
 <script setup>
+// client/admin/src/App.vue — the admin panel's frame: the sidebar (not on the login page), the default-password warning, the page
+// Used by: main.js
+// Uses: NavBar, DefaultPasswordWarning, useNav (the collapsed sidebar), the router's page
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import NavBar from './components/NavBar.vue';

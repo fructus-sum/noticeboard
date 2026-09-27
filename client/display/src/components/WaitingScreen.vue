@@ -1,4 +1,10 @@
 <script setup>
+// client/display/src/components/WaitingScreen.vue — what shows while there's nothing to play
+//
+// While connecting: a pulsing dot. Connected, with a playlist that has no slides: the logo (when
+// turned on) and "No slideshow published".
+// Props: connected, received (a playlist arrived, with no slides), logo ({ url } or null)
+// Used by: App.vue
 defineProps({
   connected: Boolean,
   received: Boolean,   // the server has sent a playlist (and it has no slides)

@@ -17,7 +17,7 @@
 //                                     sync also records sampleSlideshow in the same write)
 //   readSlides(folder)              → the parsed slideshow.json: { slides: [...] }. Missing or
 //                                     broken → { slides: [] }; other keys are kept; a file without a
-//                                     slides list counts as no slides (refactor decision B0)
+//                                     slides list counts as no slides (CURRENT_SYSTEM_DESIGN §16 #6)
 //   modifySlides(folder, fn)        → fn's result. Locked read → fn(data) → written only if fn
 //                                     changed data. Two updates never overwrite each other
 //   slideCount(folder)              → number of slides
@@ -34,7 +34,7 @@
 //
 // Change impact
 //   slideshow.json and the entries are read by the viewer's playlist, the admin panel and older
-//   versions after a rollback: keep their shape (OLD_SYSTEM_DESIGN §5–6).
+//   versions after a rollback: keep their shape (CURRENT_SYSTEM_DESIGN §5–6).
 const fs = require('fs');
 const path = require('path');
 const configService = require('./configService');

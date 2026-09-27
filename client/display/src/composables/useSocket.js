@@ -1,3 +1,16 @@
+// client/display/src/composables/useSocket.js — the viewer's live connection to the server
+//
+// Provides
+//   useSocket() → { playlist, connected, received, settings }
+//   Sends display:ready on every connect; takes playlist:update, display:settings and
+//   display:build. Reconnects by itself after any outage (every 2–10 s, never giving up), and
+//   reloads onto a new build when display:build changes (once the server answers).
+//
+// Used by: App.vue
+// Uses: socket.io-client, SOCKET_EVENTS from @shared, recovery.js (reloadSoon)
+//
+// Change impact
+//   The event names and payloads are a contract with the server (CURRENT_SYSTEM_DESIGN §3.4, §15).
 import { ref, onUnmounted } from 'vue';
 import { io } from 'socket.io-client';
 import { SOCKET_EVENTS } from '@shared/index.js';

@@ -3,7 +3,7 @@
 # The files the installer writes onto a Pi (systemd units, both kiosk scripts, the autostart entry,
 # the Help shortcut), generated for fixed answers and compared with tests/fixtures/installer-golden/,
 # which was recorded from the baseline installer. Restructuring the installer must not change
-# them (GOAL_SYSTEM_DESIGN §8.1). NB_UPDATE_SNAPSHOT=1 records them again (only for a deliberate,
+# them (CURRENT_SYSTEM_DESIGN §8, §14 D30). NB_UPDATE_SNAPSHOT=1 records them again (only for a deliberate,
 # reviewed change, together with INSTALLER_VERSION).
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO/tests/helpers/installer.sh"

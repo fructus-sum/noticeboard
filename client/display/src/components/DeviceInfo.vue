@@ -1,4 +1,12 @@
 <script setup>
+// client/display/src/components/DeviceInfo.vue — the location pin: how to reach the noticeboard
+//
+// A faint pin in the top-left corner. Its pop-up shows the Noticeboard server's addresses and port
+// (GET /api/device), and the viewer's URL for another device on the network, never the admin
+// panel's. It closes with ✕, Esc, or by itself after 90 seconds.
+//
+// Used by: App.vue (when showDeviceInfo is on in Settings → Display)
+// Uses: CornerButton, ScreenDialog
 import { ref, onMounted, onUnmounted } from 'vue';
 import CornerButton from './CornerButton.vue';
 import ScreenDialog from './ScreenDialog.vue';

@@ -1,8 +1,12 @@
+// client/admin/src/composables/useBranding.js — the logo, shared by the sidebar and the Settings page
+//
+// A change in Settings shows in the sidebar straight away.
+// Provides: useBranding() → { logo ({ enabled, custom, url, maxSize }, or null), refreshLogo() }
+// Used by: NavBar, settings/LogoSettings
+// Uses: useApi (GET /settings/logo)
 import { ref } from 'vue';
 import { api } from './useApi.js';
 
-// The logo and whether it's shown, shared by the sidebar and the Settings page, so a change
-// in Settings shows in the sidebar straight away
 const logo = ref(null);   // { enabled, custom, url, maxSize }
 
 async function refreshLogo() {

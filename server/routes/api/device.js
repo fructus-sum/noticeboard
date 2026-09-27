@@ -1,3 +1,22 @@
+// server/routes/api/device.js — /api/device: the location pin's addresses and the kiosk exit button
+//
+// Responsibilities
+//   GET  /                    this server's IP addresses and port (never the viewing device's), the
+//                             one the display used first. MAC addresses are admin-only (settings).
+//   POST /kiosk-exit          the viewer's exit button: this device asks to leave kiosk mode (60 s)
+//   POST /kiosk-exit/claim    the kiosk script on the same device collects it: {"exit":true} once
+//   Requests are kept per device (IP address; every loopback address is the server itself), so a
+//   screen can only ever affect itself.
+//
+// Used by
+//   routes/api/index.js (behind the MAC filter); the viewer (DeviceInfo, ExitKiosk); the kiosk scripts
+//
+// Uses
+//   utils/network (lanInterfaces, plainAddress, isLoopback)
+//
+// Change impact
+//   The claim must answer exactly {"exit":true}, without spaces: installed kiosk scripts compare the
+//   text (CURRENT_SYSTEM_DESIGN §15).
 const express = require('express');
 const { lanInterfaces, plainAddress, isLoopback } = require('../../utils/network');
 

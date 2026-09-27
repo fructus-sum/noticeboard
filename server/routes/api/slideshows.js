@@ -1,5 +1,15 @@
-// /api/slideshows: the admin panel's list of slideshows, creating, changing and deleting them.
-// The data belongs to services/slideshowStore.js, the rules to services/slideshowRules.js.
+// server/routes/api/slideshows.js — /api/slideshows: listing, creating, changing and deleting slideshows
+//
+// Responsibilities
+//   Adds what the admin panel shows but config.json doesn't store (slide counts, the sample flag).
+//   A change the displays can see (publish, schedule, duration…) announces a new playlist.
+//
+// Used by
+//   routes/api/index.js; the admin panel (SlideshowsView, SlideshowDetailView)
+//
+// Uses
+//   services/slideshowStore (the data), services/slideshowRules (duration, hide/publish, the
+//   sample's protection), services/displayEvents, middleware/asyncRoute
 const express = require('express');
 const store = require('../../services/slideshowStore');
 const rules = require('../../services/slideshowRules');

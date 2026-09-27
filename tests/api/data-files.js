@@ -1,7 +1,7 @@
 // What the server writes to data/ for a fixed script of admin actions: config.json (without the
 // secrets), every slideshow.json and the media file names, byte-for-byte after the random parts
 // (ids, times, the sample's signature) are replaced with stable placeholders. Recorded in
-// tests/fixtures/data-files.json from the code before the slideshow store (refactor stage 3);
+// tests/fixtures/data-files.json from the code before the slideshow store existed;
 // NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change. Needs ffmpeg (the sample's
 // video thumbnail).
 const fs = require('fs');

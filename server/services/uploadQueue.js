@@ -1,3 +1,21 @@
+// server/services/uploadQueue.js — processing uploads and making thumbnails, two at a time
+//
+// Provides
+//   enqueueProcessing({ folder, slideId, tmpPath, mime })
+//       converts the upload, marks the slide ready (or failed) and announces a new playlist
+//   enqueueThumbnail({ folder, slideId, filename })   a video's still, for the admin panel
+//   queueSize()
+//
+// Used by
+//   routes/api/slides.js, services/sampleSlideshow
+//
+// Uses
+//   services/mediaService, services/slideshowStore (modifySlides: locked), services/displayEvents,
+//   services/mediaTypes, utils/pathHelpers, utils/logger
+//
+// Change impact
+//   Uploads wait in tmp/noticeboard-uploads until processed: update.sh waits while it has a recent
+//   file, so the path must not change (CURRENT_SYSTEM_DESIGN §15).
 const PQueue = require('p-queue').default;
 const fs = require('fs');
 const path = require('path');
