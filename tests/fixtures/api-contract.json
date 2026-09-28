@@ -429,7 +429,7 @@
     "path": "/api/settings/updates/schedule",
     "status": 409,
     "type": "application/json",
-    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Server to set them up.\"}"
   },
   "updates: install at, bad": {
     "method": "PUT",
@@ -443,7 +443,7 @@
     "path": "/api/settings/updates/install-now",
     "status": 409,
     "type": "application/json",
-    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Server to set them up.\"}"
   },
   "updates: verify, wrong password": {
     "method": "POST",
@@ -865,7 +865,7 @@
     "path": "/api/settings/maintenance/restore-defaults",
     "status": 409,
     "type": "application/json",
-    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Server to set them up.\"}"
   },
   "audioshows: list, empty": {
     "method": "GET",
