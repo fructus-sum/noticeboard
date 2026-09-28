@@ -20,11 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0   # the upgrade rehearsal and the module loader test start from older commits
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -34,6 +34,11 @@ jobs:
 
       - name: Let Chrome use its sandbox (Ubuntu 24.04 restricts it by default)
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      # The repository doesn't track .gitignore (the owner keeps it local): the same rules, so the
+      # tests' copies of "uncommitted changes" don't take node_modules, the built apps or data/
+      - name: The local ignore rules
+        run: printf '%s\n' 'node_modules/' 'data/' 'tmp/' 'logs/' 'client/display/dist/' 'client/admin/dist/' '.env' '*.log' '*.tmp' >> .git/info/exclude
 
       - name: A git identity for the tests' throwaway commits
         run: |

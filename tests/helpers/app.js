@@ -13,7 +13,8 @@
 //   page(connect, size)        → a Chrome tab (cdp.js) with until/go/login/click/mouse helpers
 //   ffmpegEnv()                → { FFMPEG_PATH, FFPROBE_PATH } when ffmpeg is found, else {} (see hasFfmpeg)
 //   shot(name)                 → a path for a screenshot, outside the repository
-//   copyChanges(dest)          copies this working tree's uncommitted changes onto a clone of it
+//   copyChanges(dest)          copies this working tree's uncommitted changes onto a clone of it,
+//                                never node_modules or the built apps
 //                                (changed and new files; deleted ones removed)
 //   check(name, pass, detail), done(env), sleep, git
 //   untilSlideEnds(playlist)   waits until the slide on air in that playlist ends (+400 ms): when a
@@ -72,7 +73,8 @@ function copyChanges(dest) {
   const list = (args) => execFileSync('git', args, { cwd: REPO, encoding: 'utf8' }).split('\n').filter(Boolean);
   const deleted = new Set(list(['ls-files', '--deleted']));
   for (const f of list(['ls-files', '--modified', '--others', '--exclude-standard'])) {
-    if (deleted.has(f)) continue;
+    // Never packages or built apps, whatever the ignore rules say (a clone without them, e.g. on CI)
+    if (deleted.has(f) || /^node_modules\/|^client\/[^/]+\/dist\//.test(f)) continue;
     fs.mkdirSync(path.dirname(path.join(dest, f)), { recursive: true });
     fs.copyFileSync(path.join(REPO, f), path.join(dest, f));
   }

@@ -43,6 +43,8 @@ EOF
 printf '#!/usr/bin/env bash\necho "$*" >> "$T/logger.log"\n' > "$T/bin/logger"
 printf '#!/usr/bin/env bash\n/usr/bin/sleep 0.2\n' > "$T/bin/sleep"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$T/bin/xset"
+# The kiosk looks for chromium-browser first: the stand-in answers to both names (a CI runner has a real one)
+cp "$T/bin/chromium" "$T/bin/chromium-browser"
 chmod +x "$T/bin/"*
 reset() { rm -f "$T"/curl.count "$T"/curl.log "$T"/launch.log "$T"/logger.log "$T"/crashed "$T"/exit-asked; }
 # The kiosk opens its normal window in the background (nohup … &) and ends at once, so the

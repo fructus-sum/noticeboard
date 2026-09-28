@@ -18,7 +18,7 @@ case "$1" in
   show)
     pid=$(cat "$MOCK/pid" 2>/dev/null || echo 0)
     if [ "$pid" -gt 0 ] && kill -0 "$pid" 2>/dev/null; then echo "$pid"; exit 0; fi
-    /usr/bin/sleep 1000 >/dev/null 2>&1 &
+    /usr/bin/sleep 1000 >/dev/null 2>&1 9>&- &
     echo $! > "$MOCK/pid"; echo "server restarted" >> "$MOCK/log"; echo $! ;;
 esac
 EOF

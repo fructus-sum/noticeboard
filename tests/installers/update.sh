@@ -2,7 +2,9 @@
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
 # Exercise installers/update.sh against a throwaway git origin, with systemctl, npm,
 # curl and sleep replaced by stand-ins (GitHub's Releases API too: tests/helpers/github.sh). A
-# background `sleep` plays the server process. Each commit to main is published as a Release.
+# background `sleep` plays the server process, started without update.sh's lock (fd 9): with a
+# real flock (Linux) it would otherwise hold the lock for every later run. The update-*.sh tests
+# start theirs the same way. Each commit to main is published as a Release.
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T=$(mktemp -d); BIN="$T/bin"; export MOCK="$T/mock"; mkdir -p "$BIN" "$MOCK"
@@ -16,7 +18,7 @@ case "$1" in
   show)
     pid=$(cat "$MOCK/pid" 2>/dev/null || echo 0)
     if [ "$pid" -gt 0 ] && kill -0 "$pid" 2>/dev/null; then echo "$pid"; exit 0; fi
-    /usr/bin/sleep 1000 >/dev/null 2>&1 &     # Restart=always: systemd starts a new server
+    /usr/bin/sleep 1000 >/dev/null 2>&1 9>&- &     # Restart=always: systemd starts a new server
     echo $! > "$MOCK/pid"; echo "server restarted" >> "$MOCK/log"; echo $! ;;
 esac
 EOF

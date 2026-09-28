@@ -27,6 +27,9 @@ stubs() {
   node()      { case "$*" in *process.version*) printf 24 ;; *) echo "node (config init)" >> "$T/calls.log" ;; esac; }
   has_tty()   { return 0; }
   ask()       { REPLY="${ANSWERS[0]}"; ANSWERS=("${ANSWERS[@]:1}"); echo "  [answered: '${REPLY}']"; }
+  # The sudo check has its own test (sudo-password.sh); here it mustn't depend on this machine's
+  # sudoers rules (a CI runner's user has NOPASSWD, as a Pi's does)
+  check_sudo_password() { echo "check_sudo_password" >> "$T/calls.log"; SUDO_STATUS=""; }
 }
 
 # ── Server, re-run on an existing install (Enter accepts the default) ──

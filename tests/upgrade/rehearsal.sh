@@ -119,6 +119,9 @@ git -C "$REPO" push -q "$T/origin.git" "$BASELINE:refs/heads/main" || { bad "bas
 git -c core.autocrlf=false clone -q "$REPO" "$T/cand"
 ( cd "$REPO" && git ls-files -z --modified --others --exclude-standard ) | while IFS= read -r -d '' f; do
   [ -e "$REPO/$f" ] || continue   # deleted: removed below (git lists it as modified too)
+  # Never packages or built apps, whatever the ignore rules say: the Pi's node_modules is a link to
+  # this repository's, and a checkout removing a committed copy would delete through it
+  case "$f" in node_modules/*|client/*/dist/*) continue ;; esac
   mkdir -p "$T/cand/$(dirname "$f")"; cp "$REPO/$f" "$T/cand/$f"
 done
 ( cd "$REPO" && git ls-files -z --deleted ) | while IFS= read -r -d '' f; do rm -f "$T/cand/$f"; done

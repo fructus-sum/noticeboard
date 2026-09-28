@@ -16,6 +16,9 @@ run() {
   (
     load_installer
     set -euo pipefail
+    # This machine's own firewall programs (ufw, nft, iptables in the sbin folders, e.g. on a CI
+    # runner) are out of reach: each case says which exist, with stand-ins
+    PATH=$(tr ':' '\n' <<<"$PATH" | grep -vE '/sbin/?$' | paste -sd: -)
     MODE=$mode; INSTALL_DIR="$T/opt"
     MOCK_UFW_STATE=""; MOCK_ACTIVE=""; MOCK_SSHD_PORT=22; MOCK_SOCKET_PORT=""; MOCK_SSH_ANCESTOR=""; MOCK_SSH_CONN=""; MOCK_VNC=""; MOCK_PORT=3000
     log() { echo "$*" >> "$T/calls.log"; }
