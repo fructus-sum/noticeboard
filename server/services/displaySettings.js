@@ -10,7 +10,8 @@
 //   records a waiting version.
 //
 // Provides
-//   current() → { showDeviceInfo, logo: { url } | null, background, installerNeeded, updateAvailable }
+//   current() → { showDeviceInfo, logo: { url } | null, background, installerNeeded, updateAvailable,
+//               restartNeeded }
 //   refresh() → Promise: reads the installer and update states again (on an error, keeps the last)
 //
 // Used by
@@ -19,7 +20,7 @@
 // Uses
 //   services/configService (display.showDeviceInfo), services/brandingService (the logo URL and
 //   the background colour), services/updates/installerVersion (status), services/updates
-//   (manualUpdateWaiting), utils/logger
+//   (manualUpdateWaiting), services/restartState (restartNeeded), utils/logger
 //
 // Change impact
 //   The payload is a contract with open screens (SYSTEM_DESIGN §3.4, §15): keys may be added,
@@ -28,6 +29,7 @@ const configService = require('./configService');
 const brandingService = require('./brandingService');
 const installerVersion = require('./updates/installerVersion');
 const updates = require('./updates');
+const restartState = require('./restartState');
 const logger = require('../utils/logger');
 
 let installerNeeded = false;
@@ -40,6 +42,8 @@ function current() {
     background: brandingService.backgroundColour(),
     installerNeeded,
     updateAvailable,
+    // A setting that takes effect only after a restart (the port) was changed: the warning mark
+    restartNeeded: restartState.status().restartNeeded,
   };
 }
 

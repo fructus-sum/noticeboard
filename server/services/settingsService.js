@@ -4,8 +4,9 @@
 //   What GET /api/settings shows (config.json without its secrets) and what PUT /api/settings may
 //   change. Only port, macFiltering and display can be changed here; the display settings are
 //   merged, so saving one of them never drops the others, and each is checked (the duration's
-//   range, the background colour's form, the video format). port and macFiltering are saved as
-//   sent (§16 #4).
+//   range, the background colour's form, the video format). The port is checked (a whole number
+//   from 1024 to 65535) and takes effect when the Server restarts (services/restartState);
+//   macFiltering is saved as sent (§16 #9).
 //
 // Provides
 //   publicSettings()  → config.json without passwordHash, jwtSecret and _comment
@@ -20,10 +21,10 @@
 //
 // Uses
 //   configService, slideshowRules (the duration rule), shared/contract.json (the colour's form, the
-//   video formats)
+//   video formats, the port's range)
 const configService = require('./configService');
 const { parseSlideSeconds } = require('./slideshowRules');
-const { display: DISPLAY } = require('../../shared/contract.json');
+const { display: DISPLAY, limits: LIMITS } = require('../../shared/contract.json');
 
 const COLOUR = new RegExp(DISPLAY.colourPattern);
 
@@ -65,10 +66,23 @@ function mergeDisplay(current, change) {
   return { merged };
 }
 
+// A port the Server can listen on without being root
+function parsePort(value) {
+  const port = Number(value);
+  const { min, max } = LIMITS.port;
+  if (!Number.isInteger(port) || port < min || port > max) return { error: `The port must be a whole number from ${min} to ${max}` };
+  return { value: port };
+}
+
 async function applyPatch(body) {
   const patch = {};
   for (const key of CHANGEABLE) {
     if (body[key] !== undefined) patch[key] = body[key];
+  }
+  if (patch.port !== undefined) {
+    const port = parsePort(patch.port);
+    if (port.error) return { status: 400, error: port.error };
+    patch.port = port.value;
   }
   if (patch.display !== undefined) {
     const { merged, error } = mergeDisplay(configService.get('display') || {}, patch.display);

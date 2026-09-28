@@ -21,7 +21,7 @@ export function useSocket() {
   const connected = ref(false);
   const received = ref(false);   // true once the server has sent a playlist
   // This display's look, set in the admin panel: the location pin and the logo
-  const settings = ref({ showDeviceInfo: true, logo: null, background: DEFAULT_BACKGROUND, installerNeeded: false, updateAvailable: false });
+  const settings = ref({ showDeviceInfo: true, logo: null, background: DEFAULT_BACKGROUND, installerNeeded: false, updateAvailable: false, restartNeeded: false });
   // The background audio: none until the server says (an older server never does)
   const audio = ref({ shows: {}, slideshows: {}, event: null });
 
@@ -55,6 +55,7 @@ export function useSocket() {
       background: data?.background || DEFAULT_BACKGROUND,
       installerNeeded: data?.installerNeeded === true,
       updateAvailable: data?.updateAvailable === true,
+      restartNeeded: data?.restartNeeded === true,
     };
   });
 

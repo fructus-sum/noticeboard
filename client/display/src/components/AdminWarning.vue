@@ -2,11 +2,11 @@
 // client/display/src/components/AdminWarning.vue — the warning mark while the admin panel needs someone
 //
 // A small red triangle in the bottom-right corner, always visible while the admin panel shows a
-// warning the screens point to: "Run the installer again on the Server", or (with manual updates) a new
-// version waiting. It stays out of the way of the slides and the other controls. Clicking or tapping it shows only "Please check the Admin panel for details.":
+// warning the screens point to: "Run the installer again on the Server", "Restart the Server" (a
+// setting that needs it), or (with manual updates) a new version waiting. It stays out of the way of the slides and the other controls. Clicking or tapping it shows only "Please check the Admin panel for details.":
 // the details stay in the admin panel. The message closes with ✕, Esc, or by itself after 60 s.
 //
-// Used by: App.vue (while display:settings says installerNeeded or updateAvailable)
+// Used by: App.vue (while display:settings says installerNeeded, updateAvailable or restartNeeded)
 // Uses: ScreenDialog
 import { ref, onMounted, onUnmounted } from 'vue';
 import ScreenDialog from './ScreenDialog.vue';

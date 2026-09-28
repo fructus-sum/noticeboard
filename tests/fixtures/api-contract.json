@@ -713,6 +713,7 @@
       "logo": {
         "url": "string"
       },
+      "restartNeeded": "boolean",
       "showDeviceInfo": "boolean",
       "updateAvailable": "boolean"
     }

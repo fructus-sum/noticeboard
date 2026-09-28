@@ -140,6 +140,8 @@ function server(env) {
       const p = proc;
       proc = null;
       running.delete(p);
+      // Already ended by itself (e.g. a restart from the admin panel): nothing to wait for
+      if (p.exitCode !== null || p.signalCode !== null) return;
       p.kill();
       await new Promise((r) => p.on('exit', r));
     },

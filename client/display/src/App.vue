@@ -51,7 +51,7 @@ if (kiosk) startDailyReload(() => connected.value);
     <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
     <DeviceInfo v-if="settings.showDeviceInfo" />
     <ExitKiosk v-if="kiosk" :visible="active" />
-    <AdminWarning v-if="settings.installerNeeded || settings.updateAvailable" />
+    <AdminWarning v-if="settings.installerNeeded || settings.updateAvailable || settings.restartNeeded" />
     <BackgroundAudio :audio="audio" :on-air="audioFor" :video-sound="videoSound" />
   </div>
 </template>

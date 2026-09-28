@@ -1575,7 +1575,7 @@
           </tr>
           <tr>
             <td><strong>Server port</strong></td>
-            <td>The port the server listens on. Changing this requires a server restart. Don't change this unless necessary.</td>
+            <td>The port the Server listens on (Settings → <strong>Port</strong>, from 1024 to 65535). A change takes effect when the Server restarts: an amber <strong>Restart the Server</strong> box appears on every admin page, with a button to do it (after the admin password). Then run the installer again on each Client with the new address, and allow the new port through any firewall. Don't change this unless necessary.</td>
             <td>3000</td>
           </tr>
           <tr>
@@ -1608,7 +1608,7 @@
       <p>Running the installer again after a restore is recommended (the warning shows the command); there are no more reminders about it once the restore is complete. Restore Defaults needs the Server's automatic updates, which the installer sets up.</p>
 
       <h3>Restarting the server service</h3>
-      <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the Server. Run this command on the Server via SSH or a terminal:</p>
+      <p>A new port takes effect when the Server restarts: use <strong>Restart the Server now…</strong> in the box at the top of the admin pages; the page moves to the new address by itself. After manual edits to <code>config.json</code>, restart it with this command on the Server, via SSH or a terminal:</p>
 
       <pre data-label="Terminal"><code>sudo systemctl restart noticeboard</code></pre>
 

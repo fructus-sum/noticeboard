@@ -51,8 +51,12 @@ router.post('/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-// Also update.sh's health check after a restart (GET /api/auth/status must answer 2xx)
+// Also update.sh's health check after a restart (GET /api/auth/status must answer 2xx), and how the
+// admin panel sees the Server back on a new port after a restart (settings/RestartNotice): another
+// port is another origin, so this one answer may reach the same site (same host, any port); the
+// page only learns that it answered, not what (an opaque response). Everything else stays same-origin.
 router.get('/status', (req, res) => {
+  res.set('Cross-Origin-Resource-Policy', 'same-site');
   res.json({ authenticated: adminSession.isLoggedIn(req) });
 });
 

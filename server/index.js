@@ -11,7 +11,8 @@
 //
 // Uses
 //   services/contentReset, services/videoConversion (recover), services/configService, services/sampleSlideshow, app.js, realtime/displaySocket,
-//   services/schedulerService, services/audioEventClock, utils/logger
+//   services/schedulerService, services/audioEventClock, services/restartState (the port it runs
+//   with), utils/logger
 //
 // Change impact
 //   The path server/index.js is in every installed service unit (SYSTEM_DESIGN §15). The
@@ -25,6 +26,7 @@ const { syncSampleSlideshow } = require('./services/sampleSlideshow');
 const createApp = require('./app');
 const { initDisplaySocket } = require('./realtime/displaySocket');
 const audioEventClock = require('./services/audioEventClock');
+const restartState = require('./services/restartState');
 const logger = require('./utils/logger');
 
 async function main() {
@@ -37,6 +39,7 @@ async function main() {
   await syncSampleSlideshow().catch((err) => logger.error('Could not set up the sample slideshow', { err: err.message }));
 
   const port = configService.get('port') || 3000;
+  restartState.setRunning({ port });
   const app = createApp();
   const server = http.createServer(app);
 

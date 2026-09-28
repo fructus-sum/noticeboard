@@ -1,7 +1,7 @@
 {
   "01 connect": [
     "display:build string",
-    "display:settings {\"showDeviceInfo\":true,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false}",
+    "display:settings {\"showDeviceInfo\":true,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false,\"restartNeeded\":false}",
     "playlist:update (empty)",
     "audio:update"
   ],
@@ -26,14 +26,14 @@
     "playlist:update events:image:6"
   ],
   "09 hide the location pin": [
-    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false}"
+    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false,\"restartNeeded\":false}"
   ],
   "10 change the default duration": [],
   "11 upload a logo": [
-    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false}"
+    "display:settings {\"showDeviceInfo\":false,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false,\"restartNeeded\":false}"
   ],
   "12 turn the logo off": [
-    "display:settings {\"showDeviceInfo\":false,\"logo\":null,\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false}"
+    "display:settings {\"showDeviceInfo\":false,\"logo\":null,\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false,\"restartNeeded\":false}"
   ],
   "13 back to the default logo": [],
   "14 unpublish": [

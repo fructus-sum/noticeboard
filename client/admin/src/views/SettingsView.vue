@@ -11,6 +11,7 @@ import { ref, onMounted } from 'vue';
 import { api } from '../composables/useApi.js';
 import DisplaySettingsCard from '../components/settings/DisplaySettingsCard.vue';
 import MacFilterCard from '../components/settings/MacFilterCard.vue';
+import ServerPortCard from '../components/settings/ServerPortCard.vue';
 import BrandingSettings from '../components/settings/BrandingSettings.vue';
 import PasswordCard from '../components/settings/PasswordCard.vue';
 import SoftwareUpdates from '../components/updates/SoftwareUpdates.vue';
@@ -28,6 +29,7 @@ onMounted(async () => {
     <h1>Settings</h1>
     <DisplaySettingsCard :settings="settings" />
     <MacFilterCard :settings="settings" />
+    <ServerPortCard :settings="settings" />
     <BrandingSettings :settings="settings" />
     <PasswordCard />
     <SoftwareUpdates />
