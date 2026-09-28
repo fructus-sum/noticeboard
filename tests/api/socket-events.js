@@ -25,6 +25,18 @@ function summary(name, payload) {
   const s = server(env);
   await s.start();
   await s.login();
+  // The start-up job that makes the sample video's thumbnail (and fills in its length) resends the
+  // playlist when it finishes; let it finish first, so it can't land in the steps below (it did, now
+  // and then: a second empty playlist on connect)
+  for (let i = 0; i < 100; i++) {
+    let pending = false;
+    for (const ss of (await s.api('GET', '/api/slideshows')).data) {
+      if ((await s.api('GET', `/api/slideshows/${ss.folder}/slides`)).data.some((x) => x.thumbnailPending)) pending = true;
+    }
+    if (!pending) break;
+    await sleep(100);
+  }
+  await sleep(300);
   const png = async (c) => new Blob([await sharp({ create: { width: 64, height: 36, channels: 3, background: c } }).png().toBuffer()], { type: 'image/png' });
 
   let received = [];
