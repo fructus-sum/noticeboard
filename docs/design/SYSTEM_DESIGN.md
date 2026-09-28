@@ -548,7 +548,7 @@ Entry point: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboa
    10. `write_server_kiosk` (`installers/kiosk/server.sh` as it is → `/opt/noticeboard/start-kiosk.sh`), `write_autostart`, `write_help_shortcut file://…/noticeboard-guide.html`.
    11. `chown -R <user> /opt/noticeboard`.
    12. `write_update_units` (service, path, timer), enable the timer and path units.
-   13. `write_installer_record` → `data/installer.json` (`INSTALLER_VERSION=3`).
+   13. `write_installer_record` → `data/installer.json` (`INSTALLER_VERSION=4`).
 11. **Display install (`install_display`):** `update_system`, `apt-get install chromium curl`, `collect_macs_html` (the MAC addresses from `/sys/class/net/*/address` as table rows), `write_display_kiosk` (`installers/kiosk/display.sh` with its `SERVER_URL=""` and `MACS_HTML=""` lines filled in → `/usr/local/bin/noticeboard-kiosk.sh`), `write_autostart`, `write_help_shortcut <SERVER_URL>/admin/help`.
 12. The summary (server: URLs using `hostname -I` and `slideshow_port`, the default password, sudo status, logs, branch).
 13. **`check_firewall`** (optional; its errors never stop the installer):
@@ -637,7 +637,7 @@ noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
 
 **Desktop:**
 - XDG autostart runs `Exec=<kiosk script>`.
-- Chromium runs with flags that suppress error dialogs, the infobar, update checks and the first-run pages, with its own `--user-data-dir`, and (installer version 3) `--autoplay-policy=no-user-gesture-required`, so background audio plays without a click.
+- Chromium runs with flags that suppress error dialogs, the infobar, update checks and the first-run pages, with its own `--user-data-dir`, and (installer version 3) `--autoplay-policy=no-user-gesture-required`, so background audio plays without a click. The Server's kiosk opens `http://localhost:<port>/`, the port read from `data/config.json` each time it waits for the Server (installer version 4; 3000 if it can't be read).
 - `xset` turns screen blanking off (X11 only; it's a no-op on Wayland/labwc).
 
 **Privileges:**
@@ -1233,7 +1233,7 @@ An installed Server receives new code through the `update.sh` that is **already 
 Behaviour kept as it is until a change is planned for it (§18): fixing one changes behaviour, so it is designed, reviewed and tested on its own.
 
 1. ~~socket.io is not MAC filtered~~ **Fixed in 0.6.2** (§18.5 item 1): the live connection is MAC filtered like the pages.
-2. **The server kiosk URL is hard-coded to port 3000.** Changing `config.port` would break the Server's own screen until the kiosk script is edited.
+2. ~~The server kiosk URL is hard-coded to port 3000~~ **Fixed in 0.6.3** (§18.5 item 2): the Server's kiosk reads the port from its settings whenever it starts the browser (installer version 4). A Client still has the Server's address, port included, from its installer run.
 3. **An empty client IP counts as the Server itself** in the MAC filter (D6).
 4. **`PUT /api/settings` does not validate `port` or the `macFiltering` shape.** A bad value is saved as it is. A port change takes effect only after a restart.
 5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.2).
@@ -1285,7 +1285,7 @@ Every planned change starts here, before any code: what changes and why, the par
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again | a patch release when fixed |
 | 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) | a patch release when done |
 | 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); to check on a real Pi, then merge into main with the owner's OK | 0.6.0 |
-| 18.4 | The words Server and Client everywhere; the supported devices | Done on the local branch `fix/server-client-terms` (after 18.3 merges); the kiosk scripts' text waits for 18.5's installer version | 0.6.1 |
+| 18.4 | The words Server and Client everywhere; the supported devices | Done (the kiosk scripts' text with §18.5 item 2, installer version 4); on `feature/audio-support`, to merge with it | 0.6.1 |
 | 18.5 | The Known Issues cleared for a stable base (§16) | Planned, after 18.4 | 0.6.2 to 0.6.13 (one per item) |
 | 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, after 18.5 | 0.7.0 |
 
@@ -1400,13 +1400,13 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 | Raspberry Pi 5 | yes | yes | H.264 and H.265 | Supported |
 | Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | Planned: needs a headless Client installer (a later feature; today's Client installer needs a desktop) |
 
-**Done (2026-09-28), except** the text inside the files the installer copies onto each device (the kiosk scripts): changing it changes the recorded installer output, which needs an installer version, so it goes with §18.5 item 2 (installer version 4). **How:** a word list (Pi → Server/Client by context; "display" as a device → Client; "screen" stays for the physical screen) applied file by file, reading each sentence (no blind search-and-replace). **Risks:** texts only: the look and text snapshots (admin pages, viewer) and the installer's golden files change on purpose; nothing an installed system reads changes. **Tests:** every group; snapshots re-recorded after a reviewed diff.
+**Done (2026-09-28).** The text inside the files the installer copies onto each device (the kiosk scripts) changed with §18.5 item 2, since it needs an installer version (4). **How:** a word list (Pi → Server/Client by context; "display" as a device → Client; "screen" stays for the physical screen) applied file by file, reading each sentence (no blind search-and-replace). **Risks:** texts only: the look and text snapshots (admin pages, viewer) and the installer's golden files change on purpose; nothing an installed system reads changes. **Tests:** every group; snapshots re-recorded after a reviewed diff.
 
 ### 18.5 The Known Issues cleared (§16)
 
 **Why:** a clean, stable base before the next features. Each item is a bug fix with its own patch number (0.6.2 to 0.6.13, in this order), as the owner decided (2026-09-28):
-1. (0.6.2, **done**) **socket.io MAC filtered.** A socket.io middleware (`io.use`) in displaySocket applies the same approval rule as `requireApprovedDevice` (macService, one implementation: `middleware/access.js` exports the check it uses) to the connecting address; a refused device gets a connect error and nothing else. The viewer never loads on such a device anyway (`/` is filtered), so screens see no change.
-2. (0.6.3) **The Server's kiosk follows the port.** `installers/kiosk/server.sh` reads the port from `data/config.json` when it starts (as update.sh does, through `configIO.readConfig`), falling back to 3000. `INSTALLER_VERSION` 4 with a changes line; golden files re-recorded on purpose.
+1. (0.6.2, **done**) **socket.io MAC filtered.** A socket.io middleware (`io.use`) in displaySocket applies the same approval rule as `requireApprovedDevice` (one implementation: macService's `resolveAddress`, which `resolveRequest` now uses too) to the connecting address, and closes the connections a change to MAC filtering no longer allows; a refused device gets a connect error and nothing else. The viewer never loads on such a device anyway (`/` is filtered), so screens see no change.
+2. (0.6.3, **done**) **The Server's kiosk follows the port.** `installers/kiosk/server.sh` reads the port from `data/config.json` each time it waits for the Server before starting the browser (as update.sh does, through `configIO.readConfig`), falling back to 3000. The kiosk scripts' texts take §18.4's words at the same time. `INSTALLER_VERSION` 4 with a changes line; golden files re-recorded on purpose; `kiosk-scripts.sh` checks a port from the settings and the fallback.
 3. (0.6.4) **An empty client address is refused** when MAC filtering is on: `macLookup.isLocalhost` no longer counts `''` as this device (D6 updated); a request without an address is blocked.
 4. (0.6.5) **Settings are checked, and a restart is asked for when needed.** `PUT /api/settings` validates `port` (a whole number 1024–65535, not in use by the Server's other services) and `macFiltering` (item 9). A new **Port** field in Settings. A setting that only applies after a restart (today: the port) makes `GET /api/settings/restart` report `restartNeeded` (the saved port differs from the one the Server is listening on). Like the installer warning, an amber box on every admin page says **Restart the Server** and what the change needs; for the port it also says each Client's installer must be run again with the new address, and the firewall rule changed. Its **Restart the Server now** button asks for the admin password (the shared confirmation, D40) and answers, then ends the Server process, which systemd starts again at once (the service has `Restart=always`; no new rights needed; Clients reconnect by themselves); the box goes away once the Server runs with the saved settings. The Delete content card's port text is corrected.
 5. (0.6.6) **Unused npm packages:** the item and §18.2 are removed (the owner, 2026-09-28); the packages are left as they are.

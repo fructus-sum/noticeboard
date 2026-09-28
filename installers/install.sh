@@ -42,7 +42,7 @@ SUDOERS_BACKUP_DIR="/root/noticeboard-sudoers-backup"
 # Raise this, and "installer" in system-requirements.json, whenever this script changes what
 # updates can't: kiosk scripts, system services, desktop shortcuts or system packages. A server
 # Server whose last installer run (data/installer.json) is older is told to run it again.
-INSTALLER_VERSION=3
+INSTALLER_VERSION=4
 # A Server follows main unless another branch was chosen in the admin panel (choose_branch)
 INSTALL_BRANCH=main
 # The installer's parts, from the same commit as this script (see load_modules)

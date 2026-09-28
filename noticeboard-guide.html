@@ -1823,7 +1823,7 @@
 
       <pre data-label="Terminal"><code>journalctl -t noticeboard-kiosk -b</code></pre>
 
-      <p><em>Waiting for the server</em> with nothing after it means the Server isn't answering (check it as above). <em>Browser exited … starting it again</em> means the browser closed and the kiosk reopened it, as it should. <em>Chromium isn't installed</em>, or an empty log, means the kiosk setup is from an older installer: run the installer again and reboot. Older installers didn't know that newer Raspberry Pi OS calls the browser <code>chromium</code> instead of <code>chromium-browser</code>.</p>
+      <p><em>Waiting for the Server</em> with nothing after it means the Server isn't answering (check it as above). <em>Browser exited … starting it again</em> means the browser closed and the kiosk reopened it, as it should. <em>Chromium isn't installed</em>, or an empty log, means the kiosk setup is from an older installer: run the installer again and reboot. Older installers didn't know that newer Raspberry Pi OS calls the browser <code>chromium</code> instead of <code>chromium-browser</code>.</p>
 
       <h3>The slideshow seems stuck, or the screen goes dark</h3>
       <p>A screen moves on by itself from any slide that won't load or play (after 30 seconds at most), catches up after the screen sleeps, and reconnects after an outage (see <a href="#unattended" style="color:var(--amber)">Running unattended</a>). If a screen still looks stuck:</p>
