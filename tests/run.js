@@ -12,7 +12,10 @@
 //   all         every group in that order
 // filter: only files whose name contains it, e.g. node tests/run.js browser branch
 // A file that fails is followed by how it ended (exit code, signal or start error) and how long it
-// ran, so a test that stops without printing a failure still says why.
+// ran, so a test that stops without printing a failure still says why. A file whose Node.js process
+// crashed (killed by a signal, or a Windows crash code such as 0xC0000409, seen now and then on
+// Windows within a second of starting, before any check) is run once more, and the summary says
+// so; a test that fails a check (exit code 1) is never run again.
 //
 // Needs: `npm run build` first (api, browser, upgrade copy the built apps); FFMPEG_PATH and
 // FFPROBE_PATH, or ffmpeg on the PATH, for the video tests; bash (on Windows: Git Bash, or BASH).
@@ -81,7 +84,8 @@ async function startChrome() {
   };
 }
 
-// → { code, how }: code 0 only when it exited normally with 0; how says how it ended
+// → { code, how, crashed }: code 0 only when it exited normally with 0; how says how it ended;
+// crashed when the process itself died (a signal, or a Windows NTSTATUS code: 0xC0000000 and up)
 function run(cmd, args) {
   const started = Date.now();
   return new Promise((resolve) => {
@@ -90,6 +94,7 @@ function run(cmd, args) {
     child.on('exit', (code, signal) => resolve({
       code: code ?? 1,
       how: signal ? `killed by ${signal}, ${took()}` : `exit code ${code} (0x${(code >>> 0).toString(16)}), ${took()}`,
+      crashed: !!signal || (code >>> 0) >= 0xC0000000,
     }));
     child.on('error', (e) => resolve({ code: 1, how: `could not start: ${e.message}` }));
   });
@@ -119,9 +124,17 @@ async function runGroup(group, filter) {
   try {
     for (const file of files) {
       console.log(`\n━━ ${group}/${path.basename(file)}`);
-      const { code, how } = await run(isShell ? bash : process.execPath, [file]);
+      let { code, how, crashed } = await run(isShell ? bash : process.execPath, [file]);
       if (code !== 0) console.log(`(${path.basename(file)} ended: ${how})`);
-      results.push({ name: `${group}/${path.basename(file)}`, result: code === 0 ? 'pass' : 'FAIL', how: code === 0 ? '' : how });
+      let note = code === 0 ? '' : how;
+      if (crashed) {
+        console.log(`(${path.basename(file)}: the process crashed rather than failing a check; running it once more)`);
+        const first = how;
+        ({ code, how } = await run(isShell ? bash : process.execPath, [file]));
+        if (code !== 0) console.log(`(${path.basename(file)} ended: ${how})`);
+        note = code === 0 ? `passed on a second run; the first crashed: ${first}` : `${how}; the first run crashed: ${first}`;
+      }
+      results.push({ name: `${group}/${path.basename(file)}`, result: code === 0 ? 'pass' : 'FAIL', how: note });
     }
   } finally {
     if (chrome) await chrome.stop();
