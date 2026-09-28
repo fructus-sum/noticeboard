@@ -4,7 +4,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { plainAddress, isLoopback, lanInterfaces } = require('../utils/network');
-const { isLocalhost } = require('../utils/macLookup');
+const { isLocalhost, lookupMac } = require('../utils/macLookup');
 const mediaTypes = require('../services/mediaTypes');
 const contract = require('../../shared/contract.json');
 
@@ -23,9 +23,14 @@ test('isLoopback: the kiosk-exit rule (the whole 127.0.0.0/8 range and ::1)', ()
   for (const a of ['192.168.1.20', '::ffff:192.168.1.20', '', undefined, '::11', '10.127.0.1']) assert.equal(isLoopback(a), false, String(a));
 });
 
-test('isLocalhost: the MAC-filter rule is unchanged (exact addresses, and an empty one)', () => {
-  for (const a of ['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost', '', undefined]) assert.equal(isLocalhost(a), true, String(a));
-  for (const a of ['127.0.0.2', '192.168.1.20', '::ffff:192.168.1.20']) assert.equal(isLocalhost(a), false, a);
+test('isLocalhost: the MAC-filter rule (exact addresses; an empty one is not the Server, 0.6.4)', () => {
+  for (const a of ['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']) assert.equal(isLocalhost(a), true, String(a));
+  for (const a of ['127.0.0.2', '192.168.1.20', '::ffff:192.168.1.20', '', undefined]) assert.equal(isLocalhost(a), false, String(a));
+});
+
+test('an empty address has no MAC, so MAC filtering refuses it (0.6.4)', async () => {
+  assert.equal(await lookupMac(''), null);
+  assert.equal(await lookupMac(undefined), null);
 });
 
 test('lanInterfaces lists IPv4, non-internal interfaces with name, ip and mac', () => {
