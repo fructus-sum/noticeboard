@@ -1,5 +1,5 @@
 // The video format for new uploads and converting the existing videos (Settings → Display,
-// SYSTEM_DESIGN §14 D43, §16 #12): H.265 unless H.264 is chosen; only the contract's formats are
+// SYSTEM_DESIGN §14 D43): H.265 unless H.264 is chosen; only the contract's formats are
 // accepted; each upload is converted to the format chosen when it's processed (checked with
 // ffprobe) and records it; the playlist gives each video its length. Converting the existing videos
 // shows each as processing in its turn while the screens keep its current file, then replaces it;

@@ -4,7 +4,7 @@
 
 **Keeping it up to date:** every planned change starts in §18, before any code. Then change this document in the same commit as the code it describes, so it is always a live view of the software and of the work in progress. Code comments refer to it as `SYSTEM_DESIGN §<n>`, and to the entries of §14 by their D-number: when a number changes, update those comments too (search the code for `SYSTEM_DESIGN`).
 
-**Version:** main is **0.5.0**; `feature/audio-support` will be **0.6.0** ("Audio"). 1.0.0 is the version with Display Groups. The rules and the history are in §19.
+**Version:** main is **0.5.0**; `feature/audio-support` carries **0.6.0** ("Audio") to **0.6.13** (the words Server and Client, and the Known Issues), which merge into main together. 1.0.0 is the version with Display Groups. The rules and the history are in §19.
 
 **Module headers:** every module starts with a header in this form (`//` comments in JavaScript and inside a Vue file's `<script setup>`, `#` in bash). Comments inside a module explain intent, compatibility constraints and anything non-obvious, not what each line does.
 
@@ -272,7 +272,7 @@ A Vue Router SPA under `/admin/`:
 | What | Where | Trigger |
 |---|---|---|
 | Recompute the active slideshows | `schedulerService.computeActive` | every 60 s, and on every `configService 'change'`. It emits `'update'` only when the ordered list of folders changes. |
-| Media processing | `uploadQueue` (p-queue, concurrency 2) | after an upload. Images: sharp → PNG. Videos: ffmpeg → the chosen format (H.265 by default, or H.264: `settingsService.videoFormat`)/AAC MP4, recorded as the slide's `format` (§16 #12), then ffprobe for the length, then a JPEG thumbnail. |
+| Media processing | `uploadQueue` (p-queue, concurrency 2) | after an upload. Images: sharp → PNG. Videos: ffmpeg → the chosen format (H.265 by default, or H.264: `settingsService.videoFormat`)/AAC MP4, recorded as the slide's `format` (D43), then ffprobe for the length, then a JPEG thumbnail. |
 | Video thumbnails (and the length of a video without one) | `uploadQueue.enqueueThumbnail` | the sample slideshow's videos, and "Create thumbnails" in the admin panel |
 | Converting the existing videos | `videoConversion` (one video at a time, beside the upload queue) | "Convert existing videos" in Settings → Display (D43) |
 | Sample slideshow sync | `sampleSlideshow.syncSampleSlideshow` | once at start-up |
@@ -368,7 +368,7 @@ Error conventions:
 - `audioEventClock` emits `'update'` when the event playing changes (worked out on a config change and when the next event starts or ends); displaySocket sends the audio again.
 - `schedulerService` emits `'update'` when the active slideshows change. Its only listener is displaySocket's playlist broadcast.
 - **`services/displayEvents.js`** is the explicit channel to the displays. `playlistChanged()` is called by the slideshow PUT, the slide DELETE and reorder routes, and `uploadQueue` after processing. `displaySettingsChanged()` is called by the logo upload and reset. `audioChanged()` is called by the tracks' delete and reorder routes and by `uploadQueue` after a track is processed. displaySocket is its only listener, so no route or service depends on socket.io.
-- Changing the default image duration (`PUT /settings` display) sends no playlist: displays keep the old duration for slideshows that use the default until the playlist is next sent (§16 #10).
+- Changing the default image duration (`PUT /settings` display) sends no playlist: displays keep the old duration for slideshows that use the default until the playlist is next sent (§16).
 
 ---
 
@@ -1245,19 +1245,10 @@ An installed Server receives new code through the `update.sh` that is **already 
 
 ## 16. Known issues
 
-Behaviour kept as it is until a change is planned for it (§18): fixing one changes behaviour, so it is designed, reviewed and tested on its own.
+Behaviour kept as it is until a change is planned for it (§18): fixing one changes behaviour, so it is designed, reviewed and tested on its own. The list was cleared for a stable base in 0.6.2–0.6.13 (§18.5; what each version fixed is in §19). What is left:
 
-1. ~~socket.io is not MAC filtered~~ **Fixed in 0.6.2** (§18.5 item 1): the live connection is MAC filtered like the pages.
-2. ~~The server kiosk URL is hard-coded to port 3000~~ **Fixed in 0.6.3** (§18.5 item 2): the Server's kiosk reads the port from its settings whenever it starts the browser (installer version 4). A Client still has the Server's address, port included, from its installer run.
-3. ~~An empty client IP counts as the Server itself~~ **Fixed in 0.6.4** (§18.5 item 3): with MAC filtering on, a request without an address is refused (D6).
-4. ~~`PUT /api/settings` does not validate `port`~~ **Fixed in 0.6.5** (§18.5 item 4): the port is checked; a change needs a restart, which the admin panel asks for (and does) like the installer warning. (The `macFiltering` shape: item 9 below.)
-6. **The media route allows audio extensions** (`.mp3 .wav .ogg`) that nothing produces there. Reviewed after audio support (0.6.7): **still an issue**, reported and left as it is (the owner, 2026-09-28): audio shows' tracks are `.m4a`, served only at `/audio`, and a slide is only ever an image or a video, so `/media` never holds audio. Harmless (the files would still be MAC filtered), but the allowlist is wider than it needs to be.
-7. ~~The admin panel ignores reorder errors~~ **Fixed in 0.6.8** (§18.5 item 7): a reorder that can't be saved says so in the list, and the list is loaded again.
-8. ~~`configService.init` regenerates the defaults when `config.json` doesn't parse~~ **Fixed in 0.6.9** (§18.5 item 8): an unreadable config.json is kept (moved aside) and the last good copy restored, or the Server starts from the defaults; the admin panel says which until dismissed.
-9. ~~`configService.update` merges only the top level, so `PUT /settings` replaced the whole `macFiltering`~~ **Fixed in 0.6.10** (§18.5 item 9): settingsService checks and merges `macFiltering` field by field, like `display`; `configService.update` stays a plain top-level merge.
-10. **Changing the default image duration doesn't resend the playlist** (kept as it is on purpose: the owner, 0.6.11) (`tests/api/socket-events.js` records this). Slideshows without their own duration keep the old one on screen until the playlist is next sent: a publish, upload, reorder or delete, a scheduler change, or a display reconnecting.
-11. ~~A message's clear timer can clear a later message~~ **Fixed in 0.6.12** (§18.5 item 11): every new message cancels the previous one's timer; an error stays until its ✕ or the next attempt's result.
-12. ~~H.265 by default, and videos in the other format~~ **Moved in 0.6.13** (§18.5 item 12): this is the design, not an issue; it is described with the video format (D43), and the Display card now warns while videos already uploaded aren't all in the saved format.
+1. **The media route allows audio extensions** (`.mp3 .wav .ogg`) that nothing produces there. Reviewed after audio support (0.6.7): still an issue, reported and left as it is (the owner, 2026-09-28). Audio shows' tracks are `.m4a`, served only at `/audio`, and a slide is only ever an image or a video, so `/media` never holds audio. Harmless (the files would still be MAC filtered), but the allowlist is wider than it needs to be.
+2. **Changing the default image duration doesn't resend the playlist** (kept as it is on purpose: the owner, 0.6.11; `tests/api/socket-events.js` records it). Slideshows without their own duration keep the old one on screen until the playlist is next sent: a publish, upload, reorder or delete, a scheduler change, or a display reconnecting.
 
 ---
 
@@ -1299,7 +1290,7 @@ Every planned change starts here, before any code: what changes and why, the par
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again | a patch release when fixed |
 | 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); to check on a real Pi, then merge into main with the owner's OK | 0.6.0 |
 | 18.4 | The words Server and Client everywhere; the supported devices | Done (the kiosk scripts' text with §18.5 item 2, installer version 4); on `feature/audio-support`, to merge with it | 0.6.1 |
-| 18.5 | The Known Issues cleared for a stable base (§16) | Planned, after 18.4 | 0.6.2 to 0.6.13 (one per item) |
+| 18.5 | The Known Issues cleared for a stable base (§16) | Done on `feature/audio-support` (all 12 items), to merge with it | 0.6.2 to 0.6.13 (one per item) |
 | 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, after 18.5 | 0.7.0 |
 
 Design notes D44–D47 are reserved for 18.3.
@@ -1463,7 +1454,7 @@ cat /proc/device-tree/model; uname -r; chromium --version
 - **Each bug fix counts as its own patch number,** even when several are done together (the owner, 2026-09-28): e.g. §18.5's twelve items are 0.6.2 to 0.6.13, and wording or documentation work such as §18.4 is a patch too.
 - `package.json` (the root, `client/admin` and `client/display`) still says 1.0.0, npm's default; nothing reads it. Setting it to the version here is for the owner to decide (by hand, with the matching top entries of `package-lock.json`, never with npm install on Windows).
 
-**Current:** main is **0.5.0**. In progress: **0.6.0** "Audio" on `feature/audio-support` (§18.3; all 7 phases done, to be checked on a Pi and merged). Planned: **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item), **0.7.0** (§18.6 Releases).
+**Current:** main is **0.5.0**. On `feature/audio-support`, done and waiting for the check on a real Pi, then one merge into main: **0.6.0** "Audio" (§18.3), **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item). Planned next: **0.7.0** (§18.6 Releases).
 
 **History** (numbered after the fact for everything before 0.6.0)
 
@@ -1474,4 +1465,17 @@ cat /proc/device-tree/model; uname -r; chromium --version
 | 0.3.0 | 2026-09-27 | PR #1 "QALife updates" (8c39d54), then fc4ba53 | The viewer's exit control, location pin setting, cursor hiding and logo; the password warning; the admin at /admin on one port; slideshow durations, hide and unhide, sample protection, previews and video thumbnails; the admin panel on phones; the MAC filtering warning; the software check before switching branch; "run the installer again" notices; the sidebar's "Last updated" | |
 | 0.4.0 | 2026-09-27 | PR #2 "Reorganise the code…" (3b4f77c) | The refactor (12 stages, the test suite in the repository, the System Design); slides that always fit the screen on a background colour; the updater's warnings on every admin page and a warning mark on every screen | the location pin's pop-up pointing the public to the admin panel |
 | 0.5.0 | 2026-09-28 | merge of QALife-updates (e2deb54) | Slide names; admin cards that fold to their title; Delete All; the update schedule; Restore Defaults; new videos in H.265 with a format setting, converting existing videos, and videos keeping to time; module comments brought up to date; MAC filtering's network requirements in the README and Help | the merged-notice test failing on a clean working tree |
-| 0.6.0 | in progress | `feature/audio-support` | "Audio": audio shows with tracks, order, crossfades, volume and a preview; background audio for slideshows; video sound; event audio (§18.3). The README's new opening | |
+| 0.6.0 | on the branch | `feature/audio-support` | "Audio": audio shows with tracks, order, crossfades, volume and a preview; background audio for slideshows; video sound; event audio (§18.3). The README's new opening | |
+| 0.6.1 | on the branch | `feature/audio-support` | The words Server and Client everywhere, and the supported devices (§18.4) | |
+| 0.6.2 | on the branch | `feature/audio-support` | | the live connection (socket.io) wasn't MAC filtered |
+| 0.6.3 | on the branch | `feature/audio-support` | installer version 4 | the Server's own screen ignored a changed port (the kiosk had 3000 built in) |
+| 0.6.4 | on the branch | `feature/audio-support` | | an empty client address counted as the Server itself |
+| 0.6.5 | on the branch | `feature/audio-support` | a Port card in Settings, and "Restart the Server" | the port wasn't checked, and a change needed a restart by hand |
+| 0.6.6 | on the branch | `feature/audio-support` | | the unused npm packages item closed (the packages left in, the owner's choice) |
+| 0.6.7 | on the branch | `feature/audio-support` | | the media route's audio extensions reviewed: still an issue, reported (§16) |
+| 0.6.8 | on the branch | `feature/audio-support` | | reorder errors were ignored |
+| 0.6.9 | on the branch | `feature/audio-support` | | an unreadable config.json was overwritten with the defaults |
+| 0.6.10 | on the branch | `feature/audio-support` | | MAC filtering's settings were saved as sent, whole |
+| 0.6.11 | on the branch | `feature/audio-support` | | the default duration not resending the playlist: kept as it is (the owner's choice) |
+| 0.6.12 | on the branch | `feature/audio-support` | | a message's timer could clear a later message |
+| 0.6.13 | on the branch | `feature/audio-support` | the Display card warns about videos in the other format | |

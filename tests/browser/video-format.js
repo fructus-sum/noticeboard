@@ -1,6 +1,6 @@
-// Settings → Display → Video format for new uploads and Existing videos (SYSTEM_DESIGN §14 D43,
-// §16 #12): H.265 by default with both formats explained and the warning that some screens and
-// browsers can't play it; choosing H.264 hides the warning and Save keeps it with the other display
+// Settings → Display → Video format for new uploads and Existing videos (SYSTEM_DESIGN §14 D43):
+// H.265 by default with both formats explained and the warning that some screens and browsers
+// can't play it; choosing H.264 hides the warning and Save keeps it with the other display
 // settings. "Convert existing videos" uses the saved format (it asks to save a changed choice
 // first), warns before it starts, shows its progress and how it went. While videos already uploaded
 // aren't in the saved format, the card says how many (§18.5 item 12): the sample's H.264 video with

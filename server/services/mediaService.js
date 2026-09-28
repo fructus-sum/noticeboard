@@ -5,7 +5,7 @@
 //   processVideo(input, outDir, id, format) → an MP4 with AAC sound, its video 'h265' (HEVC, the
 //                                     default: smaller) or 'h264' (plays everywhere), as chosen in
 //                                     Settings → Display. Videos already processed keep their format
-//                                     (SYSTEM_DESIGN §16 #12)
+//                                     (SYSTEM_DESIGN §14 D43)
 //   getMediaDuration(file) → a video's or audio file's length in whole seconds, or null (ffprobe)
 //   createThumbnail(video, outDir, id) → a still for the admin panel
 //   processAudio(input, outDir, id) → an AAC .m4a (192 kbit/s), its loudness evened out (EBU R128,
