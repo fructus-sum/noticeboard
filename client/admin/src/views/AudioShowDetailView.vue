@@ -2,15 +2,16 @@
 // client/admin/src/views/AudioShowDetailView.vue — one audio show (/admin/audio/:folder)
 //
 // Loads the show (404 → back to the list) and its tracks; the header with its name and status; its
-// settings card and its track list (SYSTEM_DESIGN §18.3).
+// settings card, "Preview the show" and its track list (SYSTEM_DESIGN §18.3).
 //
 // Used by: router/index.js
-// Uses: useApi, audio/AudioShowSettingsCard, audio/TrackList, ui/StatusBadge
+// Uses: useApi, audio/AudioShowSettingsCard, audio/ShowPreview, audio/TrackList, ui/StatusBadge
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../composables/useApi.js';
 import AudioShowSettingsCard from '../components/audio/AudioShowSettingsCard.vue';
 import TrackList from '../components/audio/TrackList.vue';
+import ShowPreview from '../components/audio/ShowPreview.vue';
 import StatusBadge from '../components/ui/StatusBadge.vue';
 
 const route = useRoute();
@@ -43,6 +44,7 @@ onMounted(async () => {
     <p v-if="error" class="error-msg">{{ error }}</p>
     <template v-if="show">
       <AudioShowSettingsCard :show="show" @change="(saved) => { show = saved; }" />
+      <ShowPreview :show="show" :tracks="tracks" />
       <TrackList v-model:tracks="tracks" :folder="folder" :volume="show.volume" />
     </template>
   </div>

@@ -1,7 +1,8 @@
 // The audio pages in the admin panel (SYSTEM_DESIGN §18.3, phase 2): "Audio" in the sidebar, creating
 // a show (it opens), its settings (edit, the fade length only with a crossfade, save, publish), the
 // track list (upload through the file picker, processing then ready, ▶ plays and ■ stops, rename,
-// reorder, delete), and the list page's summary, publish toggle and delete.
+// reorder, delete), "Preview the show" (phase 3: off until a track is ready, plays naming the track,
+// ⏭ moves on, ■ stops), and the list page's summary, publish toggle and delete.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -55,6 +56,10 @@ for (const [name, hz] of [['First song.mp3', 440], ['Second song.mp3', 550]]) {
   check('  … and on the server', stored.order === 'shuffle' && stored.transition === 'crossfade' && stored.fadeSeconds === 6 && stored.volume === 70, JSON.stringify(stored));
   check('  … the API needed the login', saved.status === 401);
 
+  // Preview: nothing to play yet
+  const previewBtn = `[...document.querySelectorAll('.preview button')].find((b) => b.textContent.includes('Preview the show'))`;
+  check('"Preview the show" is off until a track is ready', await c.evaluate(`${previewBtn}?.disabled === true && document.querySelector('.preview').innerText.includes('Upload a track')`));
+
   // Upload two tracks through the file picker
   const { root } = await c.send('DOM.getDocument', { depth: -1, pierce: true });
   const { nodeId } = await c.send('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[type=file]' });
@@ -69,6 +74,20 @@ for (const [name, hz] of [['First song.mp3', 440], ['Second song.mp3', 550]]) {
   check('▶ plays the track (the button becomes ■)', await c.until(`document.querySelector('.track-play').textContent.trim() === '■'`, 5000));
   for (const type of ['mousePressed', 'mouseReleased']) await c.send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
   check('■ stops it', await c.until(`document.querySelector('.track-play').textContent.trim() === '▶'`, 5000));
+
+  // Preview the show (a real click again), ⏭, ■
+  const clickText = async (text) => {
+    const at = await c.evaluate(`(() => { const b = [...document.querySelectorAll('.preview button')].find((x) => x.textContent.includes(${JSON.stringify(text)})); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    for (const type of ['mousePressed', 'mouseReleased']) await c.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
+  };
+  await clickText('Preview the show');
+  const playingName = `(document.querySelector('.preview__now strong')?.textContent ?? '').trim()`;
+  check('▶ Preview the show plays, naming the track', await c.until(`['First song.mp3', 'Second song.mp3'].includes(${playingName})`, 5000), await c.evaluate(`document.querySelector('.preview')?.innerText`));
+  const firstPlayed = await c.evaluate(playingName);
+  await clickText('Next track');
+  check('  … ⏭ moves to the other track', await c.until(`${playingName} !== '' && ${playingName} !== ${JSON.stringify(firstPlayed)}`, 8000), await c.evaluate(playingName));
+  await clickText('Stop');
+  check('  … ■ Stop ends the preview', await c.until(`!!(${previewBtn}) && !document.querySelector('.preview__now')`, 5000));
 
   // Rename, reorder, delete
   await c.evaluate(`[...document.querySelectorAll('.track-row button')].find((b) => b.title === 'Rename').click()`);
