@@ -686,7 +686,7 @@
 
     <div class="nav-section">
       <div class="nav-section-label">Administration</div>
-      <a class="nav-link" href="#displays"><span class="nav-num">09</span>Remote Displays</a>
+      <a class="nav-link" href="#displays"><span class="nav-num">09</span>Clients &amp; MAC filtering</a>
       <a class="nav-link" href="#settings"><span class="nav-num">10</span>Settings</a>
       <a class="nav-link" href="#troubleshooting"><span class="nav-num">11</span>Troubleshooting</a>
     </div>
@@ -699,11 +699,11 @@
     <div class="hero">
       <div class="hero-eyebrow">User Guide — v1.0</div>
       <h1>The <em>complete</em><br>Noticeboard guide</h1>
-      <p class="hero-intro">Everything you need to set up, manage, and display content on your Raspberry Pi noticeboard system — from installation to daily use.</p>
+      <p class="hero-intro">Everything you need to set up, manage, and display content on your noticeboard, its Server and its Clients — from installation to daily use.</p>
       <div class="hero-meta">
-        <div class="hero-meta-item"><span class="dot"></span>Raspberry Pi</div>
+        <div class="hero-meta-item"><span class="dot"></span>Server &amp; Clients</div>
         <div class="hero-meta-item"><span class="dot"></span>Images &amp; Video</div>
-        <div class="hero-meta-item"><span class="dot"></span>Multi-display</div>
+        <div class="hero-meta-item"><span class="dot"></span>Multi-screen</div>
         <div class="hero-meta-item"><span class="dot"></span>Scheduled content</div>
       </div>
     </div>
@@ -716,7 +716,18 @@
         <h2>Overview</h2>
       </div>
 
-      <p>Noticeboard turns one or more Raspberry Pis into a managed digital display system. One Pi runs the server and admin panel. Any number of additional Pis (or browsers on a local network) can act as display screens — showing slideshows of images and videos that you control remotely from the admin panel.</p>
+      <p>Noticeboard is a managed digital display system with two roles. The <strong>Server</strong> is the device running the Noticeboard server: it stores the content, runs the admin panel, and shows the slideshow on its own screen. A <strong>Client</strong> is a device showing the Noticeboard viewer on its screen, from the Server. A Raspberry Pi can be either, depending on how it is installed. Any number of Clients (or browsers on the local network) can show the slideshows of images, videos and audio that you control from the admin panel.</p>
+      <h3 id="devices" style="scroll-margin-top:80px">Supported devices</h3>
+      <table>
+        <thead><tr><th>Device</th><th>Server</th><th>Client</th><th>Video</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Raspberry Pi 3</td><td>yes</td><td>yes</td><td>H.264 only, 1080p only</td><td>Supported (choose H.264 in <strong>Settings → Display</strong>)</td></tr>
+          <tr><td>Raspberry Pi 4</td><td>yes</td><td>yes</td><td>H.264 and H.265</td><td>Supported</td></tr>
+          <tr><td>Raspberry Pi 5</td><td>yes</td><td>yes</td><td>H.264 and H.265</td><td>Supported</td></tr>
+          <tr><td>Orange Pi Zero 2W</td><td>no</td><td>yes, headless</td><td>H.264 and H.265</td><td>Planned: needs a headless Client installer</td></tr>
+        </tbody>
+      </table>
+      <p>New videos are converted to <strong>H.265 (HEVC)</strong> by default; <strong>H.264</strong> is the fallback for older hardware such as the Raspberry Pi 3 (see <a href="#settings" style="color:var(--blue)">Settings</a>).</p>
 
       <h3>How it works</h3>
       <p>The system has three parts that work together:</p>
@@ -726,7 +737,7 @@
         <tbody>
           <tr>
             <td><strong>Server</strong></td>
-            <td>Runs on one Pi. Stores all content, manages slideshows, and serves both the admin panel and display pages.</td>
+            <td>The Server. Stores all content, manages slideshows, and serves both the admin panel and the viewer.</td>
             <td>Always running in the background</td>
           </tr>
           <tr>
@@ -736,57 +747,57 @@
           </tr>
           <tr>
             <td><strong>Display</strong></td>
-            <td>A browser page (at <code>/</code>) that shows the active slideshow. Can run on the server Pi itself or on separate display Pis.</td>
+            <td>A browser page (at <code>/</code>) that shows the active slideshow, on the Server's own screen and on every Client.</td>
             <td>The audience — no interaction needed</td>
           </tr>
         </tbody>
       </table>
 
-      <p>When you make a change in the admin panel, the display screens update automatically within seconds — no page refresh required.</p>
+      <p>When you make a change in the admin panel, the screens update automatically within seconds — no page refresh required.</p>
       <p>Every image and video is shown whole, as large as fits the screen, in its own shape: never cut off and never stretched, whether the screen is landscape or portrait. Any space left around it (for example, at the sides of a portrait picture on a landscape screen) is filled with the background colour, black unless you choose another (see <a href="#logo" style="color:var(--blue)">Branding</a>).</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">The display screen requires no interaction and is designed to run unattended for months. Once set up, the Pi running the display can be left alone indefinitely: it recovers from outages and crashes by itself (see <a href="#unattended" style="color:var(--blue)">Running unattended</a>) and even installs new versions by itself (see <a href="#updates" style="color:var(--blue)">Automatic updates</a>). If anyone needs the noticeboard's address, the faint pin in the top-left corner of any screen shows the Noticeboard server's address (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</div>
+        <div class="callout-body">A screen requires no interaction and is designed to run unattended for months. Once set up, the Server and the Clients can be left alone indefinitely: it recovers from outages and crashes by itself (see <a href="#unattended" style="color:var(--blue)">Running unattended</a>) and even installs new versions by itself (see <a href="#updates" style="color:var(--blue)">Automatic updates</a>). If anyone needs the noticeboard's address, the faint pin in the top-left corner of any screen shows the Server's address (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</div>
       </div>
 
       <h3 id="unattended" style="scroll-margin-top:80px">Running unattended</h3>
-      <p>Nobody needs to touch a display, and it doesn't need anyone to click on it or keep it in focus. It keeps the slideshow moving by itself, whatever happens:</p>
+      <p>Nobody needs to touch a screen, and it doesn't need anyone to click on it or keep it in focus. It keeps the slideshow moving by itself, whatever happens:</p>
 
       <table>
-        <thead><tr><th>When…</th><th>The display…</th></tr></thead>
+        <thead><tr><th>When…</th><th>The screen…</th></tr></thead>
         <tbody>
           <tr><td>A slide is due to change</td><td>Moves on at the right time: images after their duration, videos when they end. It checks every 2 seconds that nothing was missed, so a slide can never get stuck on screen.</td></tr>
           <tr><td>A slide won't appear (a download that never finishes, a video that won't start)</td><td>Skips it after 30 seconds and carries on with the next one.</td></tr>
           <tr><td>A video stops playing part-way</td><td>Skips it after 30 seconds without progress. A video the browser paused, for example while the screen was asleep, is started again.</td></tr>
           <tr><td>The screen sleeps and wakes, or the browser hides or freezes the page</td><td>Catches up as soon as the page runs again.</td></tr>
-          <tr><td>The server restarts, loses power or drops off the network</td><td>Keeps what it has on screen, reconnects by itself, and carries on within seconds of the server coming back. While nothing can load, it tries again every 30 seconds.</td></tr>
+          <tr><td>The server restarts, loses power or drops off the network</td><td>Keeps what it has on screen, reconnects by itself, and carries on within seconds of the Server coming back. While nothing can load, it tries again every 30 seconds.</td></tr>
           <tr><td>A new version is installed</td><td>Reloads itself onto the new version as soon as the server answers again.</td></tr>
           <tr><td>Every slide keeps failing</td><td>Reloads the page (at most once every 30 minutes).</td></tr>
           <tr><td>It has been running for a day</td><td>Reloads once between 2 and 5 am, to clear anything the browser has built up over a long run.</td></tr>
           <tr><td>A slideshow is published, disabled, scheduled on or off, edited or reordered</td><td>Lets the slide on screen finish its full time (a video plays to its end), then starts the new running order from its first slide. A slide is never cut short.</td></tr>
-          <tr><td>The browser closes or crashes</td><td>The Pi opens it again after a few seconds, once the server answers.</td></tr>
+          <tr><td>The browser closes or crashes</td><td>The Server or Client opens it again after a few seconds, once the Server answers.</td></tr>
         </tbody>
       </table>
 
-      <p>A display only ever reloads once it has checked that the server answers, so a screen is never left on a browser error page. The slide timing has been tested over a simulated 30 days of running, with outages, sleep and missed timers along the way.</p>
+      <p>A screen only ever reloads once it has checked that the Server answers, so a screen is never left on a browser error page. The slide timing has been tested over a simulated 30 days of running, with outages, sleep and missed timers along the way.</p>
 
       <h3 id="viewer" style="scroll-margin-top:80px">On the screen: the pin, the exit button, the warning mark and the cursor</h3>
       <table>
         <thead><tr><th>What</th><th>What it does</th></tr></thead>
         <tbody>
-          <tr><td><strong>Location pin</strong> (faint, top-left corner)</td><td>Tap or click it to see the <em>Noticeboard server's</em> address: the IP address and port to open on another device. It's always the server's address, never the address of the screen or computer you're looking at. The pin can be turned off in <strong>Settings → Display</strong>. The pop-up closes with its ✕, or by itself after 90 seconds.</td></tr>
-          <tr><td><strong>Exit button</strong> (top-right corner)</td><td>Appears while the mouse moves (or on a tap or key press) and hides again after 3 seconds of stillness. It takes <em>this screen</em> out of full-screen kiosk mode: after you confirm, the full-screen browser closes and the slideshow opens again in a normal browser window, so you can use the browser, minimise or close it, or get to the Raspberry Pi desktop. Nothing else changes: the server keeps running, other screens carry on, and nothing is unpublished. The screen goes back to full screen the next time it starts up.</td></tr>
-          <tr><td><strong>Warning mark</strong> (small red triangle, bottom-right corner)</td><td>Shown on every screen while the installer needs running again on the server Pi. Tapping or clicking it shows <em>Please check the Admin panel for details.</em>: the admin panel says what to do (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>). It goes away by itself once the installer has run.</td></tr>
+          <tr><td><strong>Location pin</strong> (faint, top-left corner)</td><td>Tap or click it to see the <em>Noticeboard server's</em> address: the IP address and port to open on another device. It's always the Server's address, never the address of the screen or computer you're looking at. The pin can be turned off in <strong>Settings → Display</strong>. The pop-up closes with its ✕, or by itself after 90 seconds.</td></tr>
+          <tr><td><strong>Exit button</strong> (top-right corner)</td><td>Appears while the mouse moves (or on a tap or key press) and hides again after 3 seconds of stillness. It takes <em>this screen</em> out of full-screen kiosk mode: after you confirm, the full-screen browser closes and the slideshow opens again in a normal browser window, so you can use the browser, minimise or close it, or get to the desktop. Nothing else changes: the Server keeps running, other screens carry on, and nothing is unpublished. The screen goes back to full screen the next time it starts up.</td></tr>
+          <tr><td><strong>Warning mark</strong> (small red triangle, bottom-right corner)</td><td>Shown on every screen while the installer needs running again on the Server. Tapping or clicking it shows <em>Please check the Admin panel for details.</em>: the admin panel says what to do (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>). It goes away by itself once the installer has run.</td></tr>
           <tr><td><strong>Mouse cursor</strong></td><td>Hides over the slideshow after 3 seconds without movement; moving the mouse brings it back straight away, along with the exit button.</td></tr>
         </tbody>
       </table>
 
-      <p>Full-screen kiosk mode only ever applies to the slideshow viewer. The kiosk runs in a browser profile of its own, so a browser you open from the Pi's desktop, for example to use the admin panel at <code>/admin</code>, is an ordinary window that behaves like any other web page.</p>
+      <p>Full-screen kiosk mode only ever applies to the slideshow viewer. The kiosk runs in a browser profile of its own, so a browser you open from the desktop, for example to use the admin panel at <code>/admin</code>, is an ordinary window that behaves like any other web page.</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">The exit button needs the kiosk set up by a recent installer. On a Pi installed before the exit button existed, run the installer again once (it keeps your answers and your content) and reboot. On a browser the Noticeboard kiosk doesn't run, such as a laptop showing the slideshow in full screen, press F11 or Esc instead.</div>
+        <div class="callout-body">The exit button needs the kiosk set up by a recent installer. On a Server or Client installed before the exit button existed, run the installer again once (it keeps your answers and your content) and reboot. On a browser the Noticeboard kiosk doesn't run, such as a laptop showing the slideshow in full screen, press F11 or Esc instead.</div>
       </div>
     </div>
 
@@ -798,16 +809,16 @@
         <h2>Installation</h2>
       </div>
 
-      <p>One installer sets up both kinds of Pi: when it starts, it asks what the Pi is for. It needs a Raspberry Pi running Raspberry Pi OS with the desktop: the current release (Trixie) or Bookworm.</p>
+      <p>One installer sets up a Server or a Client: when it starts, it asks which this device is. It needs a Raspberry Pi running Raspberry Pi OS with the desktop: the current release (Trixie) or Bookworm (see <a href="#devices" style="color:var(--blue)">Supported devices</a>).</p>
 
-      <h3>Option A — Single Pi (server + display on the same Pi)</h3>
-      <p>Use this if you have one Pi that will both run the server and show the display on its own screen.</p>
+      <h3>Option A — A Server (it also shows the slideshow on its own screen)</h3>
+      <p>Every noticeboard has one Server. It also shows the slideshow on its own screen, so a single device is enough to start with.</p>
 
       <div class="steps">
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Open a terminal on the Pi</strong>
+            <strong>Open a terminal on the device</strong>
             <p>Press Ctrl+Alt+T, or find Terminal in the application menu.</p>
           </div>
         </div>
@@ -822,21 +833,21 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Answer the installer's questions</strong>
-            <p>When asked what the Pi is for, type <code>1</code> (<em>Server + display</em>). Then answer the sudo question — see the note below.</p>
+            <p>When asked what this device is, type <code>1</code> (<em>Server</em>). Then answer the sudo question — see the note below.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Wait for completion</strong>
-            <p>The installer first brings the Pi's software fully up to date, then downloads Node.js, clones the project, builds the web app, and sets up a background service and automatic updates. The install itself takes 3–8 minutes depending on your internet connection; the update can take much longer on a Pi that hasn't been updated for a while.</p>
+            <p>The installer first brings the device's software fully up to date, then downloads Node.js, clones the project, builds the web app, and sets up a background service and automatic updates. The install itself takes 3–8 minutes depending on your internet connection; the update can take much longer on a device that hasn't been updated for a while.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Reboot the Pi</strong>
-            <p>When the installer finishes, it asks whether to reboot: press Enter. After restarting, Chromium will open automatically in fullscreen kiosk mode showing the display, as soon as the server is ready. If the browser is ever closed or crashes, it opens again by itself.</p>
+            <strong>Reboot</strong>
+            <p>When the installer finishes, it asks whether to reboot: press Enter. After restarting, Chromium will open automatically in fullscreen kiosk mode showing the slideshow, as soon as the Server is ready. If the browser is ever closed or crashes, it opens again by itself.</p>
           </div>
         </div>
       </div>
@@ -850,25 +861,25 @@
 
       <div class="callout tip">
         <div class="callout-icon">🔒</div>
-        <div class="callout-body"><strong>The sudo question.</strong> Raspberry Pi OS lets you run <code>sudo</code> commands without a password, so anything that takes over the Pi's user account can take over the whole Pi. The installer offers to make <code>sudo</code> ask for your password — we recommend answering <strong>y</strong>. It backs up the setting first and asks you to type your password once to prove it works, so you can't lock yourself out. If you answer <strong>n</strong>, nothing changes, and you can run the installer again later to change your mind.</div>
+        <div class="callout-body"><strong>The sudo question.</strong> Raspberry Pi OS lets you run <code>sudo</code> commands without a password, so anything that takes over its user account can take over the whole device. The installer offers to make <code>sudo</code> ask for your password — we recommend answering <strong>y</strong>. It backs up the setting first and asks you to type your password once to prove it works, so you can't lock yourself out. If you answer <strong>n</strong>, nothing changes, and you can run the installer again later to change your mind.</div>
       </div>
 
-      <h3>Option B — Separate display Pi (remote client)</h3>
-      <p>Use this if you already have a server Pi running and want to add an additional Pi as a second (or third) display screen.</p>
+      <h3>Option B — A Client (it shows the slideshow from a Server)</h3>
+      <p>Use this to add another screen: a Client shows the slideshow from a Server that is already running.</p>
 
       <div class="steps">
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Find the server Pi's IP address</strong>
-            <p>Tap the faint pin in the top-left corner of the server Pi's screen: it shows the IP address and port. Or, on the server Pi, open a terminal and run <code>hostname -I</code> and note the first address shown (e.g. <code>192.168.1.42</code>).</p>
+            <strong>Find the Server's IP address</strong>
+            <p>Tap the faint pin in the top-left corner of the Server's screen: it shows the IP address and port. Or, on the Server, open a terminal and run <code>hostname -I</code> and note the first address shown (e.g. <code>192.168.1.42</code>).</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Run the installer on the display Pi</strong>
-            <p>On the new display Pi, open a terminal and run the command below. When asked what the Pi is for, type <code>2</code> (<em>Remote display</em>). After your answers, it brings the Pi's software fully up to date before installing, which can take a while.</p>
+            <strong>Run the installer on the Client</strong>
+            <p>On the new Client, open a terminal and run the command below. When asked what this device is, type <code>2</code> (<em>Client</em>). After your answers, it brings the device's software fully up to date before installing, which can take a while.</p>
           </div>
         </div>
         <div class="step">
@@ -881,57 +892,57 @@
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Approve the display in the admin panel</strong>
-            <p>If MAC filtering is enabled on the server, the new display will show its MAC address on screen. You must add it to the approved list in Admin → Settings before it can show content. See <a href="#displays" style="color:var(--amber)">Section 9</a>.</p>
+            <strong>Approve the Client in the admin panel</strong>
+            <p>If MAC filtering is enabled on the Server, the new Client will show its MAC address on screen. You must add it to the approved list in Admin → Settings before it can show content. See <a href="#displays" style="color:var(--amber)">Section 9</a>.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
-            <strong>Reboot the display Pi</strong>
-            <p>When the installer finishes, it asks whether to reboot: press Enter. Chromium will open automatically and connect to the server. Until the server answers, or while it waits for approval, the screen shows a waiting page with this Pi's MAC address; the slideshow replaces it by itself as soon as the server lets the display in (it checks every 10 seconds).</p>
+            <strong>Reboot the Client</strong>
+            <p>When the installer finishes, it asks whether to reboot: press Enter. Chromium will open automatically and connect to the Server. Until the Server answers, or while it waits for approval, the screen shows a waiting page with this Client's MAC address; the slideshow replaces it by itself as soon as the Server lets the Client in (it checks every 10 seconds).</p>
           </div>
         </div>
       </div>
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
-      <h3 id="static-ip" style="scroll-margin-top:80px">Give the server Pi a fixed address</h3>
-      <p>Remote display Pis find the server by its IP address, so that address must not change. Most home and office networks hand out addresses automatically and can give a device a different one after a restart. If you use remote displays, fix the server Pi's address in one of two ways:</p>
+      <h3 id="static-ip" style="scroll-margin-top:80px">Give the Server a fixed address</h3>
+      <p>Clients find the Server by its IP address, so that address must not change. Most home and office networks hand out addresses automatically and can give a device a different one after a restart. If you use Clients, fix the Server's address in one of two ways:</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
-        <li><strong>A reservation in your router</strong> (recommended): most routers can always give the same address to one device, often called a <em>DHCP reservation</em> or <em>static lease</em>. Your router's manual or its admin page explains how. You'll need the server Pi's MAC address, which the top of the admin panel's Slideshows page shows.</li>
-        <li><strong>A static address on the Pi itself</strong>: set it in Raspberry Pi OS's network settings. The official Raspberry Pi documentation's networking pages explain how for your version of Raspberry Pi OS. Choose an address outside the range your router hands out.</li>
+        <li><strong>A reservation in your router</strong> (recommended): most routers can always give the same address to one device, often called a <em>DHCP reservation</em> or <em>static lease</em>. Your router's manual or its admin page explains how. You'll need the Server's MAC address, which the top of the admin panel's Slideshows page shows.</li>
+        <li><strong>A static address on the Server itself</strong>: on a Raspberry Pi, set it in Raspberry Pi OS's network settings. The official Raspberry Pi documentation's networking pages explain how for your version of Raspberry Pi OS. Choose an address outside the range your router hands out.</li>
       </ul>
-      <p>If the server's address does change, run the installer again on each remote display Pi and give it the new address.</p>
+      <p>If the Server's address does change, run the installer again on each Client and give it the new address.</p>
 
       <h3>Running the installer again</h3>
-      <p>You can run the installer again at any time — for example to point a display Pi at a different server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub, from the branch the Pi follows (<em>main</em> unless you've switched), so what it sets up matches the version it installs. It never touches your slideshows, slides or settings.</p>
-      <p>On a server Pi that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it. If you go back to <em>main</em>, it hands over to <em>main</em>'s installer, which carries on with your answers.</p>
+      <p>You can run the installer again at any time — for example to point a Client at a different Server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub, from the branch the Server follows (<em>main</em> unless you've switched), so what it sets up matches the version it installs. It never touches your slideshows, slides or settings.</p>
+      <p>On a Server that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it. If you go back to <em>main</em>, it hands over to <em>main</em>'s installer, which carries on with your answers.</p>
 
       <h3 id="firewall" style="scroll-margin-top:80px">Firewall (optional)</h3>
-      <p>Just before it offers to reboot, the installer asks <em>"Check this Pi's firewall?"</em>. Many Pis already have a firewall set up the way their owner wants, so it changes nothing unless you answer <strong>y</strong>.</p>
+      <p>Just before it offers to reboot, the installer asks <em>"Check this device's firewall?"</em>. Many devices already have a firewall set up the way their owner wants, so it changes nothing unless you answer <strong>y</strong>.</p>
 
       <table>
         <thead><tr><th>You answer…</th><th>What happens</th></tr></thead>
         <tbody>
-          <tr><td><strong>n</strong></td><td>Nothing is checked or changed. On a server Pi, the installer tells you the port to allow through your own firewall so other devices can reach the slideshow and admin panel: <strong>3000</strong>, unless you've changed it. A remote display Pi needs no incoming port.</td></tr>
+          <tr><td><strong>n</strong></td><td>Nothing is checked or changed. On a Server, the installer tells you the port to allow through your own firewall so other devices can reach the slideshow and admin panel: <strong>3000</strong>, unless you've changed it. A Client needs no incoming port.</td></tr>
           <tr><td><strong>y</strong>, and a firewall is already on</td><td>With <em>ufw</em> or <em>firewalld</em>, the slideshow port is added and every existing rule is kept. Rules made some other way (your own nftables or iptables setup) are left exactly as they are, and the installer tells you which port to allow.</td></tr>
-          <tr><td><strong>y</strong>, and there's no firewall</td><td>It offers to set up <em>ufw</em>, the firewall Raspberry Pi recommends. It asks <em>"Set up a firewall now?"</em> first.</td></tr>
+          <tr><td><strong>y</strong>, and there's no firewall</td><td>It offers to set up <em>ufw</em>, the firewall Raspberry Pi OS recommends. It asks <em>"Set up a firewall now?"</em> first.</td></tr>
         </tbody>
       </table>
 
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
-        <div class="callout-body"><strong>Let the installer set up the firewall only on a dedicated slideshow Pi running Raspberry Pi OS.</strong> It blocks every incoming connection except the ones you choose, which could stop other things the Pi does. If this Pi does other jobs, answer <strong>n</strong> and set up its firewall yourself.</div>
+        <div class="callout-body"><strong>Let the installer set up the firewall only on a device used just for the noticeboard, running Raspberry Pi OS.</strong> It blocks every incoming connection except the ones you choose, which could stop other things the device does. If it does other jobs, answer <strong>n</strong> and set up its firewall yourself.</div>
       </div>
 
       <p>If you let it set up the firewall, it asks what must stay reachable before it blocks anything:</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
-        <li><strong>SSH</strong> (logging in from another computer): <em>"Do you need SSH access to this Pi?"</em> Its port is opened only if you say yes, even if SSH is installed, because an SSH port nobody uses is safer closed. It shows the port SSH is set to, usually 22; press Enter to use it, or type another. If you're connected over SSH at the time and say no, it warns you and asks you to confirm.</li>
-        <li><strong>The slideshow port</strong> (server Pi): press Enter to keep 3000, or type another.</li>
-        <li><strong>Remote desktop (VNC)</strong>: asked only if VNC is running on the Pi.</li>
+        <li><strong>SSH</strong> (logging in from another computer): <em>"Do you need SSH access to this device?"</em> Its port is opened only if you say yes, even if SSH is installed, because an SSH port nobody uses is safer closed. It shows the port SSH is set to, usually 22; press Enter to use it, or type another. If you're connected over SSH at the time and say no, it warns you and asks you to confirm.</li>
+        <li><strong>The slideshow port</strong> (Server): press Enter to keep 3000, or type another.</li>
+        <li><strong>Remote desktop (VNC)</strong>: asked only if VNC is running on the device.</li>
       </ul>
-      <p>It then allows those ports, plus <code>5353/udp</code> so the Pi's <code>.local</code> name keeps working. Other incoming connections are blocked and outgoing ones allowed, and the firewall is turned on, starting with the Pi from then on. Any ufw rules you already had are kept.</p>
+      <p>It then allows those ports, plus <code>5353/udp</code> so the device's <code>.local</code> name keeps working. Other incoming connections are blocked and outgoing ones allowed, and the firewall is turned on, starting with the device from then on. Any ufw rules you already had are kept.</p>
 
       <div class="callout success">
         <div class="callout-icon">🔓</div>
@@ -939,7 +950,7 @@
       </div>
 
       <table>
-        <thead><tr><th>To…</th><th>Run this on the Pi</th></tr></thead>
+        <thead><tr><th>To…</th><th>Run this on the device</th></tr></thead>
         <tbody>
           <tr><td>See the firewall's rules</td><td><code>sudo ufw status</code></td></tr>
           <tr><td>Open another port later (e.g. 8080)</td><td><code>sudo ufw allow 8080/tcp</code></td></tr>
@@ -954,19 +965,19 @@
       <div class="mock-ui">
         <div class="mock-titlebar">
           <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
-          <div class="mock-url">http://&lt;your-pi-ip&gt;:3000/admin</div>
+          <div class="mock-url">http://&lt;server-ip&gt;:3000/admin</div>
         </div>
         <div class="mock-body" style="padding:16px 20px;font-size:13px;color:var(--text-dim)">
-          Replace <code>&lt;your-pi-ip&gt;</code> with the Pi's local IP address — e.g. <code>http://192.168.1.42:3000/admin</code><br><br>
-          <strong style="color:var(--text)">On the Pi itself,</strong> you can always use <code>http://localhost:3000/admin</code>
+          Replace <code>&lt;server-ip&gt;</code> with the Server's local IP address — e.g. <code>http://192.168.1.42:3000/admin</code><br><br>
+          <strong style="color:var(--text)">On the Server itself,</strong> you can always use <code>http://localhost:3000/admin</code>
         </div>
       </div>
 
-      <p>Not sure of the Pi's IP address? Tap the faint pin in the top-left corner of any display screen — it shows the server's IP address and port. The pop-up closes with its ✕, or by itself after 90 seconds.</p>
+      <p>Not sure of the Server's IP address? Tap the faint pin in the top-left corner of any screen — it shows the Server's IP address and port. The pop-up closes with its ✕, or by itself after 90 seconds.</p>
 
       <p>The admin panel is only ever at <code>/admin</code>, on the same port as the slideshow (3000). There's no separate admin port.</p>
 
-      <p>This guide is always at hand, and reading it doesn't need a login: the installer puts a <strong>Noticeboard Help</strong> shortcut on the Pi's desktop, and in the admin panel <strong>Help</strong> in the sidebar opens it in a new tab. From any device, it's at <code>http://&lt;server-ip&gt;:3000/admin/help</code>.</p>
+      <p>This guide is always at hand, and reading it doesn't need a login: the installer puts a <strong>Noticeboard Help</strong> shortcut on the desktop of the Server and each Client, and in the admin panel <strong>Help</strong> in the sidebar opens it in a new tab. From any device, it's at <code>http://&lt;server-ip&gt;:3000/admin/help</code>.</p>
     </div>
 
     <!-- ── 03 First Login ── -->
@@ -983,7 +994,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Open the admin panel</strong>
-            <p>Navigate to <code>http://&lt;pi-ip&gt;:3000/admin</code> in your browser.</p>
+            <p>Navigate to <code>http://&lt;server-ip&gt;:3000/admin</code> in your browser.</p>
           </div>
         </div>
         <div class="step">
@@ -1004,10 +1015,10 @@
 
       <div class="callout danger">
         <div class="callout-icon">🔒</div>
-        <div class="callout-body"><strong>Security notice:</strong> The admin panel is accessible to any device on your local network. Always change the default password. The display page (<code>/</code>) does not require a password and is intentionally public on the local network so that any screen can show it.</div>
+        <div class="callout-body"><strong>Security notice:</strong> The admin panel is accessible to any device on your local network. Always change the default password. The viewer (<code>/</code>) does not require a password and is intentionally public on the local network so that any screen can show it.</div>
       </div>
 
-      <p>Once you're logged in, the top of the <strong>Slideshows</strong> page shows this Pi's IP address and MAC address — handy if you need to reserve the Pi's address in your router or tell someone where to find it. It only appears after you log in.</p>
+      <p>Once you're logged in, the top of the <strong>Slideshows</strong> page shows the Server's IP address and MAC address — handy if you need to reserve its address in your router or tell someone where to find it. It only appears after you log in.</p>
 
       <p>The sidebar has, from the top: the logo (see <a href="#logo" style="color:var(--blue)">Logo</a>), <strong>Slideshows</strong>, <strong>Settings</strong>, <strong>Help ↗</strong> (this guide) and <strong>Open viewer ↗</strong>, which opens the slideshow as the screens show it, in a new tab, while you stay logged in. At the bottom, <strong>Last updated</strong> shows when the noticeboard was last updated; it opens the project on GitHub.</p>
 
@@ -1015,7 +1026,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">💡</div>
-        <div class="callout-body"><strong>A sample slideshow is ready to try.</strong> Every installation comes with a <em>Sample slideshow</em>, marked <em>Sample</em> in the list: five slides, four images that show for 3 seconds each and a short video that plays to the end. It isn't published, so the display won't show it until you click <strong>Publish</strong>. It shows off what the noticeboard can do, so software updates keep it current: when a new version comes with new or changed sample images, videos or settings, they're added to it. It can be hidden but not deleted. Put your own content in a slideshow of your own, since the sample's slides are replaced whenever its content changes.</div>
+        <div class="callout-body"><strong>A sample slideshow is ready to try.</strong> Every installation comes with a <em>Sample slideshow</em>, marked <em>Sample</em> in the list: five slides, four images that show for 3 seconds each and a short video that plays to the end. It isn't published, so the screens won't show it until you click <strong>Publish</strong>. It shows off what the noticeboard can do, so software updates keep it current: when a new version comes with new or changed sample images, videos or settings, they're added to it. It can be hidden but not deleted. Put your own content in a slideshow of your own, since the sample's slides are replaced whenever its content changes.</div>
       </div>
 
       <h3>Changing the admin password</h3>
@@ -1054,7 +1065,7 @@
         <h2>Creating Slideshows</h2>
       </div>
 
-      <p>A <strong>slideshow</strong> is a named collection of images and/or videos that plays on the display screen. You can have multiple slideshows and control which ones are active, when they appear, and in what order.</p>
+      <p>A <strong>slideshow</strong> is a named collection of images and/or videos that plays on the screens. You can have multiple slideshows and control which ones are active, when they appear, and in what order.</p>
 
       <h3>Creating your first slideshow</h3>
       <div class="steps">
@@ -1083,7 +1094,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Click Create</strong>
-            <p>The slideshow is created and appears in the list. It starts in <span class="pill grey">Disabled</span> status — it won't appear on the display until you publish it.</p>
+            <p>The slideshow is created and appears in the list. It starts in <span class="pill grey">Disabled</span> status — it won't appear on the screens until you publish it.</p>
           </div>
         </div>
       </div>
@@ -1114,7 +1125,7 @@
       </table>
 
       <h3>Deleting a slideshow</h3>
-      <p>From the slideshow list, click <strong>Delete</strong> next to the slideshow. You will be asked to confirm. <strong>Deletion is permanent</strong> — all uploaded media files for that slideshow will also be removed from the server. The sample slideshow is the one exception: it can't be deleted, but you can hide it.</p>
+      <p>From the slideshow list, click <strong>Delete</strong> next to the slideshow. You will be asked to confirm. <strong>Deletion is permanent</strong> — all uploaded media files for that slideshow will also be removed from the Server. The sample slideshow is the one exception: it can't be deleted, but you can hide it.</p>
 
       <h3 id="hiding" style="scroll-margin-top:80px">Hiding a slideshow</h3>
       <p>To tidy away an old or seasonal slideshow without deleting it, click <strong>Hide</strong> next to it. Hiding only takes it out of the list: its slides, settings, schedule and everything else stay exactly as they are.</p>
@@ -1154,7 +1165,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.265 (HEVC) MP4, which keeps them small, or to H.264 if you choose it in <strong>Settings → Display → Video format for new uploads</strong>; videos already uploaded keep their format. A browser that can't play H.265, such as Firefox, shows no preview of a new video in the admin panel, and a screen that can't play one skips it. Images take a few seconds. Videos take longer: a large or long video can take several minutes on a Raspberry Pi. The slide shows <span class="pill amber">processing</span> meanwhile. You don't need to wait: carry on uploading, arranging and setting up your slideshows, and the video appears by itself once it's ready.</div>
+        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.265 (HEVC) MP4, which keeps them small, or to H.264 if you choose it in <strong>Settings → Display → Video format for new uploads</strong>; videos already uploaded keep their format. A browser that can't play H.265, such as Firefox, shows no preview of a new video in the admin panel, and a screen that can't play one skips it. Images take a few seconds. Videos take longer: a large or long video can take several minutes on the Server. The slide shows <span class="pill amber">processing</span> meanwhile. You don't need to wait: carry on uploading, arranging and setting up your slideshows, and the video appears by itself once it's ready.</div>
       </div>
 
       <h3>Uploading a slide</h3>
@@ -1193,8 +1204,8 @@
       <table>
         <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
         <tbody>
-          <tr><td><span class="pill amber">processing</span></td><td>The file has been received and is being converted. It will not appear on the display yet.</td></tr>
-          <tr><td><span class="pill green">ready</span></td><td>Processing is complete. If the slideshow is published, this slide will appear on the display.</td></tr>
+          <tr><td><span class="pill amber">processing</span></td><td>The file has been received and is being converted. It will not appear on the screens yet.</td></tr>
+          <tr><td><span class="pill green">ready</span></td><td>Processing is complete. If the slideshow is published, this slide will appear on the screens.</td></tr>
           <tr><td><span class="pill red">error</span></td><td>Processing failed. The file may be corrupted or in an unsupported format. Delete it and try uploading again.</td></tr>
         </tbody>
       </table>
@@ -1210,14 +1221,14 @@
       <p>While a video is processed, the noticeboard also makes a thumbnail for it from a typical frame near the start. The video itself isn't changed. Videos uploaded before thumbnails existed have none; the slideshow's page then says so and offers <strong>Create thumbnails</strong>, which makes them the same way.</p>
 
       <h3 id="video-sound" style="scroll-margin-top:80px">Playing a video's sound</h3>
-      <p>Videos play silently unless you tick <strong>Sound</strong> under the video in the slide list. While a video with sound plays, the slideshow's background audio (if it has one, see <a href="#audio" style="color:var(--blue)">Audio shows</a>) is either <strong>lowered</strong> to the volume you choose (20 % unless you change it) or <strong>paused</strong>; when the video ends it comes back up, or carries on where it was. Each change is saved straight away. A screen plays sound only once its Pi's installer has been run again for audio; until then the video still plays, silently.</p>
+      <p>Videos play silently unless you tick <strong>Sound</strong> under the video in the slide list. While a video with sound plays, the slideshow's background audio (if it has one, see <a href="#audio" style="color:var(--blue)">Audio shows</a>) is either <strong>lowered</strong> to the volume you choose (20 % unless you change it) or <strong>paused</strong>; when the video ends it comes back up, or carries on where it was. Each change is saved straight away. A screen plays sound only once the installer has been run again on its Server or Client for audio; until then the video still plays, silently.</p>
 
       <h3>How long each slide displays</h3>
       <p><strong>Images</strong> display for a fixed number of seconds. The default is <strong>10 seconds</strong>, set in <strong>Settings → Display → Default image duration</strong>. A slideshow can use its own duration instead (click <strong>Edit</strong> on its page, then <em>Image duration → Use its own</em>); every slideshow without one uses the default. Changing the default never changes a slideshow that has its own.</p>
       <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide.</p>
       <p>When one slideshow follows another on screen, each slide keeps its own slideshow's duration. And when what's on air changes (a slideshow is published, disabled, scheduled on or off, edited or reordered), the slide on screen still gets its full time before the new running order starts.</p>
 
-      <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If an image hasn't appeared after 30 seconds (a file that won't download), the display skips it. A video that won't play (for example one in a format the screen can't decode), won't start or stops keeps its place for its own length, then the slideshow carries on, so the timing stays as you planned it. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
+      <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If an image hasn't appeared after 30 seconds (a file that won't download), the screen skips it. A video that won't play (for example one in a format the screen can't decode), won't start or stops keeps its place for its own length, then the slideshow carries on, so the timing stays as you planned it. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
 
       <h3>Reordering slides</h3>
       <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The screens pick up the new order within seconds, once the slide they're showing has had its full time.</p>
@@ -1240,7 +1251,7 @@
         <li><strong>Repeat every week:</strong> on the days you tick, from a start time to an end time on the same day, using the noticeboard's own clock.</li>
       </ul>
       <p>Two scheduled events can't overlap: saving one that would says which show it clashes with and when. The card shows whether the event is playing now, when it plays next, or that it has ended, and warns if the show isn't published or has no ready track (its event won't play until it does). The Audio list shows which show's event is playing or coming up.</p>
-      <p>The sound comes out of each screen's usual audio output: on most TVs and monitors that's the HDMI cable, with the volume set on the TV and by each show's volume. A Pi needs its installer run again once before its screen plays sound (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>); until then it stays silent and everything else works as before. A screen shown in an ordinary browser window may also wait for a click or key press before it plays sound.</p>
+      <p>The sound comes out of each screen's usual audio output: on most TVs and monitors that's the HDMI cable, with the volume set on the TV and by each show's volume. A Server or Client needs its installer run again once before its screen plays sound (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>); until then it stays silent and everything else works as before. A screen shown in an ordinary browser window may also wait for a click or key press before it plays sound.</p>
     </div>
 
     <!-- ── 06 Publish & Disable ── -->
@@ -1251,7 +1262,7 @@
         <h2>Publish &amp; Disable</h2>
       </div>
 
-      <p>Every slideshow has a <strong>status</strong> — either <span class="pill green">Published</span> or <span class="pill grey">Disabled</span>. Only published slideshows appear on the display. Disabled slideshows are completely hidden from viewers, regardless of any schedule settings, but you can still edit them freely in the admin panel.</p>
+      <p>Every slideshow has a <strong>status</strong> — either <span class="pill green">Published</span> or <span class="pill grey">Disabled</span>. Only published slideshows appear on the screens. Disabled slideshows are completely hidden from viewers, regardless of any schedule settings, but you can still edit them freely in the admin panel.</p>
 
       <h3>Understanding the status buttons</h3>
 
@@ -1303,12 +1314,12 @@
           <tr>
             <td><button class="mock-btn publish" style="pointer-events:none">Publish</button></td>
             <td><span class="pill grey">Disabled</span></td>
-            <td>Makes the slideshow live. It will appear on all displays immediately (subject to its schedule).</td>
+            <td>Makes the slideshow live. It will appear on all screens immediately (subject to its schedule).</td>
           </tr>
           <tr>
             <td><button class="mock-btn disable" style="pointer-events:none">Disable</button></td>
             <td><span class="pill green">Published</span></td>
-            <td>Removes the slideshow from all displays immediately. It can be re-published at any time.</td>
+            <td>Removes the slideshow from all screens immediately. It can be re-published at any time.</td>
           </tr>
         </tbody>
       </table>
@@ -1318,16 +1329,16 @@
 
       <div class="callout success">
         <div class="callout-icon">✓</div>
-        <div class="callout-body"><strong>Changes are instant.</strong> When you click Publish or Disable, all connected display screens update within 1–2 seconds via a live connection — no page refresh required on the display side.</div>
+        <div class="callout-body"><strong>Changes are instant.</strong> When you click Publish or Disable, all connected screens update within 1–2 seconds via a live connection — no page refresh required on the screens.</div>
       </div>
 
       <h3>Typical workflows</h3>
 
       <p><strong>Setting up a new slideshow before going live:</strong> Create the slideshow (it starts disabled) → upload all your images → adjust the order and schedule → click Publish when ready.</p>
 
-      <p><strong>Seasonal or event content:</strong> Upload your Christmas/event content weeks in advance. Leave it disabled. On the day, click Publish. After the event, click Disable. The content remains on the server ready for next year — just click Publish again.</p>
+      <p><strong>Seasonal or event content:</strong> Upload your Christmas/event content weeks in advance. Leave it disabled. On the day, click Publish. After the event, click Disable. The content remains on the Server ready for next year — just click Publish again.</p>
 
-      <p><strong>Pulling content quickly:</strong> If you need to immediately remove something from display (e.g. outdated information), click Disable on the relevant slideshow. The change takes effect within seconds on all screens.</p>
+      <p><strong>Pulling content quickly:</strong> If you need to immediately remove something from the screens (e.g. outdated information), click Disable on the relevant slideshow. The change takes effect within seconds on all screens.</p>
     </div>
 
     <!-- ── 07 Scheduling ── -->
@@ -1394,11 +1405,11 @@
 
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
-        <div class="callout-body"><strong>The schedule uses the server Pi's clock.</strong> Make sure the Pi's time and timezone are set correctly. Run <code>sudo raspi-config</code> and check <em>Localisation Options → Timezone</em> if you notice timing is off.</div>
+        <div class="callout-body"><strong>The schedule uses the Server's clock.</strong> Make sure the Server's time and timezone are set correctly. On a Raspberry Pi, run <code>sudo raspi-config</code> and check <em>Localisation Options → Timezone</em> if you notice timing is off.</div>
       </div>
 
       <h3>What happens when no slideshows are active</h3>
-      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the display shows the words <em>No slideshow published</em> on the background colour (black unless you choose another), with the logo above them (see <a href="#logo" style="color:var(--blue)">Branding</a>). This is not an error: publish a slideshow, or check its schedule, and the display switches to it within seconds. A black screen with only a faint pulsing dot means something else: the display can't reach the server.</p>
+      <p>If no published slideshow matches the current schedule (or there are no published slideshows at all), the screens show the words <em>No slideshow published</em> on the background colour (black unless you choose another), with the logo above them (see <a href="#logo" style="color:var(--blue)">Branding</a>). This is not an error: publish a slideshow, or check its schedule, and the screens switch to it within seconds. A black screen with only a faint pulsing dot means something else: that screen can't reach the Server.</p>
     </div>
 
     <!-- ── 08 Ordering & Priority ── -->
@@ -1439,10 +1450,10 @@
         <h2>Remote Displays</h2>
       </div>
 
-      <p>Any device on the same network as the server can open the display page at <code>http://&lt;server-ip&gt;:3000/</code> — including laptops, tablets, and additional Raspberry Pis. If you want to restrict which devices can see the display, use MAC filtering. Remote display Pis reach the server by its IP address, so give the server a fixed address (see <a href="#static-ip" style="color:var(--blue)">Give the server Pi a fixed address</a>).</p>
+      <p>Any device on the same network as the Server can open the viewer at <code>http://&lt;server-ip&gt;:3000/</code> — including laptops and tablets, as well as installed Clients. If you want to restrict which devices can see it, use MAC filtering. Clients reach the Server by its IP address, so give the Server a fixed address (see <a href="#static-ip" style="color:var(--blue)">Give the Server a fixed address</a>).</p>
 
       <h3>MAC filtering</h3>
-      <p>MAC filtering lets you create an approved list of devices. When enabled, only approved devices can access the display and admin panel. Unapproved devices see a "Not Found" error.</p>
+      <p>MAC filtering lets you create an approved list of devices. When enabled, only approved devices can access the viewer and admin panel. Unapproved devices see a "Not Found" error.</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
@@ -1450,9 +1461,9 @@
       </div>
 
       <h3 id="mac-network" style="scroll-margin-top:80px">MAC address network requirements</h3>
-      <p>Noticeboard uses the server to identify display devices by their MAC address.</p>
-      <p>The MAC address is not supplied by the display's web browser. Instead, the Noticeboard server identifies the device's IP address and uses the local network to determine the corresponding MAC address.</p>
-      <p>Because of this, the Noticeboard server and the display devices must normally be on the same local network for MAC address filtering to work correctly.</p>
+      <p>The Server identifies Clients by their MAC address.</p>
+      <p>The MAC address is not supplied by the Client's web browser. Instead, the Server identifies the device's IP address and uses the local network to determine the corresponding MAC address.</p>
+      <p>Because of this, the Server and the Clients must normally be on the same local network for MAC address filtering to work correctly.</p>
       <p><strong>Example.</strong> A typical setup could look like this:</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
         <li>Noticeboard Server: <code>192.168.1.10</code></li>
@@ -1460,23 +1471,23 @@
         <li>Meeting Room Display: <code>192.168.1.21</code></li>
         <li>Staff Room Display: <code>192.168.1.22</code></li>
       </ul>
-      <p>All of these devices are connected to the same local network. When one of the displays connects to Noticeboard, the server can identify its IP address and determine its MAC address from the local network. Noticeboard can then use that MAC address for MAC address filtering: deciding which devices can see the slideshows and the admin panel.</p>
+      <p>All of these devices are connected to the same local network. When one of the Clients connects to the Server, the Server can identify its IP address and determine its MAC address from the local network. Noticeboard can then use that MAC address for MAC address filtering: deciding which devices can see the slideshows and the admin panel.</p>
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
         <div class="callout-body">
           <strong>Limitations while MAC filtering is on.</strong> MAC filtering is off by default, and none of this applies then.
           <ul style="margin:8px 0 0 18px;line-height:1.6">
-            <li><strong>A device on another network is blocked.</strong> A device behind another router, on a different VLAN or subnet, or connected over a VPN reaches the server through a router, so the server can't see its MAC address and treats it as not approved: it gets "Not Found" for the slideshow and the admin panel. A remote display Pi stays on its waiting screen. Adding the MAC address the device shows doesn't help, because the server never sees it.</li>
-            <li><strong>Behind a router that shares one address (NAT), every device looks the same.</strong> The server sees only that router's MAC address, so approving it approves every device behind that router, not just one display.</li>
+            <li><strong>A device on another network is blocked.</strong> A device behind another router, on a different VLAN or subnet, or connected over a VPN reaches the Server through a router, so the Server can't see its MAC address and treats it as not approved: it gets "Not Found" for the slideshow and the admin panel. A Client stays on its waiting screen. Adding the MAC address the device shows doesn't help, because the server never sees it.</li>
+            <li><strong>Behind a router that shares one address (NAT), every device looks the same.</strong> The Server sees only that router's MAC address, so approving it approves every device behind that router, not just one Client.</li>
             <li><strong>Some Wi-Fi range extenders (repeaters) do the same:</strong> they replace each device's MAC address with their own. Mesh Wi-Fi systems normally don't.</li>
-            <li><strong>This includes the devices you manage it from.</strong> MAC filtering also guards the admin panel, so a computer or phone on another network is locked out too. The server Pi itself is always allowed.</li>
+            <li><strong>This includes the devices you manage it from.</strong> MAC filtering also guards the admin panel, so a computer or phone on another network is locked out too. The Server itself is always allowed.</li>
           </ul>
         </div>
       </div>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body"><strong>Recommended: one network for everything.</strong> When using MAC filtering, put the Noticeboard server, every display and the computers or phones you manage it from on the same local network: the same subnet, or the same VLAN if your network uses VLANs. Devices on different VLANs are routed between them, so they have the same limitations as separate networks. If some displays have to be on another network, leave MAC filtering off.</div>
+        <div class="callout-body"><strong>Recommended: one network for everything.</strong> When using MAC filtering, put the Server, every Client and the computers or phones you manage it from on the same local network: the same subnet, or the same VLAN if your network uses VLANs. Devices on different VLANs are routed between them, so they have the same limitations as separate networks. If some Clients have to be on another network, leave MAC filtering off.</div>
       </div>
 
       <h3>Enabling MAC filtering and adding a device</h3>
@@ -1485,7 +1496,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Find the MAC address of the device you want to approve</strong>
-            <p>If the device already tried to connect and was blocked, a remote-display Pi will show its own MAC address on screen. On other devices, check the network settings or run <code>ip link show</code> in a terminal.</p>
+            <p>If the device already tried to connect and was blocked, a Client will show its own MAC address on screen. On other devices, check the network settings or run <code>ip link show</code> in a terminal.</p>
           </div>
         </div>
         <div class="step">
@@ -1505,14 +1516,14 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Enable MAC filtering</strong>
-            <p>Toggle "MAC filtering enabled" to on. The server Pi itself (<code>localhost</code>) is always approved automatically.</p>
+            <p>Toggle "MAC filtering enabled" to on. The Server itself (<code>localhost</code>) is always approved automatically.</p>
           </div>
         </div>
       </div>
 
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
-        <div class="callout-body"><strong>Add your own device to the approved list before enabling MAC filtering</strong>, and make sure it's on the same local network as the server (see <a href="#mac-network" style="color:var(--amber)">MAC address network requirements</a>). If you enable it without adding the browser you're using, you will be locked out of the admin panel. If this happens, SSH into the Pi, edit <code>/opt/noticeboard/data/config.json</code>, and set <code>"enabled": false</code> in the <code>macFiltering</code> section, then restart the service.</div>
+        <div class="callout-body"><strong>Add your own device to the approved list before enabling MAC filtering</strong>, and make sure it's on the same local network as the Server (see <a href="#mac-network" style="color:var(--amber)">MAC address network requirements</a>). If you enable it without adding the browser you're using, you will be locked out of the admin panel. If this happens, SSH into the Server, edit <code>/opt/noticeboard/data/config.json</code>, and set <code>"enabled": false</code> in the <code>macFiltering</code> section, then restart the service.</div>
       </div>
 
       <p>When you tick <strong>Enable MAC filter</strong>, a pop-up reminds you of this before anything changes. If the noticeboard can tell the MAC address of the device you're using, the pop-up shows it with an <strong>Add it to the list</strong> button. <strong>How to find your MAC address</strong> opens simple steps for Windows, Mac and Linux; its <strong>OK</strong> takes you back. <strong>Cancel</strong> unticks the box, and <strong>Turn on MAC filtering</strong> keeps it ticked: filtering starts when you click <strong>Save</strong>. Addresses copied from Windows, with dashes, are fine.</p>
@@ -1539,7 +1550,7 @@
           </tr>
           <tr>
             <td><strong>Video format for new uploads</strong> (Display)</td>
-            <td>What uploaded videos are converted to. <strong>H.265</strong> makes files about half the size, but converting takes longer and a screen can only play it if its browser can decode it (on a Raspberry Pi, with its hardware decoder); a screen that can't shows nothing for the video's length, then carries on, and some browsers (e.g. Firefox) can't preview it. <strong>H.264</strong> plays everywhere. The card explains both and shows this warning while H.265 is chosen. Videos already uploaded keep their format until you convert them (<strong>Convert existing videos…</strong>, below the setting: one video after another, each shown as <em>processing</em> in its slideshow in its turn while the screens keep showing it as it is; it takes a long time and slows the Pi meanwhile, and the card warns about that first).</td>
+            <td>What uploaded videos are converted to. <strong>H.265</strong> makes files about half the size, but converting takes longer and a screen can only play it if its browser can decode it (on a Raspberry Pi 4 or 5, with its hardware decoder; a Raspberry Pi 3 can't, so choose H.264 there); a screen that can't shows nothing for the video's length, then carries on, and some browsers (e.g. Firefox) can't preview it. <strong>H.264</strong> plays everywhere. The card explains both and shows this warning while H.265 is chosen. Videos already uploaded keep their format until you convert them (<strong>Convert existing videos…</strong>, below the setting: one video after another, each shown as <em>processing</em> in its slideshow in its turn while the screens keep showing it as it is; it takes a long time and slows the Server meanwhile, and the card warns about that first).</td>
             <td>H.265</td>
           </tr>
           <tr>
@@ -1593,11 +1604,11 @@
       <h3 id="delete-content" style="scroll-margin-top:80px">Deleting your content</h3>
       <p>The <strong>Delete content</strong> card at the bottom of the Settings page has <strong>Delete All…</strong>. It deletes every slideshow except the sample slideshow, with all their slides and files, and every audio show with its tracks and event. The sample slideshow (and whether it's published or hidden, though not its background audio, whose show is gone), your settings, the logo and the background colour are kept: it isn't a factory reset.</p>
       <p>Because it can't be undone, it asks three times, like switching branch: first it lists every slideshow and audio show it will delete, with how many slides or tracks each has; then it asks for the admin password; then it gives you a last chance to back out. Cancelling at any step, or a wrong password, changes nothing. Screens stop showing the deleted slideshows straight away.</p>
-      <p><strong>Restore Defaults…</strong>, in the same card, makes the noticeboard as if it had just been installed on the branch it follows. Every slideshow and audio show is deleted (the sample slideshow comes back as new); every setting goes back to its default, including the admin password (<code>Admin@12345</code>, and everyone is logged out), MAC filtering (off) and the port (3000; you can set another one again afterwards); the logo, the update schedule, the update history, the settings backups and the logs are deleted; and the software is reinstalled from the latest version of the branch, into a clean folder. What the installer set up on the Pi (the kiosk, the services, sudo and the firewall) and the branch it follows are kept. It asks the same three times as Delete All, and the first warning lists all of this. It takes a few minutes; the page then goes to the login page by itself.</p>
-      <p>Running the installer again after a restore is recommended (the warning shows the command); there are no more reminders about it once the restore is complete. Restore Defaults needs the Pi's automatic updates, which the installer sets up.</p>
+      <p><strong>Restore Defaults…</strong>, in the same card, makes the noticeboard as if it had just been installed on the branch it follows. Every slideshow and audio show is deleted (the sample slideshow comes back as new); every setting goes back to its default, including the admin password (<code>Admin@12345</code>, and everyone is logged out), MAC filtering (off) and the port (3000; you can set another one again afterwards); the logo, the update schedule, the update history, the settings backups and the logs are deleted; and the software is reinstalled from the latest version of the branch, into a clean folder. What the installer set up on the Server (the kiosk, the services, sudo and the firewall) and the branch it follows are kept. It asks the same three times as Delete All, and the first warning lists all of this. It takes a few minutes; the page then goes to the login page by itself.</p>
+      <p>Running the installer again after a restore is recommended (the warning shows the command); there are no more reminders about it once the restore is complete. Restore Defaults needs the Server's automatic updates, which the installer sets up.</p>
 
       <h3>Restarting the server service</h3>
-      <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the server. Run this command on the Pi via SSH or a terminal:</p>
+      <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the Server. Run this command on the Server via SSH or a terminal:</p>
 
       <pre data-label="Terminal"><code>sudo systemctl restart noticeboard</code></pre>
 
@@ -1609,11 +1620,11 @@
       <p>Press <code>Ctrl+C</code> to stop following the log.</p>
 
       <h3 id="updates" style="scroll-margin-top:80px">Automatic updates</h3>
-      <p>The server Pi keeps itself up to date with Noticeboard on GitHub, following one <em>branch</em> of it: <em>main</em>, the stable version, unless you choose another (see <a href="#branches" style="color:var(--blue)">Switching branch</a>). Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it when the <a href="#update-schedule" style="color:var(--blue)">update schedule</a> says so (straight away, unless you choose otherwise): it rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way the Pi starts its display (the kiosk) is set up by the installer, so a change to that needs the installer run again.</p>
+      <p>The Server keeps itself up to date with Noticeboard on GitHub, following one <em>branch</em> of it: <em>main</em>, the stable version, unless you choose another (see <a href="#branches" style="color:var(--blue)">Switching branch</a>). Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it when the <a href="#update-schedule" style="color:var(--blue)">update schedule</a> says so (straight away, unless you choose otherwise): it rebuilds the app and restarts the Server. The screens go dark for a few seconds, then every screen — the Server's and the Clients' — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way a Server or Client starts its slideshow full screen (the kiosk) is set up by the installer, so a change to that needs the installer run again.</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body"><strong>Updates are careful.</strong> An update waits while an upload is being processed. If a new version fails to install or doesn't start, the Pi puts the previous version back, keeps running it, and skips that version until a newer one is published. Updates never change or delete your slideshows, slides or settings. The updater runs as the Pi's normal user, so it never needs <code>sudo</code>.</div>
+        <div class="callout-body"><strong>Updates are careful.</strong> An update waits while an upload is being processed. If a new version fails to install or doesn't start, the Server puts the previous version back, keeps running it, and skips that version until a newer one is published. Updates never change or delete your slideshows, slides or settings. The updater runs as the Server's normal user, so it never needs <code>sudo</code>.</div>
       </div>
 
       <p><strong>Last updated</strong>, above <strong>Log out</strong> in the admin panel's sidebar, shows when the noticeboard was last updated: when it installed the version it runs, the same time as <strong>Last update</strong> in the Software updates card. It changes only when an update is installed, not every time you open the page. Hover over it to see the version and when that version was made (on a copy that hasn't been updated by the updater or the installer, it shows that date instead). Click it to open the project on GitHub.</p>
@@ -1642,8 +1653,8 @@
       </table>
 
       <h3 id="installer-needed" style="scroll-margin-top:80px">When the installer needs running again</h3>
-      <p>Updates change the Noticeboard app, but not what only the installer sets up on the Pi: the kiosk that shows the slideshow full screen, the system services, the desktop shortcuts and system packages. When a new version (or a branch you switch to) changes one of those, an amber box at the top of every admin page says <strong>Run the installer again on this Pi</strong>. It lists what running it brings and shows the command to run, with a <strong>Copy</strong> button. The command is for the branch the Pi follows. Until the installer has been run, every screen also shows a small red warning triangle in its bottom-right corner (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</p>
-      <p>Run it in a terminal on the server Pi, or over SSH. It keeps your answers (press Enter), slideshows and settings, and offers to restart at the end. The box goes away once the installer has run; there's nothing to close. Until then the noticeboard works as before, just without what the box lists. If the box says so, run the installer on each remote display Pi too.</p>
+      <p>Updates change the Noticeboard app, but not what only the installer sets up on the Server and the Clients: the kiosk that shows the slideshow full screen, the system services, the desktop shortcuts and system packages. When a new version (or a branch you switch to) changes one of those, an amber box at the top of every admin page says <strong>Run the installer again on the Server</strong>. It lists what running it brings and shows the command to run, with a <strong>Copy</strong> button. The command is for the branch the Server follows. Until the installer has been run, every screen also shows a small red warning triangle in its bottom-right corner (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</p>
+      <p>Run it in a terminal on the Server, or over SSH. It keeps your answers (press Enter), slideshows and settings, and offers to restart at the end. The box goes away once the installer has run; there's nothing to close. Until then the noticeboard works as before, just without what the box lists. If the box says so, run the installer on each Client too.</p>
       <p>Before you switch branch, the check tells you if that branch will need the installer run again (see <a href="#branches" style="color:var(--blue)">Switching branch</a>).</p>
 
       <h3 id="branches" style="scroll-margin-top:80px">Switching branch</h3>
@@ -1654,7 +1665,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Choose and check the branch</strong>
-            <p>In <strong>Settings → Software updates</strong>, type the branch name or pick it from the list, then click <strong>Check branch</strong>. The noticeboard checks that the branch exists on GitHub and can be used, and shows the change: the branch and version running now → the new branch and its version, with its latest change. It also checks the software on this Pi against the list the branch keeps of what it needs (see below), and says if the branch will need the installer run again on this Pi after the switch (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>). Nothing has changed yet.</p>
+            <p>In <strong>Settings → Software updates</strong>, type the branch name or pick it from the list, then click <strong>Check branch</strong>. The noticeboard checks that the branch exists on GitHub and can be used, and shows the change: the branch and version running now → the new branch and its version, with its latest change. It also checks the software on the Server against the list the branch keeps of what it needs (see below), and says if the branch will need the installer run again on the Server after the switch (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>). Nothing has changed yet.</p>
           </div>
         </div>
         <div class="step">
@@ -1686,14 +1697,14 @@
       </div>
 
       <h3 id="branch-software" style="scroll-margin-top:80px">Software a branch needs</h3>
-      <p>Besides the parts it installs by itself, the noticeboard needs some programs on the Pi: Node.js, npm, Git, FFmpeg, curl and Chromium. A branch can need newer versions, or programs <em>main</em> doesn't, so every branch keeps a list of what it needs (<code>system-requirements.json</code>). When you check a branch, the Pi compares its own software with that list:</p>
+      <p>Besides the parts it installs by itself, the noticeboard needs some programs on the Server: Node.js, npm, Git, FFmpeg, curl and Chromium. A branch can need newer versions, or programs <em>main</em> doesn't, so every branch keeps a list of what it needs (<code>system-requirements.json</code>). When you check a branch, the Server compares its own software with that list:</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
         <li><strong>Everything's there:</strong> a green line lists the versions found.</li>
-        <li><strong>Something is missing or too old:</strong> an amber box names each program, the version the branch needs, what this Pi has, what it's for, and how to install it. <strong>Install it yourself before switching</strong>: the switch doesn't install system software. If you switch anyway, an extra <em>Missing software</em> confirmation comes first, which you have to tick to continue, and the final warning reminds you what's missing.</li>
+        <li><strong>Something is missing or too old:</strong> an amber box names each program, the version the branch needs, what the Server has, what it's for, and how to install it. <strong>Install it yourself before switching</strong>: the switch doesn't install system software. If you switch anyway, an extra <em>Missing software</em> confirmation comes first, which you have to tick to continue, and the final warning reminds you what's missing.</li>
         <li><strong>The branch keeps no list</strong> (it's older than these checks): the card says it can't be checked.</li>
       </ul>
 
-      <p>Some branches can't be chosen, and the check says why: a branch that doesn't exist; one older than branch switching (the Pi couldn't be switched back from the admin panel afterwards); and one with files in the places the noticeboard keeps its content and settings (<code>data/</code>, <code>tmp/</code>, <code>logs/</code> or <code>.env</code>).</p>
+      <p>Some branches can't be chosen, and the check says why: a branch that doesn't exist; one older than branch switching (the Server couldn't be switched back from the admin panel afterwards); and one with files in the places the noticeboard keeps its content and settings (<code>data/</code>, <code>tmp/</code>, <code>logs/</code> or <code>.env</code>).</p>
 
       <div class="callout success">
         <div class="callout-icon">↩</div>
@@ -1702,30 +1713,30 @@
 
       <p><strong>Your data is kept.</strong> Switching never deletes anything. Slideshows, slides and media stay exactly where they are. Before each switch, the settings (<code>config.json</code> and each slideshow's <code>slideshow.json</code>) are copied to <code>/opt/noticeboard/data/backups/</code>, in a folder named after the time and the branch switched from, in case the new branch changes them. To go back to those settings, copy the files back and restart the service.</p>
 
-      <p>If a switch starts at the next check (within 15 minutes) rather than straight away, the Pi's installer ran before branch switching existed: run it once to make switches start at once.</p>
+      <p>If a switch starts at the next check (within 15 minutes) rather than straight away, the Server's installer ran before branch switching existed: run it once to make switches start at once.</p>
 
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
-        <div class="callout-body"><strong>If the Software updates card says putting the previous version back failed,</strong> the noticeboard is still running, but might not start after a restart. Run the installer on the server Pi: it installs the branch in the settings again, or offers to go back to <em>main</em>. Your content is untouched.</div>
+        <div class="callout-body"><strong>If the Software updates card says putting the previous version back failed,</strong> the noticeboard is still running, but might not start after a restart. Run the installer on the Server: it installs the branch in the settings again, or offers to go back to <em>main</em>. Your content is untouched.</div>
       </div>
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
       <h3>Update commands</h3>
       <table>
-        <thead><tr><th>To…</th><th>Run this on the server Pi</th></tr></thead>
+        <thead><tr><th>To…</th><th>Run this on the Server</th></tr></thead>
         <tbody>
           <tr><td>See what the updater did</td><td><code>sudo journalctl -u noticeboard-update</code> (or look at Settings → Software updates)</td></tr>
           <tr><td>Check for an update now</td><td><code>bash /opt/noticeboard/installers/update.sh</code></td></tr>
           <tr><td>Retry a version that was skipped</td><td><code>bash /opt/noticeboard/installers/update.sh --force</code></td></tr>
           <tr><td>Switch branch</td><td>Use Settings → Software updates in the admin panel</td></tr>
-          <tr><td>Go back to <em>main</em> from the Pi itself</td><td>Run the installer and choose <em>Go back to main</em></td></tr>
+          <tr><td>Go back to <em>main</em> from the Server itself</td><td>Run the installer and choose <em>Go back to main</em></td></tr>
           <tr><td>Turn automatic updates off</td><td><code>sudo systemctl disable --now noticeboard-update.timer</code></td></tr>
           <tr><td>Turn them back on</td><td><code>sudo systemctl enable --now noticeboard-update.timer</code></td></tr>
         </tbody>
       </table>
 
-      <p><strong>Installed before automatic updates existed?</strong> Run the installer once and let it reboot at the end; after that the Pi updates itself. Remote display Pis only need the installer again when the way they start the display changes. Run it once on each display Pi set up before the kiosk learned to reopen the browser and leave the waiting page by itself (over SSH is fine); after that they never need a visit.</p>
+      <p><strong>Installed before automatic updates existed?</strong> Run the installer once and let it reboot at the end; after that the Server updates itself. Clients only need the installer again when the way they start the slideshow changes. Run it once on each Client set up before the kiosk learned to reopen the browser and leave the waiting page by itself (over SSH is fine); after that they never need a visit.</p>
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
     </div>
@@ -1739,7 +1750,7 @@
       </div>
 
       <h3>Display says "No slideshow published" or stays black</h3>
-      <p><em>No slideshow published</em> means the display is connected but has nothing to show. A black screen with only a faint pulsing dot means it can't reach the server. The usual causes:</p>
+      <p><em>No slideshow published</em> means the screen is connected but has nothing to show. A black screen with only a faint pulsing dot means it can't reach the Server. The usual causes:</p>
 
       <table>
         <thead><tr><th>Cause</th><th>How to check</th><th>Fix</th></tr></thead>
@@ -1773,7 +1784,7 @@
       <pre data-label="Terminal"><code>sudo systemctl restart noticeboard</code></pre>
 
       <h3>Uploaded image/video doesn't appear after processing</h3>
-      <p>Large videos can take several minutes to process: while a slide shows <span class="pill amber">processing</span>, just wait, and it appears by itself. Once it's <span class="pill green">ready</span>, check that the slideshow is published and that the schedule is currently active. If the slide shows <span class="pill red">error</span>, delete it and try uploading again. For videos, check that <code>ffmpeg</code> is installed on the Pi:</p>
+      <p>Large videos can take several minutes to process: while a slide shows <span class="pill amber">processing</span>, just wait, and it appears by itself. Once it's <span class="pill green">ready</span>, check that the slideshow is published and that the schedule is currently active. If the slide shows <span class="pill red">error</span>, delete it and try uploading again. For videos, check that <code>ffmpeg</code> is installed on the Server:</p>
 
       <pre data-label="Terminal"><code>ffmpeg -version</code></pre>
 
@@ -1781,26 +1792,26 @@
 
       <pre data-label="Terminal"><code>sudo apt-get install -y ffmpeg</code></pre>
 
-      <h3>Remote display Pi won't connect / shows MAC address screen</h3>
-      <p>If the display Pi shows its MAC address and says it's <em>waiting for MAC address approval</em>, it can reach the server, but MAC filtering is blocking it. Add its MAC address to the approved list in Admin → Settings → MAC Filtering; the slideshow appears by itself within about 10 seconds. If it says it's <em>waiting for the Noticeboard server</em>, it can't reach the server at all: check the server Pi is on and running, and that the address on screen is right (to change it, run the installer on the display Pi again). A display Pi set up with an older installer may keep showing the MAC address screen after approval until it's rebooted; run the installer on it once to fix that.</p>
+      <h3>A Client won't connect / shows its MAC address</h3>
+      <p>If the Client shows its MAC address and says it's <em>waiting for MAC address approval</em>, it can reach the Server, but MAC filtering is blocking it. Add its MAC address to the approved list in Admin → Settings → MAC Filtering; the slideshow appears by itself within about 10 seconds. If it says it's <em>waiting for the Noticeboard server</em>, it can't reach the Server at all: check the Server is on and running, and that the address on screen is right (to change it, run the installer on the Client again). A Client set up with an older installer may keep showing the MAC address screen after approval until it's rebooted; run the installer on it once to fix that.</p>
 
       <h3>Display is connected but slides seem slow to update after a change</h3>
-      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the display to update. Uploads, publishing, disabling, reordering and deleting slides take effect within seconds, but always after the slide on screen has had its full time: with 10-second images, allow up to 10 seconds more (a video plays to its end first). A video that's still processing appears by itself once it's ready.</p>
+      <p>The scheduler checks for schedule changes every 60 seconds. If you change a schedule setting, wait up to 1 minute for the screens to update. Uploads, publishing, disabling, reordering and deleting slides take effect within seconds, but always after the slide on screen has had its full time: with 10-second images, allow up to 10 seconds more (a video plays to its end first). A video that's still processing appears by itself once it's ready.</p>
 
-      <h3>Can't get out of full screen on a display</h3>
-      <p>Move the mouse (or tap the screen, or press a key): the exit button appears in the top-right corner. Click it and confirm, and that screen's browser becomes a normal window (see <a href="#viewer" style="color:var(--amber)">On the screen</a>). If no exit button appears, the Pi's kiosk was set up by an older installer: run the installer again on that Pi and reboot. Until then, from another computer you can log in to it over SSH and stop the kiosk with <code>pkill -f kiosk</code>; it comes back at the next reboot.</p>
+      <h3>Can't get out of full screen on a screen</h3>
+      <p>Move the mouse (or tap the screen, or press a key): the exit button appears in the top-right corner. Click it and confirm, and that screen's browser becomes a normal window (see <a href="#viewer" style="color:var(--amber)">On the screen</a>). If no exit button appears, that Server or Client's kiosk was set up by an older installer: run the installer again on it and reboot. Until then, from another computer you can log in to it over SSH and stop the kiosk with <code>pkill -f kiosk</code>; it comes back at the next reboot.</p>
 
-      <h3>The admin panel is hard to use on the Pi itself</h3>
-      <p>Leave full screen with the exit button first, then open the browser from the desktop and go to <code>http://localhost:3000/admin</code>. Since the kiosk runs in a browser profile of its own, that's an ordinary browser window. On a Pi set up by an older installer, a browser opened from the desktop could open inside the full-screen kiosk; run the installer again once to fix that.</p>
+      <h3>The admin panel is hard to use on the Server itself</h3>
+      <p>Leave full screen with the exit button first, then open the browser from the desktop and go to <code>http://localhost:3000/admin</code>. Since the kiosk runs in a browser profile of its own, that's an ordinary browser window. On a device set up by an older installer, a browser opened from the desktop could open inside the full-screen kiosk; run the installer again once to fix that.</p>
 
       <h3>The location pin shows an unexpected address</h3>
-      <p>The pin always shows the Noticeboard <em>server's</em> address, even on a remote display or on a laptop, because that's the address other devices need. If the server has several network connections (e.g. wired and Wi-Fi), each is listed, the one this screen uses first. If the address keeps changing, give the server a fixed address (see <a href="#static-ip" style="color:var(--amber)">Give the server Pi a fixed address</a>).</p>
+      <p>The pin always shows the <em>Server's</em> address, even on a Client or on a laptop, because that's the address other devices need. If the Server has several network connections (e.g. wired and Wi-Fi), each is listed, the one this screen uses first. If the address keeps changing, give the Server a fixed address (see <a href="#static-ip" style="color:var(--amber)">Give the Server a fixed address</a>).</p>
 
       <h3>A video has no thumbnail</h3>
       <p>Videos uploaded before thumbnails existed have none. Open the slideshow in the admin panel and click <strong>Create thumbnails</strong>. If it says the last try failed, check that <code>ffmpeg</code> is installed (see below).</p>
 
-      <h3>The Pi display is blank or black on boot (kiosk doesn't start)</h3>
-      <p>The kiosk waits for the server to be ready before launching Chromium, and opens Chromium again if it ever closes or crashes. If the server takes longer than usual to start (e.g. after a system update), the kiosk still launches — just more slowly. Check the server is running:</p>
+      <h3>The screen is blank or black on boot (kiosk doesn't start)</h3>
+      <p>The kiosk waits for the server to be ready before launching Chromium, and opens Chromium again if it ever closes or crashes. If the Server takes longer than usual to start (e.g. after a system update), the kiosk still launches — just more slowly. Check the server is running:</p>
 
       <pre data-label="Terminal"><code>sudo systemctl status noticeboard</code></pre>
 
@@ -1808,50 +1819,50 @@
 
       <pre data-label="Terminal"><code>sudo journalctl -u noticeboard --no-pager -n 50</code></pre>
 
-      <p>If the Pi reaches the desktop but the browser never opens, the kiosk's own log says what it did during this boot:</p>
+      <p>If the Server or Client reaches the desktop but the browser never opens, the kiosk's own log says what it did during this boot:</p>
 
       <pre data-label="Terminal"><code>journalctl -t noticeboard-kiosk -b</code></pre>
 
-      <p><em>Waiting for the server</em> with nothing after it means the server isn't answering (check it as above). <em>Browser exited … starting it again</em> means the browser closed and the kiosk reopened it, as it should. <em>Chromium isn't installed</em>, or an empty log, means the kiosk setup is from an older installer: run the installer again and reboot. Older installers didn't know that newer Raspberry Pi OS calls the browser <code>chromium</code> instead of <code>chromium-browser</code>.</p>
+      <p><em>Waiting for the server</em> with nothing after it means the Server isn't answering (check it as above). <em>Browser exited … starting it again</em> means the browser closed and the kiosk reopened it, as it should. <em>Chromium isn't installed</em>, or an empty log, means the kiosk setup is from an older installer: run the installer again and reboot. Older installers didn't know that newer Raspberry Pi OS calls the browser <code>chromium</code> instead of <code>chromium-browser</code>.</p>
 
       <h3>The slideshow seems stuck, or the screen goes dark</h3>
-      <p>The display moves on by itself from any slide that won't load or play (after 30 seconds at most), catches up after the screen sleeps, and reconnects after an outage (see <a href="#unattended" style="color:var(--amber)">Running unattended</a>). If a screen still looks stuck:</p>
+      <p>A screen moves on by itself from any slide that won't load or play (after 30 seconds at most), catches up after the screen sleeps, and reconnects after an outage (see <a href="#unattended" style="color:var(--amber)">Running unattended</a>). If a screen still looks stuck:</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
         <li><strong>The same slide for a long time:</strong> it may be a long video. Videos play to the end.</li>
         <li><strong>The screen goes black after a while:</strong> that's Raspberry Pi OS blanking the screen, not the noticeboard. Turn it off with <code>sudo raspi-config</code> → <em>Display Options</em> → <em>Screen Blanking</em> → <em>No</em>, then reboot.</li>
-        <li><strong>A faint pulsing dot on black:</strong> the display can't reach the server. It reconnects by itself once the server is back; check the server as described above.</li>
+        <li><strong>A faint pulsing dot on black:</strong> the screen can't reach the Server. It reconnects by itself once the Server is back; check the Server as described above.</li>
         <li><strong>Only some slides show:</strong> the others may not have finished processing, or failed to. Check them in the admin panel.</li>
       </ul>
 
       <h3>An update hasn't appeared on the screen</h3>
-      <p>The server Pi checks for updates every 15 minutes and waits while an upload is being processed, so allow about 20 minutes. <strong>Settings → Software updates</strong> in the admin panel shows the branch and version running, the last check and the last update. Updates only come from the branch shown there, so a change on another branch won't appear. For more detail, see what the updater did:</p>
+      <p>The Server checks for updates every 15 minutes and waits while an upload is being processed, so allow about 20 minutes. <strong>Settings → Software updates</strong> in the admin panel shows the branch and version running, the last check and the last update. Updates only come from the branch shown there, so a change on another branch won't appear. For more detail, see what the updater did:</p>
 
       <pre data-label="Terminal"><code>sudo journalctl -u noticeboard-update --no-pager -n 30</code></pre>
 
-      <p>If it says it is <em>skipping</em> a version, that version failed to install or start, so the Pi went back to the previous one. It installs the next version automatically once one is published; to retry the skipped one anyway, run <code>bash /opt/noticeboard/installers/update.sh --force</code>. If the log is empty, the Pi was probably installed before automatic updates existed — see <a href="#updates" style="color:var(--amber)">Automatic updates</a>.</p>
+      <p>If it says it is <em>skipping</em> a version, that version failed to install or start, so the Server went back to the previous one. It installs the next version automatically once one is published; to retry the skipped one anyway, run <code>bash /opt/noticeboard/installers/update.sh --force</code>. If the log is empty, the Server was probably installed before automatic updates existed — see <a href="#updates" style="color:var(--amber)">Automatic updates</a>.</p>
 
       <h3>A branch switch didn't happen, or was undone</h3>
       <p>The <strong>Last update</strong> line of Settings → Software updates says what happened:</p>
       <table>
         <thead><tr><th>It says</th><th>What it means</th></tr></thead>
         <tbody>
-          <tr><td><span class="pill amber">Cancelled</span></td><td>The switch never started, so nothing changed: the branch couldn't be downloaded (is the Pi online?), was unusable, or its latest version had already failed once. Try again later, or choose another branch.</td></tr>
+          <tr><td><span class="pill amber">Cancelled</span></td><td>The switch never started, so nothing changed: the branch couldn't be downloaded (is the Server online?), was unusable, or its latest version had already failed once. Try again later, or choose another branch.</td></tr>
           <tr><td><span class="pill amber">Rolled back</span></td><td>The new branch failed to install (it didn't build, or its downloads failed) or didn't start, so the previous branch and version were put back. Nothing else changed. Try again later, or choose another branch.</td></tr>
-          <tr><td><span class="pill red">Failed</span></td><td>Putting the previous version back failed too. Run the installer on the server Pi, as the message says (see <a href="#branches" style="color:var(--amber)">Switching branch</a>).</td></tr>
+          <tr><td><span class="pill red">Failed</span></td><td>Putting the previous version back failed too. Run the installer on the Server, as the message says (see <a href="#branches" style="color:var(--amber)">Switching branch</a>).</td></tr>
           <tr><td><span class="pill blue">Waiting to start</span> for a while</td><td>Another update, an upload or the installer is running. The switch starts at the next check, within 15 minutes.</td></tr>
         </tbody>
       </table>
 
       <h3>Other devices can't reach the slideshow or admin panel</h3>
-      <p>If it works on the server Pi itself (<code>http://localhost:3000/</code>) but not from other devices, a firewall is probably blocking the port. On the server Pi, check with <code>sudo ufw status</code>. If ufw is on and port 3000 isn't listed, allow it with <code>sudo ufw allow 3000/tcp</code>, or run the installer again and let the firewall step do it (see <a href="#firewall" style="color:var(--amber)">Firewall</a>). If you use a different firewall, allow TCP port 3000 in it. Also check that both devices are on the same network.</p>
+      <p>If it works on the Server itself (<code>http://localhost:3000/</code>) but not from other devices, a firewall is probably blocking the port. On the Server, check with <code>sudo ufw status</code>. If ufw is on and port 3000 isn't listed, allow it with <code>sudo ufw allow 3000/tcp</code>, or run the installer again and let the firewall step do it (see <a href="#firewall" style="color:var(--amber)">Firewall</a>). If you use a different firewall, allow TCP port 3000 in it. Also check that both devices are on the same network.</p>
 
       <h3>sudo now asks for a password</h3>
-      <p>That's expected if you answered <strong>y</strong> to the installer's sudo question: commands that start with <code>sudo</code> now need your Pi user's password. To go back to no password, copy the saved setting back. The installer printed the exact command when it made the change; on most Pis it is:</p>
+      <p>That's expected if you answered <strong>y</strong> to the installer's sudo question: commands that start with <code>sudo</code> now need your user's password. To go back to no password, copy the saved setting back. The installer printed the exact command when it made the change; on most devices it is:</p>
 
       <pre data-label="Terminal"><code>sudo cp /root/noticeboard-sudoers-backup/010_pi-nopasswd /etc/sudoers.d/</code></pre>
 
       <h3>How to check everything is working</h3>
-      <p>From the Pi's terminal, this one-liner confirms the server is up and accepting connections:</p>
+      <p>From the Server's terminal, this one-liner confirms the server is up and accepting connections:</p>
 
       <pre data-label="Terminal"><code>curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3000/
 # Should print: HTTP 200</code></pre>
@@ -1866,7 +1877,7 @@
 
     <footer class="footer">
       <span>Noticeboard User Guide — v1.0</span>
-      <span>Built for Raspberry Pi OS · Node.js 20 · Vue 3</span>
+      <span>A Server and its Clients · Raspberry Pi OS · Node.js 20 · Vue 3</span>
     </footer>
 
   </main>
