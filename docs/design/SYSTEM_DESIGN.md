@@ -4,7 +4,7 @@
 
 **Keeping it up to date:** every planned change starts in §18, before any code. Then change this document in the same commit as the code it describes, so it is always a live view of the software and of the work in progress. Code comments refer to it as `SYSTEM_DESIGN §<n>`, and to the entries of §14 by their D-number: when a number changes, update those comments too (search the code for `SYSTEM_DESIGN`).
 
-**Version:** main is **0.5.0**; `feature/audio-support` carries **0.6.0** ("Audio") to **0.6.13** (the words Server and Client, and the Known Issues), which merge into main together. 1.0.0 is the version with Display Groups. The rules and the history are in §19.
+**Version:** main is **0.5.0**; `feature/audio-support` carries **0.6.0** ("Audio") to **0.6.14** (the words Server and Client, the Known Issues, and fixes from the Pi test), which merge into main together. 1.0.0 is the version with Display Groups. The rules and the history are in §19.
 
 **Module headers:** every module starts with a header in this form (`//` comments in JavaScript and inside a Vue file's `<script setup>`, `#` in bash). Comments inside a module explain intent, compatibility constraints and anything non-obvious, not what each line does.
 
@@ -1481,3 +1481,4 @@ cat /proc/device-tree/model; uname -r; chromium --version
 | 0.6.11 | on the branch | `feature/audio-support` | | the default duration not resending the playlist: kept as it is (the owner's choice) |
 | 0.6.12 | on the branch | `feature/audio-support` | | a message's timer could clear a later message |
 | 0.6.13 | on the branch | `feature/audio-support` | the Display card warns about videos in the other format | |
+| 0.6.14 | on the branch | `feature/audio-support` | `?debug=audio` on the viewer | a video's sound silenced the background music on a Pi (every sound is now 48 kHz) |
