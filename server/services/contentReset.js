@@ -1,17 +1,20 @@
 // server/services/contentReset.js — deleting the admin's content in one go, and Restore Defaults
 //
 // Responsibilities
-//   Delete All: every slideshow except the sample, with its slides and files. The sample
-//   slideshow (and whether it's published or hidden), every setting, the logo and the background
-//   colour are kept: it isn't a factory reset.
+//   Delete All: every slideshow except the sample, with its slides and files, and every audio show
+//   with its tracks and event. The sample slideshow (and whether it's published or hidden, but not
+//   its background audio, whose show is gone), every setting, the logo and the background colour
+//   are kept: it isn't a factory reset.
 //   Restore Defaults (SYSTEM_DESIGN §14 D42): as if newly installed on the branch the Pi follows.
 //   The request leaves a marker (data/restore-defaults) and asks update.sh to reinstall that
 //   branch into a clean folder and restart the server; the data is reset at the next start-up,
 //   before anything reads it, so nothing is half-written.
 //
 // Provides
-//   deleteAllContent()     → { deleted: [names] }: one config write, then the folders; the displays
-//                            are sent the new playlist
+//   deleteAllContent()     → { deleted: [slideshow names], deletedAudio: [audio show names] }: the
+//                            audio shows first (one config write, which also clears the kept
+//                            slideshows' choice of one), then the slideshows (one more), each followed
+//                            by their folders; the displays are sent the new playlist and audio
 //   requestRestore(by)     → the updates info: the marker, the status "requested" and the request
 //                            (409 when the updater isn't set up or an update is running)
 //   applyPendingRestore()  → whether a restore was applied. At start-up, before config.json is
@@ -25,7 +28,7 @@
 //   routes/api/settings/maintenance.js; server/index.js (applyPendingRestore)
 //
 // Uses
-//   services/slideshowStore (removeMany), services/slideshowRules (isSample),
+//   services/slideshowStore (removeMany), services/audioShowStore (removeMany), services/slideshowRules (isSample),
 //   services/displayEvents (playlistChanged), services/updates (updaterReady), services/updates/updateFiles (saveRestoreRequest),
 //   utils/pathHelpers, utils/logger
 //
@@ -37,6 +40,7 @@
 const fs = require('fs');
 const path = require('path');
 const store = require('./slideshowStore');
+const audioShowStore = require('./audioShowStore');
 const { isSample } = require('./slideshowRules');
 const displayEvents = require('./displayEvents');
 const logger = require('../utils/logger');
@@ -48,11 +52,18 @@ const KEPT_DATA = ['update-branch.env', 'installer.json'];
 const KEPT_TMP = ['update.lock'];   // update.sh holds it while it restarts this server
 
 async function deleteAllContent() {
+  // The audio shows, and every slideshow's choice of one, in one write (the audio's config change
+  // tells the screens). Without audio shows the slideshows' entries aren't touched.
+  const audio = audioShowStore.list();
+  const slideshows = store.list().map(({ audioShow, ...rest }) => rest);
+  const removedAudio = audio.length ? await audioShowStore.removeMany(audio.map((a) => a.folder), { slideshows }) : [];
   const own = store.list().filter((s) => !isSample(s.folder));
   const removed = await store.removeMany(own.map((s) => s.folder));
   if (removed.length) displayEvents.playlistChanged();
-  logger.info('Delete All: every slideshow but the sample deleted', { count: removed.length, folders: removed.map((s) => s.folder) });
-  return { deleted: removed.map((s) => s.name) };
+  logger.info('Delete All: every slideshow but the sample, and every audio show, deleted', {
+    count: removed.length, folders: removed.map((s) => s.folder), audioShows: removedAudio.map((a) => a.folder),
+  });
+  return { deleted: removed.map((s) => s.name), deletedAudio: removedAudio.map((a) => a.name) };
 }
 
 async function requestRestore(by) {

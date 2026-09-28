@@ -18,7 +18,8 @@
 //     replace(folder, entry)          → saves a changed entry in its place (null if none)
 //     remove(folder, other)           → removes the entry (with other keys, if given, in the same
 //                                       config write), then deletes the folder (false if none)
-//     removeMany(folders)             → the entries removed: one config write, then their folders
+//     removeMany(folders, other)      → the entries removed: one config write (with other keys, if
+//                                       given), then their folders
 //     commitEntries(entries, other)   one config write of the entries plus other keys
 //     readItems(folder)               → the parsed JSON file: { [itemsKey]: [...] }. Missing or broken
 //                                       → an empty list; other keys are kept; a file without the list
@@ -94,12 +95,14 @@ function createShowStore({ kind, configKey, rootDir, fileName, itemsKey, mediaDi
     return true;
   }
 
-  async function removeMany(folders) {
+  async function removeMany(folders, other = null) {
     const gone = new Set(folders);
     const all = list();
     const removed = all.filter((s) => gone.has(s.folder));
     if (!removed.length) return [];
-    await configService.set(configKey, all.filter((s) => !gone.has(s.folder)));
+    const rest = all.filter((s) => !gone.has(s.folder));
+    if (other) await configService.update({ [configKey]: rest, ...other });
+    else await configService.set(configKey, rest);
     for (const { folder } of removed) {
       const dir = folderDir(folder);
       if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });

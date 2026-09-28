@@ -849,7 +849,8 @@
     "status": 200,
     "type": "application/json",
     "content": {
-      "deleted": []
+      "deleted": [],
+      "deletedAudio": []
     }
   },
   "maintenance: restore defaults, no token": {
