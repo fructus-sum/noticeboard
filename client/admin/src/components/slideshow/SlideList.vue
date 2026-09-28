@@ -5,8 +5,8 @@
 //   Uploading (several files at once), the rows with a thumbnail, name, type, stored file name and
 //   status, renaming a slide (✎: Enter or leaving the field saves, Esc cancels; an empty name goes
 //   back to the uploaded file's name), moving a slide up or down, deleting one, making missing
-//   video thumbnails, and the larger preview (hover shows it, a click or tap pins it; Esc or ✕
-//   closes it). While a slide is being processed or its thumbnail made, the list reloads every 2
+//   video thumbnails, a video's own sound (VideoSoundControl), and the larger preview (hover
+//   shows it, a click or tap pins it; Esc or ✕ closes it). While a slide is being processed or its thumbnail made, the list reloads every 2
 //   seconds until none is.
 //
 // Props: folder. v-model:slides, the list as the server returns it (the page loads it first).
@@ -14,13 +14,14 @@
 // Used by: views/SlideshowDetailView
 // It stays open while a slide or an upload has failed (a warning).
 // Uses: useApi (the slides routes), useItemList (upload, reloading, delete, reorder), useRename,
-//   SlidePreview, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
+//   SlidePreview, VideoSoundControl, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { mediaUrl, mediaDisplayName, LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import { useRename } from '../../composables/useRename.js';
 import { useItemList } from '../../composables/useItemList.js';
 import SlidePreview from './SlidePreview.vue';
+import VideoSoundControl from './VideoSoundControl.vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 
 const props = defineProps({ folder: { type: String, required: true } });
@@ -160,6 +161,7 @@ onUnmounted(() => {
         <div class="slide-detail">
           {{ slide.type }}<template v-if="slide.filename"> · {{ slide.filename }}</template><template v-if="slide.thumbnailPending"> · making a thumbnail…</template>
         </div>
+        <VideoSoundControl v-if="slide.type === 'video' && slide.status === 'ready'" :folder="folder" :slide="slide" @change="(saved) => { slides[i] = saved; }" />
       </div>
       <span class="badge" :class="`badge--${slide.status}`">{{ slide.status }}</span>
       <div style="display:flex;gap:4px">

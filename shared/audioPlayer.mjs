@@ -147,6 +147,10 @@ export function createAudioPlayer({
     if (deck.el) {
       deck.el.pause();
       deck.el.volume = 0;
+      // Let go of the file (its download and the memory holding it) until the deck plays again;
+      // its old events are ignored (the token), so this raises no error
+      deck.el.removeAttribute?.('src');
+      deck.el.load?.();
     }
   }
 

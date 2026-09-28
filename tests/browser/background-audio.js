@@ -3,6 +3,9 @@
 // the slideshow on screen gives the engine its audio show, a change reaches an open screen, and
 // "None" takes it away. A headless browser may refuse sound, so the engine's state is checked
 // (window.noticeboardAudio), not what is heard; a click on the screen starts refused sound at once.
+// Phase 5: a video's Sound switch in the slide list; on screen the video plays (aloud, or muted if
+// the browser refuses), the background audio is lowered to the chosen volume meanwhile and brought
+// back after, or paused and resumed.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -18,9 +21,13 @@ if (!hasFfmpeg()) {
 const FFMPEG = ffmpegEnv().FFMPEG_PATH || 'ffmpeg';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nb-bg-audio-'));
 execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=20', '-c:a', 'libmp3lame', path.join(dir, 'tune.mp3')]);
+// A 4-second video with its own sound
+execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=25:duration=4', '-f', 'lavfi', '-i', 'sine=frequency=880:duration=4',
+  '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', path.join(dir, 'clip.mp4')]);
 
 (async () => {
-  const env = makeApp({ port: 3956 });
+  // H.264, which a PC's headless Chrome can play
+  const env = makeApp({ port: 3956, config: { display: { defaultSlideDurationSeconds: 3, videoFormat: 'h264' } } });
   const s = server(env);
   await s.start();
   await s.login();
@@ -30,6 +37,14 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:du
   const img = new FormData();
   img.append('files', new Blob([await sharp({ create: { width: 800, height: 450, channels: 3, background: '#39c' } }).png().toBuffer()], { type: 'image/png' }), 'x.png');
   await s.api('POST', `/api/slideshows/${ss}/slides`, img);
+  const clip = new FormData();
+  clip.append('files', new Blob([fs.readFileSync(path.join(dir, 'clip.mp4'))], { type: 'video/mp4' }), 'clip.mp4');
+  await s.api('POST', `/api/slideshows/${ss}/slides`, clip);
+  for (let i = 0; i < 600; i++) {
+    const all = (await s.api('GET', `/api/slideshows/${ss}/slides`)).data;
+    if (all.length === 2 && all.every((x) => x.status === 'ready')) break;
+    await sleep(100);
+  }
   await s.api('PUT', `/api/slideshows/${ss}`, { enabled: true });
   const music = (await s.api('POST', '/api/audioshows', { name: 'Lobby music' })).data.folder;
   const tune = new FormData();
@@ -78,6 +93,25 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:du
   check('  … and the settings say so', await c.until(`${fact}.includes('Lobby music (not published: silent until it is)')`), await c.evaluate(fact));
   await s.api('PUT', `/api/audioshows/${music}`, { enabled: true });
   check('published again: it plays again', await v.until(`${audioState}?.show === ${JSON.stringify(music)}`, 10000));
+
+  // A video with its own sound: the switch in the slide list, lowered to 30 %
+  await c.go(`${env.base}/admin/slideshows/${ss}`);
+  await c.until(`!!document.querySelector('.video-sound input[type=checkbox]')`);
+  await c.evaluate(`document.querySelector('.video-sound input[type=checkbox]').click()`);
+  check('the Sound switch turns a video\'s sound on (lowered by default)', await c.until(`!!document.querySelector('.video-sound select') && document.querySelector('.video-sound select').value === 'lower'`));
+  await c.evaluate(`(() => { const i = document.querySelector('.video-sound__volume'); i.value = '30'; i.dispatchEvent(new Event('input')); i.dispatchEvent(new Event('change')); })()`);
+  let saved = null;
+  for (let i = 0; i < 30 && saved?.lowerTo !== 30; i++) { await sleep(100); saved = (await s.api('GET', `/api/slideshows/${ss}/slides`)).data.find((x) => x.type === 'video'); }
+  check('  … and the volume while it plays is saved', saved?.sound === true && saved.withSound === 'lower' && saved.lowerTo === 30, JSON.stringify(saved));
+  // The viewer's tab to the front, as on a real screen: Chrome holds back media in a tab behind another
+  await v.send('Page.bringToFront');
+  const videoPlaying = `(() => { const v = document.querySelector('video'); return !!v && v.currentTime > 0.3 && !v.paused; })()`;
+  check('on screen the video plays (aloud, or muted if the browser won\'t)', await v.until(videoPlaying, 20000), JSON.stringify(await v.evaluate(`(() => { const x = document.querySelector('video'); return x && { t: x.currentTime, paused: x.paused, muted: x.muted }; })()`)));
+  check('  … with the background audio lowered to 30 %', await v.until(`Math.abs((${audioState}?.duck ?? 1) - 0.3) < 0.01`, 3000), JSON.stringify(await v.evaluate(audioState)));
+  check('  … and back to full once it has gone', await v.until(`!document.querySelector('video') && ${audioState}?.duck === 1`, 15000), JSON.stringify(await v.evaluate(audioState)));
+  await s.api('PUT', `/api/slideshows/${ss}/slides/${saved.id}/sound`, { sound: true, withSound: 'pause' });
+  check('paused instead: the background audio pauses while the video plays', await v.until(`${audioState}?.paused === true && !!document.querySelector('video')`, 20000), JSON.stringify(await v.evaluate(audioState)));
+  check('  … and carries on after', await v.until(`${audioState}?.paused === false && ${audioState}?.playing === true && !document.querySelector('video')`, 15000), JSON.stringify(await v.evaluate(audioState)));
 
   // None
   await c.go(`${env.base}/admin/slideshows/${ss}`);

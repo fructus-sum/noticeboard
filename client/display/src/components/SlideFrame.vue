@@ -4,7 +4,7 @@
 // Every event carries this slide's generation, so a late event from a slide that is already fading
 // out can't be mistaken for the slide that replaced it.
 //
-// Props: slide ({ type, url, … }), generation
+// Props: slide ({ type, url, sound?, … }), generation
 // Emits: ready, progress, ended, failed (each with the generation)
 // Used by: SlideShow
 // Uses: ImageSlide, VideoSlide
@@ -28,6 +28,7 @@ const emit = defineEmits(['ready', 'progress', 'ended', 'failed']);
   <VideoSlide
     v-else-if="slide.type === 'video'"
     :src="slide.url"
+    :sound="slide.sound === true"
     @ready="emit('ready', generation)"
     @progress="emit('progress', generation)"
     @ended="emit('ended', generation)"

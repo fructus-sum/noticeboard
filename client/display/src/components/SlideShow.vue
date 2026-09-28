@@ -10,7 +10,7 @@
 // Props
 //   slides (the playlist), connected
 // Emits
-//   on-air(folder): the slideshow of the slide now on screen (for the background audio)
+//   on-air(slide): the slide now on screen (its slideshow and a video's sound, for the background audio)
 //
 // Used by
 //   App.vue
@@ -39,7 +39,7 @@ let removeOld = null;
 
 function showSlide({ index, generation }) {
   layers.value = [...layers.value.slice(-1), { slide: props.slides[index], generation }];
-  emit('on-air', props.slides[index]?.slideshow ?? null);
+  emit('on-air', props.slides[index] ?? null);
   clearTimeout(removeOld);
   removeOld = setTimeout(() => { layers.value = layers.value.slice(-1); }, FADE_MS + 100);
 }

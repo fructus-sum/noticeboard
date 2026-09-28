@@ -6,7 +6,8 @@
 //   on the background colour chosen in Settings (the CSS variable --nb-background);
 //   the location pin (when turned on in Settings), the exit button (kiosk only, while someone
 //   uses the mouse, keyboard or touchscreen) and the warning mark while the installer needs running
-//   again; the background audio of the slideshow on screen (none while the waiting screen shows);
+//   again; the background audio of the slideshow on screen (none while the waiting screen shows),
+//   lowered or paused while a video plays its own sound;
 //   the nightly reload. ?kiosk=off (a screen that left
 //   kiosk mode) makes it an ordinary page: no exit button, no nightly reload.
 //
@@ -30,9 +31,13 @@ import { startDailyReload } from './recovery.js';
 const { playlist, connected, received, settings, audio } = useSocket();
 const { active } = useActivity();
 const hasSlides = computed(() => playlist.value.slides.length > 0);
-// The slideshow of the slide on screen, for its background audio; none on the waiting screen
+// The slide on screen, for the background audio: its slideshow's show, and a video's own sound
 const onAir = ref(null);
-const audioFor = computed(() => (hasSlides.value ? onAir.value : null));
+const audioFor = computed(() => (hasSlides.value ? onAir.value?.slideshow ?? null : null));
+const videoSound = computed(() => {
+  const s = hasSlides.value ? onAir.value : null;
+  return s?.type === 'video' && s.sound === true ? { withSound: s.withSound, lowerTo: s.lowerTo } : null;
+});
 
 // ?kiosk=off: this screen left kiosk mode (the kiosk script reopens the viewer like this in a
 // normal window), so it's an ordinary web page now: no exit button, no nightly reload
@@ -42,12 +47,12 @@ if (kiosk) startDailyReload(() => connected.value);
 
 <template>
   <div class="app" :class="{ 'app--idle': !active }" :style="{ '--nb-background': settings.background }">
-    <SlideShow v-if="hasSlides" :slides="playlist.slides" :connected="connected" @on-air="(folder) => { onAir = folder; }" />
+    <SlideShow v-if="hasSlides" :slides="playlist.slides" :connected="connected" @on-air="(slide) => { onAir = slide; }" />
     <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
     <DeviceInfo v-if="settings.showDeviceInfo" />
     <ExitKiosk v-if="kiosk" :visible="active" />
     <AdminWarning v-if="settings.installerNeeded || settings.updateAvailable" />
-    <BackgroundAudio :audio="audio" :on-air="audioFor" />
+    <BackgroundAudio :audio="audio" :on-air="audioFor" :video-sound="videoSound" />
   </div>
 </template>
 

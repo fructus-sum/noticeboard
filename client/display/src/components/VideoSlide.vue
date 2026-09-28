@@ -1,19 +1,22 @@
 <script setup>
-// client/display/src/components/VideoSlide.vue — a video slide, played muted to the end
+// client/display/src/components/VideoSlide.vue — a video slide, played to the end, muted unless it has sound
 //
 // As large as fits the screen, whole and in its own shape (object-fit: contain), with the viewer's
 // background colour around it.
 //
-// Props: src. Emits: ready (playback started), progress (it moved forward), ended, error (it
-// can't play: refused by the autoplay policy, or unplayable).
+// Props: src, sound (play its own sound: SYSTEM_DESIGN §18.3; if the browser refuses sound, it
+// plays muted instead, so the slide still plays and keeps to time).
+// Emits: ready (playback started), progress (it moved forward), ended, error (it can't play:
+// refused by the autoplay policy even muted, or unplayable).
 // Used by: SlideFrame
 // Uses: usePageWake (starts it again when the page wakes; the clock's stall deadline skips it if
 // it still won't play)
 import { ref, onMounted } from 'vue';
 import { usePageWake } from '../composables/usePageWake.js';
 
-defineProps({
+const props = defineProps({
   src: { type: String, required: true },
+  sound: { type: Boolean, default: false },
 });
 
 // ready: playback started; progress: it moved forward; error: it can't play
@@ -21,9 +24,18 @@ const emit = defineEmits(['ready', 'progress', 'ended', 'error']);
 const video = ref(null);
 
 function play() {
-  const attempt = video.value?.play();
-  // Refused (autoplay policy) or unplayable counts as an error; an interrupted play() doesn't
+  const el = video.value;
+  if (!el) return;
+  el.muted = !props.sound;
+  const attempt = el.play();
+  // Refused (autoplay policy) or unplayable counts as an error; an interrupted play() doesn't.
+  // A video with sound that the browser won't play aloud plays muted instead.
   attempt?.catch?.((err) => {
+    if (err?.name === 'NotAllowedError' && !el.muted) {
+      el.muted = true;
+      el.play()?.catch?.((again) => { if (again?.name !== 'AbortError') emit('error'); });
+      return;
+    }
     if (err?.name !== 'AbortError') emit('error');
   });
 }
