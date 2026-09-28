@@ -115,7 +115,9 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:
   // step, SYSTEM_DESIGN §18.8), which could leave too little of it to see the volume settle
   const videoPlaying = `(() => { const v = document.querySelector('video'); return !!v && v.currentTime > 0.3 && v.currentTime < 1.5 && !v.paused; })()`;
   check('on screen the video plays (aloud, or muted if the browser won\'t)', await v.until(videoPlaying, 20000), JSON.stringify(await v.evaluate(`(() => { const x = document.querySelector('video'); return x && { t: x.currentTime, paused: x.paused, muted: x.muted }; })()`)));
-  check('  … with the background audio lowered to 30 %', await v.until(`Math.abs((${audioState}?.duck ?? 1) - 0.3) < 0.01`, 3000), JSON.stringify(await v.evaluate(audioState)));
+  // The saved volume reaches the screen when the slide on air ends (the switch saved 20 % first): it
+  // may take a round of the slideshow
+  check('  … with the background audio lowered to 30 %', await v.until(`!!document.querySelector('video') && Math.abs((${audioState}?.duck ?? 1) - 0.3) < 0.01`, 15000), JSON.stringify(await v.evaluate(audioState)));
   check('  … and back to full once it has gone', await v.until(`!document.querySelector('video') && ${audioState}?.duck === 1`, 15000), JSON.stringify(await v.evaluate(audioState)));
   await s.api('PUT', `/api/slideshows/${ss}/slides/${saved.id}/sound`, { sound: true, withSound: 'pause' });
   check('paused instead: the background audio pauses while the video plays', await v.until(`${audioState}?.paused === true && !!document.querySelector('video')`, 20000), JSON.stringify(await v.evaluate(audioState)));

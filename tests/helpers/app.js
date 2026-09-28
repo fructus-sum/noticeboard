@@ -16,6 +16,8 @@
 //   copyChanges(dest)          copies this working tree's uncommitted changes onto a clone of it
 //                                (changed and new files; deleted ones removed)
 //   check(name, pass, detail), done(env), sleep, git
+//   untilSlideEnds(playlist)   waits until the slide on air in that playlist ends (+400 ms): when a
+//                              changed playlist reaches the screens (SYSTEM_DESIGN §18.8)
 //
 // Used by
 //   tests/api/*, tests/browser/* (the branch tests build their own clone with copyChanges)
@@ -173,6 +175,13 @@ async function page(connect, { width = 1280, height = 720 } = {}) {
   return c;
 }
 
+// A changed playlist reaches the screens when the slide on air ends (every screen in step,
+// SYSTEM_DESIGN §18.8): wait for that moment of the playlist the screens have
+async function untilSlideEnds(playlist, extraMs = 400) {
+  const { boundaryAfter } = require('../../shared/slideTimeline.mjs');
+  if (playlist?.slides?.length) await sleep(Math.max(0, boundaryAfter(playlist.slides, playlist.startedAt ?? Date.now(), Date.now()) - Date.now()) + extraMs);
+}
+
 function done(env) {
   if (env) fs.rmSync(env.T, { recursive: true, force: true });
   console.log(ok ? 'ALL PASSED' : 'SOME FAILED');
@@ -180,6 +189,6 @@ function done(env) {
 }
 
 module.exports = {
-  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, copyWorkingTree, copyChanges,
+  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, copyWorkingTree, copyChanges, untilSlideEnds,
   isOk: () => ok,
 };

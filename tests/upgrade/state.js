@@ -113,7 +113,8 @@ async function snapshot() {
     slides,
     settings,
     logo: (await api('GET', '/api/settings/logo', null, cookie)).json,
-    playlist: shown.playlist,
+    // Without startedAt (0.7.0): the Server's time the playlist started, which is new at every start
+    playlist: shown.playlist && Object.fromEntries(Object.entries(shown.playlist).filter(([k]) => k !== 'startedAt')),
     displaySettings: shown.settings,
     oldLoginStillWorks: (await api('GET', '/api/auth/status', null, cookie)).json,
     kioskClaimAnswer: claim.text,

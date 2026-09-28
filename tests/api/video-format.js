@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { MODULES, makeApp, server, check, done, sleep, ffmpegEnv, hasFfmpeg } = require('../helpers/app.js');
+const { MODULES, makeApp, server, check, done, sleep, ffmpegEnv, hasFfmpeg, untilSlideEnds } = require('../helpers/app.js');
 const { io } = require(path.join(MODULES, 'socket.io-client'));
 
 if (!hasFfmpeg()) {
@@ -107,7 +107,8 @@ const codecOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams
   check('the converted video is ready, H.265, in a new file', converted.status === 'ready' && !converted.reprocessing && converted.format === 'h265'
     && converted.filename !== secondFile && codecOf(file(converted)) === 'hevc,hvc1');
   check('  … its old file is deleted, its thumbnail kept', !fs.existsSync(path.join(slidesDir, secondFile)) && converted.thumbnail === second.thumbnail && fs.existsSync(path.join(slidesDir, converted.thumbnail)));
-  await sleep(1500);
+  await sleep(500);
+  await untilSlideEnds(playlist);   // the change reaches the screens when the slide on air ends
   check('  … and the screens get the new file', playlist.slides.some((x) => x.url.endsWith(converted.filename)));
   check('nothing is left in the uploads folder', fs.readdirSync(path.join(env.APP, 'tmp', 'noticeboard-uploads')).length === 0);
 

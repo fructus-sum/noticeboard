@@ -1,7 +1,7 @@
 // Regression pass through the API (cleans up after itself):
 // 3 rounds of 2-image uploads, then publish (live playlist), media served, reorder, schedule, disable, delete.
 const path = require('path');
-const { MODULES, makeApp, server: appServer } = require('../helpers/app.js');
+const { MODULES, makeApp, server: appServer, untilSlideEnds } = require('../helpers/app.js');
 const ENV = makeApp({ port: 3923 });
 const APP_SERVER = appServer(ENV);
 const BASE = ENV.base;
@@ -65,7 +65,8 @@ const check = (name, pass, detail = '') => { ok &&= pass; console.log(`${pass ? 
     check('reorder slides', reordered.map((s) => s.id).join() === order.join());
 
     await api('PUT', `/slideshows/${folder}`, { enabled: false });
-    await sleep(2500);
+    await sleep(500);
+    await untilSlideEnds(playlist);   // the change reaches the screens when the slide on air ends
     check('disable -> slides leave the display', playlist.slides.every((s) => s.slideshow !== folder));
   } finally {
     await api('DELETE', `/slideshows/${folder}`);

@@ -4,7 +4,7 @@
 // counted together with the branch switch's (5 per 15 minutes).
 const fs = require('fs');
 const path = require('path');
-const { MODULES, makeApp, server, check, done, sleep } = require('../helpers/app.js');
+const { MODULES, makeApp, server, check, done, sleep, untilSlideEnds } = require('../helpers/app.js');
 const sharp = require(path.join(MODULES, 'sharp'));
 const { io } = require(path.join(MODULES, 'socket.io-client'));
 
@@ -76,7 +76,8 @@ const png = (colour) => sharp({ create: { width: 64, height: 36, channels: 3, ba
   const settings = (await s.api('GET', '/api/settings')).data;
   check('the settings are kept', settings.display?.backgroundColor === '#123456');
   check('the logo is kept', fs.existsSync(path.join(env.APP, 'data', 'branding', 'logo.png')) && (await s.api('GET', '/api/settings/logo')).data?.custom === true, JSON.stringify((await s.api('GET', '/api/settings/logo')).data));
-  await sleep(1500);
+  await sleep(500);
+  await untilSlideEnds(playlists[playlists.length - 1]);   // the change reaches the screens when the slide on air ends
   const last = playlists[playlists.length - 1];
   check('the screens were sent the new playlist, without the deleted slideshows', playlists.length > shown && last.slides.every((x) => x.slideshow === sample.folder), `${playlists.length - shown} sent`);
 

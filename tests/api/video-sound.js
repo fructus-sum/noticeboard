@@ -14,6 +14,9 @@ const { io } = require(path.join(MODULES, 'socket.io-client'));
 
   const sample = (await s.api('GET', '/api/slideshows')).data.find((x) => x.sample);
   const url = `/api/slideshows/${sample.folder}/slides`;
+  // The start-up job that makes the sample video's thumbnail fills in its keys; let it finish first,
+  // so the video read here is the one stored
+  for (let i = 0; i < 100 && (await s.api('GET', url)).data.some((x) => x.thumbnailPending); i++) await sleep(100);
   const slides = (await s.api('GET', url)).data;
   const video = slides.find((x) => x.type === 'video');
   const image = slides.find((x) => x.type === 'image');
