@@ -9,7 +9,7 @@
 //     NOTICEBOARD_GITHUB_API.
 //
 // Used by
-//   tests/api/branch-switching.js
+//   tests/api/branch-switching.js, tests/browser/branch-switching.js, tests/browser/admin-pages-look.js
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
