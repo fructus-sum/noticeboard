@@ -252,7 +252,7 @@ A Vue Router SPA under `/admin/`:
 | What | Where | Trigger |
 |---|---|---|
 | Recompute the active slideshows | `schedulerService.computeActive` | every 60 s, and on every `configService 'change'`. It emits `'update'` only when the ordered list of folders changes. |
-| Media processing | `uploadQueue` (p-queue, concurrency 2) | after an upload. Images: sharp → PNG. Videos: ffmpeg → H.264/AAC MP4, then ffprobe for the duration, then a JPEG thumbnail. |
+| Media processing | `uploadQueue` (p-queue, concurrency 2) | after an upload. Images: sharp → PNG. Videos: ffmpeg → H.265 (HEVC)/AAC MP4 (earlier uploads stay H.264, §16 #12), then ffprobe for the duration, then a JPEG thumbnail. |
 | Video thumbnails | `uploadQueue.enqueueThumbnail` | the sample slideshow's videos, and "Create thumbnails" in the admin panel |
 | Sample slideshow sync | `sampleSlideshow.syncSampleSlideshow` | once at start-up |
 | Password-check token expiry (branch switch, Delete All) | `actionTokens.take` | lazily, when tokens are used |
@@ -790,7 +790,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/mediaService.js`**
 - **Purpose:** converting uploads into slides.
-- **API:** `processImage` (sharp → PNG), `processVideo` (ffmpeg → H.264 MP4), `getVideoDuration` (ffprobe), `createThumbnail`.
+- **API:** `processImage` (sharp → PNG), `processVideo` (ffmpeg → H.265 MP4: libx265, CRF 28, `hvc1` tag), `getVideoDuration` (ffprobe), `createThumbnail`.
 - **Used by:** uploadQueue.
 
 **`services/mediaNames.js`**
@@ -1144,6 +1144,7 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 9. `configService.update` merges only the top level. `PUT /settings` therefore replaces the whole `macFiltering` object, which is intended (the admin panel sends everything).
 10. **Changing the default image duration doesn't resend the playlist** (`tests/api/socket-events.js` records this). Slideshows without their own duration keep the old one on screen until the playlist is next sent: a publish, upload, reorder or delete, a scheduler change, or a display reconnecting.
 11. **A message's clear timer can clear a later message:** "Saved." clears itself after 2 seconds (3 for "Password changed."), whatever the card shows by then. Saving twice within 2 seconds, the second failing, shows its error only briefly (`useFlash`).
+12. **Videos are H.265 (HEVC) from 2026-09-28** (the owner's choice), to make them smaller. Videos uploaded before stay H.264 and aren't converted. A browser plays H.265 only if it can decode it: Chromium on a Pi relies on the Pi's hardware decoder, and a PC's browser on its own (e.g. Firefox can't, so the admin panel's preview of a new video stays blank there). A screen that can't play a video skips it after 30 seconds (the slide clock, §3.5). Encoding H.265 takes several times longer than H.264 on a Pi.
 
 ---
 

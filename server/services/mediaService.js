@@ -2,7 +2,8 @@
 //
 // Provides
 //   processImage(input, outDir, id) → a PNG
-//   processVideo(input, outDir, id) → an H.264 MP4 the Pi's browser plays
+//   processVideo(input, outDir, id) → an H.265 (HEVC) MP4 with AAC sound. Videos processed before
+//                                     H.265 (H.264) are left as they are (SYSTEM_DESIGN §16)
 //   getVideoDuration(file), createThumbnail(video, outDir, id) → a still for the admin panel
 //
 // Used by
@@ -30,12 +31,14 @@ function processVideo(inputPath, outDir, slideId) {
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
-      .videoCodec('libx264')
+      .videoCodec('libx265')
       .audioCodec('aac')
       .outputOptions([
-        '-crf 23',
+        '-crf 28',                      // about the quality of H.264 at 23, in a smaller file
         '-preset fast',
         '-pix_fmt yuv420p',
+        '-tag:v hvc1',                  // the HEVC tag browsers expect in an MP4
+        '-x265-params log-level=error',
         '-movflags +faststart',
         '-map 0:v:0',
         '-map 0:a:0?',   // audio optional — handles silent videos
