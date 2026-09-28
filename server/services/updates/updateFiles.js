@@ -13,7 +13,8 @@
 //                               _AT), read by installers/lib/schedule.sh; update.sh removes _AT once
 //                               the set time has come
 //     tmp/update-request        its existence starts update.sh (systemd's noticeboard-update.path);
-//                               its text says what was asked: "install-now", "check", or a switch
+//                               its text says what was asked: "install-now", "check",
+//                               "restore-defaults", or a switch
 //
 // Provides
 //   readBranchSetting()        → Promise<string>  the branch updates follow ('main' if none)
@@ -26,6 +27,7 @@
 //   saveInstallAt(iso|null)    → Promise  sets or removes the set time, keeping the schedule
 //   requestRun(what)           → Promise  writes tmp/update-request: "check" or "install-now"
 //   saveInstallNow(status)     → Promise  the status ("requested"), then the request
+//   saveRestoreRequest(status) → Promise  the status, then the "restore-defaults" request
 //   saveSwitch(branch, status) → Promise  writes the branch setting, then the status, then the
 //                                request, each in one step. If any write fails, all three are
 //                                put back as they were and the error is thrown
@@ -129,6 +131,11 @@ async function saveInstallNow(status) {
   await requestRun('install-now');
 }
 
+async function saveRestoreRequest(status) {
+  await writeFileAtomic(updateStatusPath(), `${JSON.stringify(status)}\n`);
+  await requestRun('restore-defaults');
+}
+
 // The request is written last: its appearance starts update.sh, which then finds the other two
 async function saveSwitch(branch, status) {
   const oldSetting = await fs.readFile(updateBranchPath(), 'utf8').catch(() => null);
@@ -158,5 +165,6 @@ module.exports = {
   saveInstallAt,
   requestRun,
   saveInstallNow,
+  saveRestoreRequest,
   saveSwitch,
 };

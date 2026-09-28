@@ -13,8 +13,13 @@
 # lib/schedule.sh) decides whether a run may install: every run checks for a new version (in
 # manual mode once a day) and records whether one is waiting; it installs only when that's due,
 # or when the admin asked (Update now, a branch switch). The request file says what was asked:
-# "install-now", "check" (only check, e.g. after the schedule changed), or anything else (a
-# branch switch, as older servers write it). Runs as the user that owns /opt/noticeboard, which is also the user the
+# "install-now", "check" (only check, e.g. after the schedule changed), "restore-defaults", or
+# anything else (a branch switch, as older servers write it).
+#
+# Restore Defaults (data/restore-defaults, left by the server): the followed branch's latest commit
+# is reinstalled even if it's the one running, into a clean folder (everything untracked deleted
+# but RESTORE_KEEP), and the server is restarted even if that failed: at start-up it resets its
+# data, logs and waiting files (server/services/contentReset.js). Runs as the user that owns /opt/noticeboard, which is also the user the
 # server runs as. No sudo.
 #
 #   Check now:             bash /opt/noticeboard/installers/update.sh
@@ -42,6 +47,14 @@ STATUS_FILE="$INSTALL_DIR/data/update-status.json"   # the last update or branch
 CHECK_FILE="$INSTALL_DIR/data/update-check.json"     # the last check for updates, shown in the admin panel
 NOTICE_FILE="$INSTALL_DIR/data/update-notice.json"   # shown on the admin home page until someone closes it
 SCHEDULE_FILE="$INSTALL_DIR/data/update-schedule.env" # the update schedule, written by the admin panel (lib/schedule.sh)
+RESTORE_FILE="$INSTALL_DIR/data/restore-defaults"    # Restore Defaults asked for (the server deletes it at start-up)
+# What a Restore Defaults clean keeps (git clean patterns; a name without a slash in the middle also
+# matches deeper in the folder, which only keeps more, and none starts with / because Git Bash would
+# rewrite it on Windows, where the tests run): what the server
+# resets itself (data, tmp, logs), what the installer made (.env, start-kiosk.sh, and its files in
+# data/ and tmp/), and what keeps the running server working until it restarts (both rebuilt
+# anyway). A file the installer adds to the folder must be added here (SYSTEM_DESIGN §15).
+RESTORE_KEEP=(data/ tmp/ logs/ .env start-kiosk.sh node_modules/ 'client/*/dist/')
 BACKUP_DIR="$INSTALL_DIR/data/backups"               # settings are copied here before a branch switch
 REQUEST_FILE="$INSTALL_DIR/tmp/update-request"       # written by the admin panel to update right now
 LOCK_FILE="$INSTALL_DIR/tmp/update.lock"             # install.sh holds this lock too
@@ -116,10 +129,19 @@ main() {
     fi
   fi
   if [ "${1:-}" = "--force" ]; then force=1; fi
+  # Restore Defaults: asked for now, or left waiting by a run that found the lock busy
+  local restore=""
+  if [ -f "$RESTORE_FILE" ]; then
+    restore=1
+    requested=1
+    force=1
+  fi
 
   exec 9>>"$LOCK_FILE"
   if ! flock -n 9; then
-    if [ "$request" = install-now ]; then
+    if [ -n "$restore" ]; then
+      write_status requested "The installer or another update is running. Restore Defaults starts at the next check, within 15 minutes."
+    elif [ "$request" = install-now ]; then
       set_install_at "$NOW"   # a set time that has come: the next check installs
       write_status requested "The installer or another update is running. The update starts at the next check, within 15 minutes."
     elif [ -n "$requested" ]; then
@@ -174,7 +196,7 @@ main() {
 
   # A branch whose work is all in main now isn't needed any more: go back to main (an install,
   # so only when one is due)
-  if [ -n "$due" ] && [ -z "$switching" ] && [ "$BRANCH" != main ] && [ "$(read_branch_setting)" = "$BRANCH" ] && branch_merged; then
+  if [ -n "$due" ] && [ -z "$switching" ] && [ -z "$restore" ] && [ "$BRANCH" != main ] && [ "$(read_branch_setting)" = "$BRANCH" ] && branch_merged; then
     echo "$BRANCH has been merged into main; going back to main."
     RETURNED_FROM=$BRANCH
     write_branch_setting main
@@ -211,7 +233,7 @@ main() {
     fi
   fi
 
-  if [ "$CURRENT" = "$TARGET" ]; then
+  if [ "$CURRENT" = "$TARGET" ] && [ -z "$restore" ]; then
     if [ -n "$switching" ]; then
       # The same version on another branch: nothing to install, just follow the new branch
       git checkout --quiet --force -B "$BRANCH" "$TARGET"
@@ -269,6 +291,9 @@ main() {
       exit 1
     fi
     write_status updating "Switching from $PREVIOUS_BRANCH (${CURRENT:0:7}) to $BRANCH (${TARGET:0:7}): installing and building. This takes a few minutes; the noticeboard keeps running until it restarts."
+  elif [ -n "$restore" ]; then
+    write_status updating "Restoring defaults: reinstalling ${TARGET:0:7} from $BRANCH into a clean folder. This takes a few minutes; the noticeboard keeps running until it restarts."
+    clean_folder
   else
     write_status updating "Installing ${TARGET:0:7} from $BRANCH. The noticeboard keeps running until it restarts."
   fi
@@ -284,6 +309,11 @@ main() {
     else
       write_status failed "${TARGET:0:7} from $BRANCH failed to install or build, and putting ${CURRENT:0:7} from $PREVIOUS_BRANCH back failed too. The noticeboard is still running, but might not start after a restart. To recover, run the installer on this Pi: curl -fsSL $INSTALLER_URL | sudo bash"
       echo "ERROR: couldn't restore ${CURRENT:0:7}'s files. Fix this before the server next restarts." >&2
+    fi
+    if [ -n "$restore" ]; then
+      # The reset still happens: the server applies it at start-up (and so clears the status above)
+      restart_server || true
+      write_status failed "Restore Defaults: the settings and content were reset, but reinstalling ${TARGET:0:7} from $BRANCH failed, so ${CURRENT:0:7} was put back. To reinstall, run the installer on this Pi: curl -fsSL $INSTALLER_URL | sudo bash"
     fi
     exit 1
   fi
@@ -306,6 +336,8 @@ main() {
   rm -f "$FAILED_FILE"
   if [ -n "$RETURNED_FROM" ]; then
     returned_to_main
+  elif [ -n "$restore" ]; then
+    write_status updated "Restored to defaults: running ${TARGET:0:7} from $BRANCH, as if newly installed."
   elif [ -n "$switching" ]; then
     write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH: now running ${TARGET:0:7}. The settings from before the switch are saved in ${backup#"$INSTALL_DIR"/}."
     remember_main
@@ -449,6 +481,14 @@ waiting_note() {
   fi
   next=$(next_install "$NOW" "$(to_epoch "$INSTALL_CHECKED_AT")")
   if [ -n "$next" ]; then echo "It's installed at $(date -d "@$next" '+%-d %b %Y, %H:%M'), or when you choose Update now."; fi
+}
+
+# Restore Defaults: delete everything untracked in the install folder but RESTORE_KEEP (a Pi has no
+# .gitignore, so -x and the keep list are what protect those)
+clean_folder() {
+  local args=() keep
+  for keep in "${RESTORE_KEEP[@]}"; do args+=(-e "$keep"); done
+  git clean -ffdxq "${args[@]}"
 }
 
 # Put a commit's files in place: code, dependencies and the built SPAs (as install.sh does).

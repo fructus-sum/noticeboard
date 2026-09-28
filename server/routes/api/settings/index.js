@@ -6,7 +6,7 @@
 //   security.js   /security, /password
 //   logo.js       /logo
 //   updates.js    /updates…, /version
-//   maintenance.js  /maintenance/… (Delete All)
+//   maintenance.js  /maintenance/… (Delete All, Restore Defaults)
 //
 // Used by
 //   routes/api/index.js

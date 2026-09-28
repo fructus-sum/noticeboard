@@ -1,4 +1,4 @@
-// server/routes/api/settings/maintenance.js — actions that can't be undone: Delete All
+// server/routes/api/settings/maintenance.js — actions that can't be undone: Delete All, Restore Defaults
 //
 // Each is: the admin password (which gives a one-time token for that action, the wrong tries
 // counted with every other password check), then a final confirmation with that token.
@@ -23,7 +23,7 @@ const logger = require('../../../utils/logger');
 const router = express.Router();
 
 // The actions, each confirmed with its own token (the subject is the same for all: this noticeboard)
-const ACTIONS = new Set(['delete-all']);
+const ACTIONS = new Set(['delete-all', 'restore-defaults']);
 const SUBJECT = 'noticeboard';
 
 const expired = () => Object.assign(
@@ -47,6 +47,11 @@ router.post('/maintenance/delete-all', jsonRoute(async (req) => {
   if (!actionTokens.take(req.body?.token, 'delete-all', SUBJECT)) throw expired();
   logger.info('Delete All requested', { ip: req.ip });
   return contentReset.deleteAllContent();
+}));
+
+router.post('/maintenance/restore-defaults', jsonRoute(async (req) => {
+  if (!actionTokens.take(req.body?.token, 'restore-defaults', SUBJECT)) throw expired();
+  return contentReset.requestRestore(req.ip);
 }));
 
 module.exports = router;

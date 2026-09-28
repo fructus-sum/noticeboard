@@ -22,6 +22,7 @@
 //   installNow(by)         → info: installs the latest version of the followed branch now
 //   waitingUpdate(info)    → the version waiting to be installed ({ commit, subject, date,
 //                            nextInstall }), or null
+//   updaterReady()         → info, or throws (409) when this noticeboard can't update itself
 //   manualUpdateWaiting()  → whether the screens show the warning mark for it: manual
 //                            updates, and a version waiting (SYSTEM_DESIGN §14 D41)
 //   validBranchName                              (from branchName.js)
@@ -305,6 +306,7 @@ module.exports = {
   installNow,
   waitingUpdate,
   manualUpdateWaiting,
+  updaterReady,
   validBranchName,
   issueToken: (branch) => tokens.issue('switch', branch),
   takeToken: (token, branch) => tokens.take(token, 'switch', branch),

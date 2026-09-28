@@ -159,6 +159,7 @@ On a remote display Pi, `/usr/local/bin/noticeboard-kiosk.sh` is started by the 
 
 ### 3.2 Server start-up (`server/index.js`)
 
+0. `contentReset.applyPendingRestore()`: when Restore Defaults left its marker (`data/restore-defaults`), it deletes the marker, everything in `data/` but `update-branch.env` and `installer.json`, the files in `tmp/` but `update.lock`, and the logs (`app.log` emptied in place), so the server starts as a new install (D42).
 1. `configService.init()` creates `data/` and `data/slideshows/`, and reads `data/config.json` with JSON5.
    - If the file is missing, it writes defaults with a bcrypt hash of `Admin@12345` and a random `jwtSecret`.
    - If the file can't be parsed, it **regenerates the defaults**, which replaces the password and the MAC list.
@@ -292,8 +293,9 @@ A Vue Router SPA under `/admin/`:
 | `POST /api/settings/updates/check` | adminAuth | fetch the branch, validate it, requirements and installer needs | BranchSwitcher |
 | `POST /api/settings/updates/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | one-time token for the switch (5 min) | SwitchDialogs |
 | `POST /api/settings/updates/switch` | adminAuth + token | writes the branch file, status and request | SwitchDialogs |
-| `POST /api/settings/maintenance/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | `{ password, action: 'delete-all' }` → one-time token for that action (5 min) | DeleteContentCard |
+| `POST /api/settings/maintenance/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | `{ password, action: 'delete-all' | 'restore-defaults' }` → one-time token for that action (5 min) | DeleteContentCard |
 | `POST /api/settings/maintenance/delete-all` | adminAuth + token | every slideshow but the sample deleted → `{ deleted: [names] }`; the playlist sent | DeleteContentCard |
+| `POST /api/settings/maintenance/restore-defaults` | adminAuth + token (action `restore-defaults`) | the marker, status `requested`, request `restore-defaults` (409 without the updater or while an update runs) | DeleteContentCard |
 | `GET/POST /api/slideshows` | adminAuth | list (with `sample`, `slideCount`) / create | SlideshowsView |
 | `GET/PUT/DELETE /api/slideshows/:folder` | adminAuth | read / update / delete (the sample gives 403) | both slideshow views |
 | `GET/POST /api/slideshows/:folder/slides` | adminAuth (once per request) | list / upload (multer, max 50 files, 500 MB each) | SlideshowDetailView (list), SlideList |
@@ -315,6 +317,7 @@ Error conventions:
 | `data/update-branch.env` | `updateFiles.saveSwitch` writes `NOTICEBOARD_BRANCH=<b>`; `updateFiles.readBranchSetting` reads it | reads `NOTICEBOARD_BRANCH` and `NOTICEBOARD_MAIN_AT_SWITCH`; `write_branch_setting` (lib/branch.sh) writes both |
 | `tmp/update-request` | `requestSwitch` (`<time> <branch>`), `installNow` (`install-now`), `setSchedule` and `setInstallAt` (`check`) write it | the systemd `.path` unit starts `update.sh`, which deletes the file at once; `check` only checks, anything else may install |
 | `data/update-schedule.env` | `updateFiles.saveSchedule` (`EVERY`, `TIME`, `DAY`, `SINCE`), `saveInstallAt` (`AT`); `readSchedule` | `lib/schedule.sh` reads it; `set_install_at` removes `AT` once its time has come (or sets it, when Update now finds the lock busy) |
+| `data/restore-defaults` | `contentReset.requestRestore` writes it; `applyPendingRestore` deletes it at start-up | update.sh: while it exists, a run is a restore (reinstall into a clean folder, restart even after a failure) |
 | `data/update-status.json` | `requestSwitch` writes `state: requested`; `getInfo` and `versionInfo` read it | `write_status` for every other state |
 | `data/update-check.json` | `getInfo` reads it (the waiting version: `waitingUpdate`) | `write_check`, with `installCheckedAt`, `fetchedAt`, `nextInstall`, `available`, `availableSubject`, `availableDate` |
 | `data/update-notice.json` | `getNotice` reads it; `dismissNotice` deletes it | `returned_to_main` writes it |
@@ -406,6 +409,7 @@ Under `/opt/noticeboard` on a server Pi.
 | `data/update-status.json` | flat JSON, all values strings | install.sh and update.sh (`write_json`), requestSwitch (JSON.stringify) | services/updates (getInfo, versionInfo) | same | Software updates card, sidebar "Last updated" |
 | `data/update-check.json` | flat JSON | update.sh | updates/updateFiles | update.sh | Software updates card, the schedule's next run (`installCheckedAt`, `fetchedAt`), the waiting version |
 | `data/update-schedule.env` | `KEY=value` lines (`NOTICEBOARD_UPDATE_EVERY`, `_TIME`, `_DAY`, `_SINCE`, `_AT`) | the admin panel (updates/updateFiles) | update.sh (lib/schedule.sh), updates/updateFiles | the admin panel; update.sh (`_AT`) | the update schedule (missing: every 15 minutes) |
+| `data/restore-defaults` | text (the time asked, and by whom) | contentReset.requestRestore | update.sh, contentReset | deleted by the server at start-up | Restore Defaults |
 | `data/update-notice.json` | flat JSON | update.sh (branch merged) | updates/updateFiles | dismissNotice (deletes) | home page notice |
 | `data/installer.json` | `{ version (number), branch, commit, time }` | install.sh (last step of a server install) | updates/installerVersion (`installedVersion`) | install.sh | home page installer box, switch check |
 | `data/backups/<time>-from-<branch>/…` | copies of the `.json`/`.env` files in `data/` | update.sh before a branch switch | the admin (manually) | none | recovery |
@@ -460,6 +464,7 @@ Outside the install folder:
 | MAC filtering with the warning pop-up and "add this device" | `MacFilterCard`, `MacFilterWarning`, `macFilter`/`macService`/`macLookup`, `settings/general.js` my-device |
 | Password change | `PasswordCard`, `settings/security.js`, `adminPassword` |
 | Delete All: every slideshow but the sample, after a warning listing them, the password and a last chance | `DeleteContentCard`, `ConfirmDangerDialogs`, `settings/maintenance.js`, `contentReset`, `actionTokens` |
+| Restore Defaults: as if newly installed on the followed branch (warning, password, last chance; the installer recommended afterwards) | `DeleteContentCard`, `ConfirmDangerDialogs`, `settings/maintenance.js`, `contentReset` (`requestRestore`, `applyPendingRestore`), update.sh (restore mode) |
 | Software updates: status, branch switch with two confirmations, software check, merged-branch notice, installer-needed box | `components/updates/` (SoftwareUpdates, UpdateStatus, BranchSwitcher, SwitchDialogs, UpdateNotice, InstallerNotice), `useUpdateInfo`, `services/updates`, `systemCheck`, update.sh |
 | Sidebar: logo, By Fructus Sum, links, Last updated, collapse | `NavBar`, `NavIcon`, `useNav`, `useBranding` |
 | Section cards fold away to their title (remembered; a card with a warning stays open) | `CollapsibleCard`, `useCollapsed`, and the eight cards that use it |
@@ -552,6 +557,7 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
 12. `refuse_reason`: the target has files in `data tmp logs .env`, or (when switching) its `update.sh` lacks the text `update-branch.env`.
 13. On a switch, `backup_settings` → `data/backups/<time>-from-<prev>/`.
 14. `status: updating`. `PORT = server_port` (node + configIO).
+14a. **Restore Defaults** (`data/restore-defaults` exists): the run is due and forced, skips the merged-branch return, installs even when `TARGET` equals `CURRENT`, first cleans the folder (`clean_folder`: `git clean -ffdxq` keeping `RESTORE_KEEP`: `data/`, `tmp/`, `logs/`, `.env`, `start-kiosk.sh`, `node_modules/`, `client/*/dist/`), restarts the server even if the install failed and was rolled back (the server resets its data at start-up), and writes its status after the restart.
 15. `install_commit`: `checkout --force -B`, `npm install --include=dev`, `npm run build`, `npm prune --omit=dev`. On failure: re-install `CURRENT` → `rolled-back`, or `failed`.
 16. `wait_for_uploads` (at most 30 min), then `restart_server`:
     - `kill -TERM` the `MainPID`; systemd restarts the service.
@@ -740,7 +746,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **`security.js`:** `/security` and `/password` (adminPassword).
 - **`logo.js`:** `/logo` GET/POST/DELETE (`logoInfo`, uploads with prefix `logo`, 20 MB, `LOGO_MIME`; brandingService; `displayEvents.displaySettingsChanged`).
 - **`updates.js`:** the software-update routes and `/version` (services/updates, `jsonRoute`, `wrongPasswordLimiter`).
-- **`maintenance.js`:** `/maintenance/verify-password` (the password for an action → its token; `wrongPasswordLimiter`) and `/maintenance/delete-all` (with the token: `contentReset.deleteAllContent`).
+- **`maintenance.js`:** `/maintenance/verify-password` (the password for an action → its token; `wrongPasswordLimiter`) , `/maintenance/delete-all` (with the token: `contentReset.deleteAllContent`) and `/maintenance/restore-defaults` (with the token: `contentReset.requestRestore`).
 
 **`routes/api/slideshows.js`**
 - **Purpose:** slideshow CRUD, thin.
@@ -832,11 +838,11 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** slideshows.js, slides.js, settings/logo.js, uploadQueue; displaySocket listens.
 
 **`services/contentReset.js`**
-- **Purpose:** `deleteAllContent()` → `{ deleted: [names] }`: every slideshow but the sample (`store.removeMany`: one config write, then the folders), then `displayEvents.playlistChanged()`.
-- **Uses:** slideshowStore, slideshowRules (`isSample`), displayEvents, logger. **Used by:** settings/maintenance.js.
+- **Purpose:** `deleteAllContent()` → `{ deleted: [names] }`: every slideshow but the sample (`store.removeMany`: one config write, then the folders), then `displayEvents.playlistChanged()`. `requestRestore(by)`: the marker, the status and the `restore-defaults` request (D42). `applyPendingRestore()` (start-up): the reset itself. `KEPT_DATA`: `update-branch.env`, `installer.json`.
+- **Uses:** slideshowStore, slideshowRules (`isSample`), displayEvents, services/updates (`updaterReady`, `updateFiles.saveRestoreRequest`), pathHelpers, logger. **Used by:** settings/maintenance.js, server/index.js.
 
 **`services/actionTokens.js`**
-- **Purpose:** the one-time proof that the admin password was checked (D40): `issue(action, subject)`, `take(token, action, subject)` (5 minutes, one use, that action and subject only). Actions: `switch` (the branch as subject), `delete-all`.
+- **Purpose:** the one-time proof that the admin password was checked (D40): `issue(action, subject)`, `take(token, action, subject)` (5 minutes, one use, that action and subject only). Actions: `switch` (the branch as subject), `delete-all`, `restore-defaults`.
 - **Used by:** services/updates (`issueToken`, `takeToken`), settings/maintenance.js.
 
 **`services/slideshowRules.js`**
@@ -945,7 +951,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/updates/UpdateStatus.vue` | the facts (running, updates and the schedule, last check, last update) and the progress box | useUpdateInfo helpers | |
 | `components/updates/BranchSwitcher.vue` | branch name, Check branch, the result with the software and installer panels, "Switch to …" | useApi, useUpdateInfo helpers | |
 | `components/updates/SwitchDialogs.vue` | Missing software (its own ModalDialog), then the shared steps with the switch's texts (ids `switch-…`) | useApi, ModalDialog, ConfirmDangerDialogs, useUpdateInfo helpers | |
-| `components/settings/DeleteContentCard.vue` | the "Delete content" card: Delete All… (loads the slideshows; nothing but the sample → says so), the warning listing each slideshow and its slides, the shared steps | useApi, useFlash, FlashMessage, CollapsibleCard, ConfirmDangerDialogs | |
+| `components/settings/DeleteContentCard.vue` | the "Delete content" card: Delete All… (loads the slideshows; nothing but the sample → says so), the warning listing each slideshow and its slides; Restore Defaults… (needs the updater), the warning listing what is reset and kept with the installer command; the shared steps; then "Restoring defaults…" until the server is back, and the login page | useApi, useFlash, FlashMessage, CollapsibleCard, ConfirmDangerDialogs | |
 | `components/ui/ConfirmDangerDialogs.vue` | the shared confirmation steps (D40): warnings and the admin password (`verify(password)` → token), then the last chance (`confirm(token)`); focus, Esc, no cancelling while an answer is on its way; props `idPrefix`, `title`, `finalTitle`, labels; slots: the first dialog's text, `final` | ModalDialog | used by SwitchDialogs, DeleteContentCard |
 | `components/settings/MacFilterWarning.vue` | warning and how-to pop-ups in one ModalDialog (Esc/outside: back from the how-to, else cancel); `GET /settings/my-device` | useApi, ModalDialog | |
 | `components/ui/StatusBadge.vue`, `PublishToggle.vue` (`small`, `busy`), `TagPill.vue`, `ModalDialog.vue` (`role`, `labelledby`, `tag`; emits `close` on Esc or outside; attributes go to the card), `FlashMessage.vue` (`flash`, `tag`) | shared pieces | none | |
@@ -1072,6 +1078,7 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 | D39 | Section cards that fold, and never hide a warning | `components/ui/CollapsibleCard.vue` + `useCollapsed` | Each card says when it needs attention: Change password (the default password), Software updates (an update running, the server restarting, the last attempt failed, rolled back or cancelled, an error message), Slides (a failed slide or upload). The page warnings sit outside the cards. |
 | D40 | Asking for the admin password again before something that can't easily be undone | `services/actionTokens.js` (the one-time token, per action), `middleware/passwordLimiter.js` (wrong tries, counted together), `components/ui/ConfirmDangerDialogs.vue` (the dialogs), `.danger-dialog` in `styles/base.css` (their texts) | Used by the branch switch and Delete All; Restore Defaults will use it too. Each action keeps its own warning texts. |
 | D41 | The update schedule: when an install is due | `installers/lib/schedule.sh` only (update.sh); it writes the next install time into update-check.json for the admin panel | The server only checks and saves the values (`updates/schedule.js`, `updateFiles`); `updateFiles.readSchedule` reads the file with the same defaults as `read_schedule`. |
+| D42 | Restore Defaults: what is reset and what is kept | the server (`contentReset.applyPendingRestore`, `KEPT_DATA`) for data/, tmp/ and logs/; update.sh (`RESTORE_KEEP`, `clean_folder`) for the rest of the folder | Two lists on purpose: each side resets what it owns. A file the installer adds to the folder must go on `RESTORE_KEEP` (`tests/installers/update-restore.sh` checks every file the installer writes). |
 
 ---
 
@@ -1100,7 +1107,8 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 14. The guide anchors the admin panel links to must stay.
 
 **Files in `data/`** (their formats and paths must not change)
-15. `config.json` (JSON5-readable, with every key in §5.1), `slideshows/<folder>/slideshow.json` (slide fields in §5.1 and §6), media names, `branding/logo.png`, `update-branch.env`, `update-status.json`, `update-check.json` (keys may be added), `update-notice.json`, `update-schedule.env`, `installer.json` and `backups/`.
+15. `config.json` (JSON5-readable, with every key in §5.1), `slideshows/<folder>/slideshow.json` (slide fields in §5.1 and §6), media names, `branding/logo.png`, `update-branch.env`, `update-status.json`, `update-check.json` (keys may be added), `update-notice.json`, `update-schedule.env`, `restore-defaults`, `installer.json` and `backups/`.
+15a. **Restore Defaults keeps** every file the installer writes into the install folder (`RESTORE_KEEP` in update.sh, `KEPT_DATA` in contentReset).
 
 **Viewer and admin pages already open in browsers**
 16. They keep running old code until they reload, so:
@@ -1146,9 +1154,9 @@ Run them with `node tests/run.js <group> [filter]` or the npm scripts. `npm run 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|
 | unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (15 tests, including 30 simulated days); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS), the media name rule and mediaDisplayName (9) | Node 20+ |
-| api (`test:api`) | `tests/api/` | **contract.js**: 90 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), the update schedule's routes and the screens' mark (`update-schedule.js`), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
-| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), Delete All's card and dialogs (`delete-all.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
-| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return, **the schedule** with a fake clock: `update-schedule.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
+| api (`test:api`) | `tests/api/` | **contract.js**: 92 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), the update schedule's routes and the screens' mark (`update-schedule.js`), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files, default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
+| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), Delete All's card and dialogs (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
+| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return, **the schedule** with a fake clock: `update-schedule.sh`; **Restore Defaults**: the clean, the keep list against every file the installer writes, a restart after a failed reinstall: `update-restore.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
 The upgrade rehearsal works like this:
@@ -1176,9 +1184,8 @@ Every planned change starts here, before any code: what changes and why, the par
 |---|---|---|
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
 | 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
-| 18.6 | Restore Defaults (as if newly installed on the branch the Pi follows) | Approved |
 
-On the branch `QALife-updates`; friendly names, folding cards, Delete All and the update schedule are done (D38–D41). 18.6 uses the confirmation steps and password tokens Delete All built (D40) and update.sh's requests (D41). None of the four changes the installer: `INSTALLER_VERSION` stays 2, and no Pi is asked to run the installer again.
+On the branch `QALife-updates`, done: friendly names (D38), folding cards (D39), Delete All (D40), the update schedule (D41) and Restore Defaults (D42). None of them changes the installer: `INSTALLER_VERSION` stays 2.
 
 ### 18.1 The viewer's black screen that only a power cycle cleared
 
@@ -1209,35 +1216,3 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Pi's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
 
-### 18.6 Restore Defaults
-
-**What changes:** a **Restore Defaults** button in the Delete content card (D40). Afterwards the noticeboard is as if it had just been installed on the branch it follows (the owner's choice: "like you never used it before"):
-- every slideshow deleted, and the sample slideshow as new (not published, not hidden);
-- `config.json` from the defaults: the password `Admin@12345`, a new session secret (everyone, including the admin who pressed it, is logged out), MAC filtering off, port 3000, the display settings, the background colour;
-- the logo, the update schedule (back to every 15 minutes), the update history (status, check, notice), the settings backups (`data/backups`), the failed-commit marker, waiting uploads and the logs deleted;
-- **the latest version of the branch reinstalled into a clean folder** (fetched, checked out over any changed program files, every other file that isn't part of the program deleted, `npm install`, built) and the server restarted.
-
-**Kept:** the branch the Pi follows (`update-branch.env`: it stays on that branch), `data/installer.json` (a record of how the Pi was set up, which a reset doesn't redo), and what the installer put in the folder or outside it: `.env`, `start-kiosk.sh`, the systemd units, the kiosk autostart, sudo and the firewall.
-
-**The clean folder:** in restore mode update.sh runs `git clean -ffdx` with an explicit keep list (one constant in update.sh): `data/`, `tmp/` and `logs/` (the server empties these itself, step 4), `.env`, `start-kiosk.sh`, `node_modules/` and `client/*/dist/`. The last two are kept only so the running server keeps working during the reinstall: `npm install` + `npm prune` bring `node_modules` exactly in line with the lockfile, and the build empties and rebuilds `dist`. (A Pi has no `.gitignore`, so `-x` and the keep list are what protect these.) Change impact: a file the installer adds to the folder in future must be added to the keep list in the same commit (§15).
-
-**The warning before it runs** (the first of the three steps) lists everything above, and also says:
-- the admin password goes back to `Admin@12345` and MAC filtering is turned off;
-- the port goes back to 3000; a custom port can be set again in Settings afterwards;
-- **running the installer again after the restore is recommended** (the command is shown, as in the installer notice), and there will be no more reminders about it once the restore is complete.
-
-**How it runs (the reset of the data happens while the server is stopped, so nothing is half-written):**
-1. The admin confirms with the shared steps (D40), starting with the warning above.
-2. `POST /api/settings/maintenance/restore-defaults` `{ token }` (the token for action `restore-defaults`): `contentReset.requestRestore()` writes `data/restore-defaults` (the time requested) and `tmp/update-request` containing `restore-defaults`. The admin panel shows "Restoring defaults…" and waits for the server to come back.
-3. update.sh (a requested run) cleans the folder and reinstalls the latest commit of the branch **even if it is the one running**, then restarts the server; in restore mode it restarts it even if the reinstall failed and was rolled back, so the reset still happens.
-4. At start-up, before `configService.init`, `server/index.js` calls `contentReset.applyPendingRestore()`: it deletes the marker first (so a reset that fails can't repeat forever), then everything in `data/` except `update-branch.env` and `installer.json`, then `logs/` and the files in `tmp/`. Start-up then continues as on a new install: default `config.json`, the sample slideshow created.
-5. update.sh writes one status line: "Restored to defaults: running <commit> from <branch>".
-
-**Risks:**
-- Restoring defaults turns MAC filtering off and sets the well-known password: the default-password warning shows on every page afterwards, as after an install. The warning says so.
-- A port other than 3000 goes back to 3000 (the server kiosk always uses 3000, §16 #2); the warning says so and that it can be set again.
-- The clean deletes files by a keep list: a mistake in it could delete something the installer made. The installers test group checks the list against every file the installer writes into the folder.
-- Without the update units (not installed by the installer), the reset can't restart the server: the button is disabled with the reason, like the branch switch.
-- An older update.sh (after a rollback) treats the request as an ordinary update and never restarts for it; the marker then applies at the next restart. The admin panel reports the reset as not finished after 60 minutes (D34).
-
-**Tests:** api (the marker and request written; `applyPendingRestore` leaves exactly the kept files; a fresh config and the sample afterwards; the old session rejected), installers (update.sh in restore mode: cleans the folder but keeps every file on the keep list, reinstalls the same commit, restarts after a failed reinstall), browser (the dialogs, the warning's text), the upgrade rehearsal.

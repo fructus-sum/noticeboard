@@ -186,6 +186,9 @@ function lanAddress() {
   await a('maintenance: delete all, no token', 'POST', '/api/settings/maintenance/delete-all', { body: {}, exact: true });
   const verified = await a('maintenance: verify', 'POST', '/api/settings/maintenance/verify-password', { body: { password: 'Admin@12345', action: 'delete-all' } });
   await a('maintenance: delete all', 'POST', '/api/settings/maintenance/delete-all', { body: { token: verified.json.token } });
+  await a('maintenance: restore defaults, no token', 'POST', '/api/settings/maintenance/restore-defaults', { body: {}, exact: true });
+  const forRestore = await s.api('POST', '/api/settings/maintenance/verify-password', { password: 'Admin@12345', action: 'restore-defaults' });
+  await a('maintenance: restore defaults, updater not set up', 'POST', '/api/settings/maintenance/restore-defaults', { body: { token: forRestore.data.token }, exact: true });
 
   await a('logout', 'POST', '/api/auth/logout', { exact: true });
   await s.stop();

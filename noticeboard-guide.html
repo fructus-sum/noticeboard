@@ -1514,7 +1514,7 @@
           </tr>
           <tr>
             <td><strong>Delete content</strong></td>
-            <td><strong>Delete All</strong>: deletes every slideshow except the sample. See <a href="#delete-content" style="color:var(--blue)">Deleting your content</a>.</td>
+            <td><strong>Delete All</strong>: deletes every slideshow except the sample. <strong>Restore Defaults</strong>: back to a new install. See <a href="#delete-content" style="color:var(--blue)">Deleting your content</a>.</td>
             <td>—</td>
           </tr>
         </tbody>
@@ -1533,6 +1533,8 @@
       <h3 id="delete-content" style="scroll-margin-top:80px">Deleting your content</h3>
       <p>The <strong>Delete content</strong> card at the bottom of the Settings page has <strong>Delete All…</strong>. It deletes every slideshow except the sample slideshow, with all their slides and files. The sample slideshow (and whether it's published or hidden), your settings, the logo and the background colour are kept: it isn't a factory reset.</p>
       <p>Because it can't be undone, it asks three times, like switching branch: first it lists every slideshow it will delete and how many slides each has; then it asks for the admin password; then it gives you a last chance to back out. Cancelling at any step, or a wrong password, changes nothing. Screens stop showing the deleted slideshows straight away.</p>
+      <p><strong>Restore Defaults…</strong>, in the same card, makes the noticeboard as if it had just been installed on the branch it follows. Every slideshow is deleted (the sample slideshow comes back as new); every setting goes back to its default, including the admin password (<code>Admin@12345</code>, and everyone is logged out), MAC filtering (off) and the port (3000; you can set another one again afterwards); the logo, the update schedule, the update history, the settings backups and the logs are deleted; and the software is reinstalled from the latest version of the branch, into a clean folder. What the installer set up on the Pi (the kiosk, the services, sudo and the firewall) and the branch it follows are kept. It asks the same three times as Delete All, and the first warning lists all of this. It takes a few minutes; the page then goes to the login page by itself.</p>
+      <p>Running the installer again after a restore is recommended (the warning shows the command); there are no more reminders about it once the restore is complete. Restore Defaults needs the Pi's automatic updates, which the installer sets up.</p>
 
       <h3>Restarting the server service</h3>
       <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the server. Run this command on the Pi via SSH or a terminal:</p>
