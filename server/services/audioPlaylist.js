@@ -1,14 +1,15 @@
 // server/services/audioPlaylist.js — what the displays play in the background (SYSTEM_DESIGN §18.3)
 //
 // Provides
-//   buildAudio() → { shows, slideshows, event }, the audio:update payload:
+//   buildAudio({ event }) → { shows, slideshows, event }, the audio:update payload:
 //     shows       { <audio show folder>: { id, order, transition, fadeSeconds, volume,
 //                   tracks: [{ url, length }] } }: the published audio shows with at least one
 //                   ready track, each exactly as shared/audioPlayer.mjs takes it (length: seconds,
 //                   null if unknown)
 //     slideshows  { <slideshow folder>: <audio show folder> }: the slideshows whose audio show is
 //                 in shows (published or not: which slideshows are on air is the playlist's job)
-//     event       null (event audio comes in a later phase)
+//     event       the audio show whose event is playing (services/audioEventClock gives it), if it
+//                 is in shows; else null
 //
 // Used by
 //   realtime/displaySocket.js
@@ -23,7 +24,7 @@ const audioShowStore = require('./audioShowStore');
 const slideshowStore = require('./slideshowStore');
 const { audioUrl } = require('../utils/pathHelpers');
 
-function buildAudio() {
+function buildAudio({ event = null } = {}) {
   const shows = {};
   for (const show of audioShowStore.list()) {
     if (show.enabled !== true) continue;
@@ -46,7 +47,7 @@ function buildAudio() {
     if (ss.audioShow && shows[ss.audioShow]) slideshows[ss.folder] = ss.audioShow;
   }
 
-  return { shows, slideshows, event: null };
+  return { shows, slideshows, event: event && shows[event] ? event : null };
 }
 
 module.exports = { buildAudio };

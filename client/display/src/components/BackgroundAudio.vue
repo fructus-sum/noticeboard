@@ -5,6 +5,8 @@
 //   Plays the audio show of the slideshow on screen (SYSTEM_DESIGN §18.3) with the shared engine
 //   (shared/audioPlayer.mjs): a new slideshow switches it at once with the new show's transition,
 //   one without audio fades it out, and two slideshows on the same show carry on without a break.
+//   While an event is on (audio.event), every screen plays that show instead, even with no
+//   slideshow on; afterwards the slideshow's show carries on with its next track.
 //   While a video plays its own sound, the background is lowered to its lowerTo % or paused, and
 //   brought back (or resumed where it was) when that slide goes.
 //   If the browser won't play sound (a kiosk whose installer hasn't been run again, or an ordinary
@@ -12,7 +14,7 @@
 //   or presses a key on the screen.
 //
 // Props
-//   audio (the last audio:update: { shows, slideshows }), onAir (the slideshow of the slide on
+//   audio (the last audio:update: { shows, slideshows, event }), onAir (the slideshow of the slide on
 //   screen, or null), videoSound (the video on screen's { withSound, lowerTo } while it plays its
 //   own sound, else null)
 //
@@ -29,9 +31,9 @@ const props = defineProps({
 
 const player = createAudioPlayer({ createElement: () => new Audio() });
 
-// The show for the slideshow on screen; the engine ignores the same show sent again
+// The event's show, else the one for the slideshow on screen; the engine ignores the same show sent again
 const show = computed(() => {
-  const folder = props.onAir ? props.audio.slideshows?.[props.onAir] : null;
+  const folder = props.audio.event || (props.onAir ? props.audio.slideshows?.[props.onAir] : null);
   return (folder && props.audio.shows?.[folder]) || null;
 });
 watch(show, (s) => player.setShow(s), { immediate: true });

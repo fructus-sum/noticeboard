@@ -2,8 +2,8 @@
 //
 // Responsibilities
 //   A pending Restore Defaults (contentReset.applyPendingRestore) → configService.init → an
-//   unfinished video conversion tidied up → the sample slideshow sync (an error is logged, start-up carries on) → the Express app → the display socket → the scheduler → listen on config.port (3000 if unset).
-//   SIGTERM or SIGINT stops the scheduler and closes the sockets (forced exit after 5 s).
+//   unfinished video conversion tidied up → the sample slideshow sync (an error is logged, start-up carries on) → the Express app → the display socket → the scheduler → the event audio clock → listen on config.port (3000 if unset).
+//   SIGTERM or SIGINT stops the scheduler and the event audio clock, and closes the sockets (forced exit after 5 s).
 //
 // Used by
 //   systemd (noticeboard.service runs node server/index.js), npm start, update.sh (restarts it),
@@ -11,11 +11,11 @@
 //
 // Uses
 //   services/contentReset, services/videoConversion (recover), services/configService, services/sampleSlideshow, app.js, realtime/displaySocket,
-//   services/schedulerService, utils/logger
+//   services/schedulerService, services/audioEventClock, utils/logger
 //
 // Change impact
 //   The path server/index.js is in every installed service unit (SYSTEM_DESIGN §15). The
-//   order matters: the socket must exist before the scheduler first announces (§3.2).
+//   order matters: the socket must exist before the scheduler and the event clock first announce (§3.2).
 const http = require('http');
 const { applyPendingRestore } = require('./services/contentReset');
 const videoConversion = require('./services/videoConversion');
@@ -24,6 +24,7 @@ const schedulerService = require('./services/schedulerService');
 const { syncSampleSlideshow } = require('./services/sampleSlideshow');
 const createApp = require('./app');
 const { initDisplaySocket } = require('./realtime/displaySocket');
+const audioEventClock = require('./services/audioEventClock');
 const logger = require('./utils/logger');
 
 async function main() {
@@ -41,6 +42,7 @@ async function main() {
 
   const io = initDisplaySocket(server);
   schedulerService.init();
+  audioEventClock.init();
 
   server.listen(port, () => {
     logger.info('Noticeboard server started', { port });
@@ -50,6 +52,7 @@ async function main() {
 
   function shutdown() {
     schedulerService.stop();
+    audioEventClock.stop();
     // io.close() disconnects the displays too; server.close() alone waits for them indefinitely
     io.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 5000).unref();

@@ -16,7 +16,7 @@ It would work well anywhere that needs centrally managed information or media ac
 - **Several slideshows** — with schedules, priorities, and a default image duration (10 seconds) that each slideshow can override; switching slideshows never cuts a slide short
 - **Hide and unhide** unpublished slideshows to tidy the list without deleting them
 - **A sample slideshow** that updates bring new examples to; it can be hidden but not deleted
-- **Background audio** — audio shows (music or sound, in order or shuffled, with crossfades and their own volume) play behind the slideshows that choose them, on every screen
+- **Background audio** — audio shows (music or sound, in order or shuffled, with crossfades and their own volume) play behind the slideshows that choose them, on every screen; a video can play its own sound (the background lowered or paused meanwhile), and an audio show can take over every screen as **event audio** (now, once, or every week)
 - **Uploads processed for you** — images to PNG, videos to H.265 MP4 (large videos take a while; carry on meanwhile), with automatic video thumbnails and a larger preview of any slide
 - **Your logo** above "No slideshow published" and in the admin sidebar, or none
 - **The server's address on every screen** — a faint location pin shows the Noticeboard server's IP address and port; it can be turned off

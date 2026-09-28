@@ -2,8 +2,8 @@
 // client/admin/src/views/AudioShowsView.vue — every audio show (/admin/audio)
 //
 // Responsibilities
-//   The list with each show's tracks and settings, publishing or unpublishing, creating a show,
-//   deleting one, and opening one (SYSTEM_DESIGN §18.3).
+//   The list with each show's tracks, settings and event (playing now, or when next), publishing
+//   or unpublishing, creating a show, deleting one, and opening one (SYSTEM_DESIGN §18.3).
 //
 // Used by: router/index.js
 // Uses: useApi (/audioshows), useShowActions, ui/StatusBadge, ui/PublishToggle
@@ -71,6 +71,7 @@ const summary = (show) => [
   show.order === 'shuffle' ? 'Shuffled' : 'In order',
   show.transition === 'crossfade' ? `Crossfade ${show.fadeSeconds} s` : 'No transition',
   `Volume ${show.volume} %`,
+  ...(show.eventState?.state === 'playing' ? ['Event playing now'] : show.eventState?.state === 'next' ? [`Event next: ${new Date(show.eventState.at).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`] : []),
 ].join(' · ');
 
 onMounted(load);

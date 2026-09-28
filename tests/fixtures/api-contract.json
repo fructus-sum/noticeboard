@@ -881,6 +881,7 @@
     "content": {
       "addedAt": "string",
       "enabled": "boolean",
+      "eventState": "null",
       "fadeSeconds": "number",
       "folder": "string",
       "name": "string",
@@ -905,6 +906,7 @@
     "content": {
       "addedAt": "string",
       "enabled": "boolean",
+      "eventState": "null",
       "fadeSeconds": "number",
       "folder": "string",
       "name": "string",
@@ -936,6 +938,7 @@
     "content": {
       "addedAt": "string",
       "enabled": "boolean",
+      "eventState": "null",
       "fadeSeconds": "number",
       "folder": "string",
       "name": "string",

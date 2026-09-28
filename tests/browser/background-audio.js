@@ -5,7 +5,8 @@
 // (window.noticeboardAudio), not what is heard; a click on the screen starts refused sound at once.
 // Phase 5: a video's Sound switch in the slide list; on screen the video plays (aloud, or muted if
 // the browser refuses), the background audio is lowered to the chosen volume meanwhile and brought
-// back after, or paused and resumed.
+// back after, or paused and resumed. Phase 6: the Event audio card: Start now takes over every screen,
+// Stop gives the slideshow's show back; saving an event that overlaps another is refused, naming it.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -112,6 +113,47 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:
   await s.api('PUT', `/api/slideshows/${ss}/slides/${saved.id}/sound`, { sound: true, withSound: 'pause' });
   check('paused instead: the background audio pauses while the video plays', await v.until(`${audioState}?.paused === true && !!document.querySelector('video')`, 20000), JSON.stringify(await v.evaluate(audioState)));
   check('  … and carries on after', await v.until(`${audioState}?.paused === false && ${audioState}?.playing === true && !document.querySelector('video')`, 15000), JSON.stringify(await v.evaluate(audioState)));
+
+  // Event audio: another show, started by hand from its page
+  const drill = (await s.api('POST', '/api/audioshows', { name: 'Fire drill' })).data.folder;
+  const drillTrack = new FormData();
+  drillTrack.append('files', new Blob([fs.readFileSync(path.join(dir, 'tune.mp3'))], { type: 'audio/mpeg' }), 'tune.mp3');
+  await s.api('POST', `/api/audioshows/${drill}/tracks`, drillTrack);
+  for (let i = 0; i < 300; i++) {
+    if ((await s.api('GET', `/api/audioshows/${drill}/tracks`)).data.every((t) => t.status === 'ready')) break;
+    await sleep(100);
+  }
+  await s.api('PUT', `/api/audioshows/${drill}`, { enabled: true });
+  await c.go(`${env.base}/admin/audio/${drill}`);
+  const eventCard = `[...document.querySelectorAll('.card')].find((x) => x.textContent.includes('Event audio'))`;
+  const cardText = `((${eventCard})?.innerText ?? '').replace(/\\s+/g, ' ')`;
+  check('the Event audio card: off', await c.until(`${cardText}.includes('Off: this show plays only behind the slideshows that choose it.')`), await c.evaluate(cardText));
+  await c.evaluate(`[...(${eventCard}).querySelectorAll('button')].find((b) => b.textContent.trim() === 'Edit').click()`);
+  await c.until(`!!document.querySelector('#audio-event-mode')`);
+  await c.evaluate(`(() => { const m = document.querySelector('#audio-event-mode'); m.value = 'now'; m.dispatchEvent(new Event('change')); })()`);
+  await c.until(`[...(${eventCard}).querySelectorAll('button[type=submit]')].some((b) => b.textContent.trim() === 'Start now')`);
+  await c.evaluate(`[...(${eventCard}).querySelectorAll('button[type=submit]')].find((b) => b.textContent.trim() === 'Start now').click()`);
+  check('Start now: playing now on every screen', await c.until(`${cardText}.includes('playing now on every screen')`), await c.evaluate(cardText));
+  check('  … the screen plays the event\'s show instead', await v.until(`${audioState}?.show === ${JSON.stringify(drill)}`, 10000), JSON.stringify(await v.evaluate(audioState)));
+  await c.evaluate(`[...(${eventCard}).querySelectorAll('button')].find((b) => b.textContent.includes('Stop')).click()`);
+  check('Stop: the event is off', await c.until(`${cardText}.includes('Off: this show plays')`), await c.evaluate(cardText));
+  check('  … and the screen is back on the slideshow\'s show', await v.until(`${audioState}?.show === ${JSON.stringify(music)}`, 10000), JSON.stringify(await v.evaluate(audioState)));
+
+  // Overlapping another show's event: refused, naming it (tomorrow, so nothing plays)
+  const day = new Date(Date.now() + 24 * 3600 * 1000);
+  const ymd = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+  await s.api('PUT', `/api/audioshows/${music}/event`, { mode: 'once', from: `${ymd}T10:00`, to: `${ymd}T12:00` });
+  await c.evaluate(`[...(${eventCard}).querySelectorAll('button')].find((b) => b.textContent.trim() === 'Edit').click()`);
+  await c.until(`!!document.querySelector('#audio-event-mode')`);
+  await c.evaluate(`(() => { const m = document.querySelector('#audio-event-mode'); m.value = 'once'; m.dispatchEvent(new Event('change')); })()`);
+  await c.until(`!!document.querySelector('#audio-event-from')`);
+  await c.evaluate(`(() => {
+    const set = (sel, v) => { const e = document.querySelector(sel); e.value = v; e.dispatchEvent(new Event('input')); };
+    set('#audio-event-from', '${ymd}T11:00'); set('#audio-event-to', '${ymd}T13:00');
+    [...(${eventCard}).querySelectorAll('button[type=submit]')].find((b) => b.textContent.trim() === 'Save').click();
+  })()`);
+  check('an overlapping event is refused, naming the other show', await c.until(`${cardText}.includes('Clashes with “Lobby music”')`), await c.evaluate(cardText));
+  await s.api('PUT', `/api/audioshows/${music}/event`, { event: null });
 
   // None
   await c.go(`${env.base}/admin/slideshows/${ss}`);

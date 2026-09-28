@@ -11,11 +11,13 @@
 //   server/index.js, realtime/displaySocket (sends a new playlist on 'update')
 //
 // Uses
-//   services/slideshowStore (list), services/configService ('change'), utils/logger
+//   services/slideshowStore (list), services/configService ('change'), utils/weeklyTimes (a timed
+//   schedule's days and times, shared with event audio), utils/logger
 const EventEmitter = require('events');
 const configService = require('./configService');
 const store = require('./slideshowStore');
 const logger = require('../utils/logger');
+const { inWeeklyWindow } = require('../utils/weeklyTimes');
 
 class SchedulerService extends EventEmitter {
   constructor() {
@@ -64,15 +66,7 @@ class SchedulerService extends EventEmitter {
   _matchesSchedule(schedule, now) {
     if (!schedule || schedule.type === 'always') return true;
 
-    if (schedule.type === 'timed') {
-      const day = now.getDay();
-      if (Array.isArray(schedule.days) && !schedule.days.includes(day)) return false;
-
-      const currentMins = now.getHours() * 60 + now.getMinutes();
-      const [sh, sm] = (schedule.startTime || '00:00').split(':').map(Number);
-      const [eh, em] = (schedule.endTime || '23:59').split(':').map(Number);
-      return currentMins >= sh * 60 + sm && currentMins < eh * 60 + em;
-    }
+    if (schedule.type === 'timed') return inWeeklyWindow(schedule, now);
 
     // Unknown schedule type — show by default
     return true;

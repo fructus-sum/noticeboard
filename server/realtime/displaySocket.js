@@ -14,14 +14,16 @@
 //                                and when the installer state changes (checked when a display
 //                                connects and every 5 minutes), only when the settings differ
 //                                from the last ones sent
-//       audio:update to all      on a config 'change' and on displayEvents.audioChanged, only
-//                                when it differs from the last one sent (SYSTEM_DESIGN §18.3)
+//       audio:update to all      on a config 'change', on displayEvents.audioChanged and on the
+//                                event clock's 'update', only when it differs from the last one
+//                                sent (SYSTEM_DESIGN §18.3)
 //
 // Used by
 //   server/index.js
 //
 // Uses
 //   socket.io; services/playlistService (buildPlaylist), services/audioPlaylist (buildAudio),
+//   services/audioEventClock (the event playing, 'update'),
 //   services/displaySettings (the payload),
 //   services/schedulerService (getActive, 'update'), services/configService ('change'),
 //   services/displayEvents, utils/displayBuildId, utils/logger
@@ -36,6 +38,7 @@ const configService = require('../services/configService');
 const displayEvents = require('../services/displayEvents');
 const { buildPlaylist } = require('../services/playlistService');
 const { buildAudio } = require('../services/audioPlaylist');
+const audioEventClock = require('../services/audioEventClock');
 const displaySettings = require('../services/displaySettings');
 const { displayBuildId } = require('../utils/displayBuildId');
 const logger = require('../utils/logger');
@@ -60,9 +63,10 @@ function initDisplaySocket(httpServer) {
   }
 
   // The background audio: sent again only when it has changed
-  let lastAudio = JSON.stringify(buildAudio());
+  const currentAudio = () => buildAudio({ event: audioEventClock.getActive() });
+  let lastAudio = JSON.stringify(currentAudio());
   function broadcastAudio() {
-    const audio = buildAudio();
+    const audio = currentAudio();
     const json = JSON.stringify(audio);
     if (json === lastAudio) return;
     lastAudio = json;
@@ -91,7 +95,7 @@ function initDisplaySocket(httpServer) {
       const playlist = buildPlaylist(schedulerService.getActive());
       socket.emit(EVENTS.PLAYLIST_UPDATE, playlist);
       logger.info('Socket: playlist sent to display', { id: socket.id, slideCount: playlist.slides.length });
-      socket.emit(EVENTS.AUDIO_UPDATE, buildAudio());
+      socket.emit(EVENTS.AUDIO_UPDATE, currentAudio());
     });
 
     socket.on('disconnect', () => {
@@ -105,6 +109,7 @@ function initDisplaySocket(httpServer) {
   displayEvents.onDisplaySettingsChanged(broadcastDisplaySettings);
   configService.on('change', broadcastAudio);
   displayEvents.onAudioChanged(broadcastAudio);
+  audioEventClock.on('update', broadcastAudio);
 
   logger.info('Socket.io initialised');
   return io;
