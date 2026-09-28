@@ -1102,6 +1102,7 @@
           <tr><td>Change the schedule</td><td>Click Edit, change Schedule type, click Save</td></tr>
           <tr><td>Change the priority</td><td>Click Edit, adjust the Priority number, click Save</td></tr>
           <tr><td>Set how long its images show</td><td>Click Edit, then under <em>Image duration</em> choose <em>Use the default</em> or <em>Use its own</em> and a number of seconds, click Save</td></tr>
+          <tr><td>Play music or sound behind it</td><td>Click Edit, choose an audio show under <em>Background audio</em> (or <em>None</em>), click Save (see <a href="#audio" style="color:var(--blue)">Audio shows</a>)</td></tr>
           <tr><td>Hide or unhide it</td><td>Click <strong>Hide</strong> / <strong>Unhide</strong> in the Status field (only while it isn't published)</td></tr>
           <tr><td>Publish or disable</td><td>Click the <strong>Publish</strong> / <strong>Disable</strong> button in the Status field</td></tr>
           <tr><td>Upload slides</td><td>Click <strong>+ Upload</strong> in the Slides card</td></tr>
@@ -1226,6 +1227,9 @@
         <li><strong>▶ Preview the show</strong> plays the whole show in your browser just as the screens will: in its order, with its transition and volume. <strong>⏭ Next track</strong> skips ahead (try a crossfade), <strong>■ Stop</strong> ends it. It uses the saved settings and the tracks that are ready, so you can try a show before publishing it. If your browser blocks the sound, click <strong>Try again</strong>.</li>
         <li><strong>Publish</strong> makes a show available to play in the background of slideshows.</li>
       </ul>
+      <p><strong>Playing it behind a slideshow:</strong> open the slideshow, click <strong>Edit</strong> in its Settings card, choose the audio show under <strong>Background audio</strong> and click <strong>Save</strong>. Only published audio shows are offered. Every screen then plays it while that slideshow's slides are on, repeating for as long as the slideshow runs. When the screens move on to a slideshow with a different audio show, the music changes straight away, with the new show's transition; a slideshow without one fades the music out, and one using the same show carries on without a break. Several slideshows can share an audio show.</p>
+      <p>Unpublishing an audio show silences it on the screens, but the slideshows keep their choice (their Settings card says <em>not published</em>) and it plays again once you publish it. Deleting an audio show removes it from the slideshows that used it.</p>
+      <p>The sound comes out of each screen's usual audio output: on most TVs and monitors that's the HDMI cable, with the volume set on the TV and by each show's volume. A Pi needs its installer run again once before its screen plays sound (see <a href="#installer-needed" style="color:var(--blue)">When the installer needs running again</a>); until then it stays silent and everything else works as before. A screen shown in an ordinary browser window may also wait for a click or key press before it plays sound.</p>
     </div>
 
     <!-- ── 06 Publish & Disable ── -->

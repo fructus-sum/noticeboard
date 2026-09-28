@@ -122,7 +122,7 @@ noticeboard/
 │   │   └── api/               index.js, auth.js, device.js, slideshows.js, slides.js, audioshows.js, tracks.js, mediaItems.js (the items' routes)
 │   │       └── settings/      index.js, general.js, security.js, logo.js, updates.js, maintenance.js (the Settings page)
 │   ├── services/              configService, showStore, slideshowStore, audioShowStore, slideshowRules, audioShowRules,
-│   │                          playlistService, displayEvents,
+│   │                          playlistService, audioPlaylist, displayEvents,
 │   │                          schedulerService, settingsService, adminPassword, adminSession, macService,
 │   │                          mediaService, mediaTypes, mediaNames, uploadQueue, brandingService, sampleSlideshow,
 │   │                          contentReset, actionTokens
@@ -205,6 +205,7 @@ socket.io attaches directly to the `http.Server`, so **`/socket.io` never passes
 | `display:build` | server → one socket | on connect | 12-character SHA-1 of `client/display/dist/index.html`, or `null` |
 | `display:settings` | server → one socket, and broadcast | on connect; broadcast on `configService 'change'`, on `displayEvents.displaySettingsChanged` (the logo), and when the installer or update state changes (checked at start-up, when a display connects and every 5 minutes), when the settings differ from the last broadcast | `{ showDeviceInfo, logo: { url } \| null, background, installerNeeded, updateAvailable }` (built by `services/displaySettings.js`) |
 | `display:ready` | display → server | on every (re)connect | none |
+| `audio:update` | server → that socket (after its playlist, on `display:ready`), and broadcast | on `display:ready`; broadcast on `configService 'change'` and on `displayEvents.audioChanged` (a track ready, deleted or reordered), when it differs from the last broadcast | `{ shows: { <audio folder>: { id, order, transition, fadeSeconds, volume, tracks: [{ url, length }] } }, slideshows: { <slideshow folder>: <audio folder> }, event: null }` (built by `services/audioPlaylist.js`: published audio shows with a ready track, and the slideshows that chose one of them; `event` is for event audio, §18.3) |
 | `playlist:update` | server → that socket (reply to `display:ready`), and broadcast | on `display:ready`; on `schedulerService 'update'`; on `displayEvents.playlistChanged` (a slideshow change, a slide deleted or reordered, an upload processed, a video converted) | `{ slides: [{ type, url, duration, slideshow, length? }] }` (`length`: videos only) |
 
 The event names are defined once, in `shared/contract.json`. `realtime/displaySocket.js` requires it, and the viewer imports it through `shared/index.js` (`SOCKET_EVENTS`).
@@ -219,7 +220,7 @@ The event names are defined once, in `shared/contract.json`. `realtime/displaySo
 ### 3.5 The viewer (`client/display`)
 
 `App.vue` wires everything together:
-- `useSocket()` provides the playlist, connection state, whether a playlist has been received, and the display settings.
+- `useSocket()` provides the playlist, connection state, whether a playlist has been received, the display settings and the background audio (`audio:update`).
 - `useActivity()` tracks mouse, keyboard and touch activity.
 - It shows `SlideShow` when there are slides, otherwise `WaitingScreen`.
 - `DeviceInfo` (the location pin) appears if `showDeviceInfo` is on.
@@ -227,6 +228,7 @@ The event names are defined once, in `shared/contract.json`. `realtime/displaySo
 - `AdminWarning` (a small red triangle, bottom right) appears on every screen while `installerNeeded` or `updateAvailable` (manual updates, a new version waiting) is true; tapping it shows only "Please check the Admin panel for details."
 - The cursor is hidden while idle (`.app--idle`).
 - `startDailyReload` runs unless `?kiosk=off`.
+- `BackgroundAudio` (no markup) plays the audio show of the slideshow on screen: `SlideShow` emits `on-air` with the slideshow of each slide it shows, App keeps it (none while the waiting screen shows), and BackgroundAudio gives the engine (`shared/audioPlayer.mjs`, §12.8) `audio.shows[audio.slideshows[onAir]]` or nothing. The engine ignores the same show sent again, so two slideshows on one audio show carry on without a break. Sound the browser refuses is tried again every minute, or at once on a click, tap or key press; `window.noticeboardAudio()` shows its state.
 
 `SlideShow.vue` holds no timing logic of its own; `slideshowClock.js` makes every timing decision. It is plain JavaScript with deadlines, a watchdog, skipping of failed slides and deferred playlist changes, and it is tested over simulated weeks. **A video with a `length` is never skipped early:** one that can't be played (e.g. a format the screen can't decode), never starts or stops keeps its place until its expected end (`holding`), then the slideshow moves on; one that plays moves on when it ends, or, if it's still moving after its expected end (it buffered), a moment after it stops moving. A video without a `length` (from an older server) is skipped when it fails or stalls for 30 s, as before.
 
@@ -345,9 +347,9 @@ Error conventions:
 
 ### 4.4 Server-internal events
 
-- `configService` (EventEmitter) emits `'change'` only from its own `set()` and `update()`, i.e. when config.json really changed. Listeners: `schedulerService` (recompute) and displaySocket's display-settings broadcast (deduplicated).
+- `configService` (EventEmitter) emits `'change'` only from its own `set()` and `update()`, i.e. when config.json really changed. Listeners: `schedulerService` (recompute), and displaySocket's display-settings and audio broadcasts (each deduplicated).
 - `schedulerService` emits `'update'` when the active slideshows change. Its only listener is displaySocket's playlist broadcast.
-- **`services/displayEvents.js`** is the explicit channel to the displays. `playlistChanged()` is called by the slideshow PUT, the slide DELETE and reorder routes, and `uploadQueue` after processing. `displaySettingsChanged()` is called by the logo upload and reset. displaySocket is its only listener, so no route or service depends on socket.io.
+- **`services/displayEvents.js`** is the explicit channel to the displays. `playlistChanged()` is called by the slideshow PUT, the slide DELETE and reorder routes, and `uploadQueue` after processing. `displaySettingsChanged()` is called by the logo upload and reset. `audioChanged()` is called by the tracks' delete and reorder routes and by `uploadQueue` after a track is processed. displaySocket is its only listener, so no route or service depends on socket.io.
 - Changing the default image duration (`PUT /settings` display) sends no playlist: displays keep the old duration for slideshows that use the default until the playlist is next sent (§16 #10).
 
 ---
@@ -378,7 +380,8 @@ Read with JSON5, so comments and `_comment` keys are allowed. Written as plain J
 
 An audio show entry looks like `{ folder, name, enabled, order: 'in-order' | 'shuffle', transition: 'none' | 'crossfade', fadeSeconds, volume, addedAt }` (limits in `shared/contract.json` `audio`, D44).
 
-A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'always' | 'timed', days?: [0-6], startTime?: 'HH:MM', endTime?: 'HH:MM' }, enabled, hidden?, slideDurationSeconds?, addedAt }`.
+A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'always' | 'timed', days?: [0-6], startTime?: 'HH:MM', endTime?: 'HH:MM' }, enabled, hidden?, slideDurationSeconds?, audioShow?, addedAt }`.
+- `audioShow` (its background audio: an audio show's folder) is stored only when one is chosen, and removed for none or when that audio show is deleted.
 - A missing `enabled` counts as enabled.
 - `hidden` is stored only when true.
 - `slideDurationSeconds: null` means "use the default".
@@ -531,7 +534,7 @@ Entry point: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboa
    10. `write_server_kiosk` (`installers/kiosk/server.sh` as it is → `/opt/noticeboard/start-kiosk.sh`), `write_autostart`, `write_help_shortcut file://…/noticeboard-guide.html`.
    11. `chown -R <user> /opt/noticeboard`.
    12. `write_update_units` (service, path, timer), enable the timer and path units.
-   13. `write_installer_record` → `data/installer.json` (`INSTALLER_VERSION=2`).
+   13. `write_installer_record` → `data/installer.json` (`INSTALLER_VERSION=3`).
 11. **Display install (`install_display`):** `update_system`, `apt-get install chromium curl`, `collect_macs_html` (the MAC addresses from `/sys/class/net/*/address` as table rows), `write_display_kiosk` (`installers/kiosk/display.sh` with its `SERVER_URL=""` and `MACS_HTML=""` lines filled in → `/usr/local/bin/noticeboard-kiosk.sh`), `write_autostart`, `write_help_shortcut <SERVER_URL>/admin/help`.
 12. The summary (server: URLs using `hostname -I` and `slideshow_port`, the default password, sudo status, logs, branch).
 13. **`check_firewall`** (optional; its errors never stop the installer):
@@ -620,7 +623,7 @@ noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
 
 **Desktop:**
 - XDG autostart runs `Exec=<kiosk script>`.
-- Chromium runs with flags that suppress error dialogs, the infobar, update checks and the first-run pages, with its own `--user-data-dir`.
+- Chromium runs with flags that suppress error dialogs, the infobar, update checks and the first-run pages, with its own `--user-data-dir`, and (installer version 3) `--autoplay-policy=no-user-gesture-required`, so background audio plays without a click.
 - `xset` turns screen blanking off (X11 only; it's a no-op on Wayland/labwc).
 
 **Privileges:**
@@ -694,9 +697,9 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Imported by:** index.js.
 
 **`server/realtime/displaySocket.js`**
-- **Purpose:** the only socket.io module. `initDisplaySocket(httpServer)`: on connect sends `display:build` and `display:settings`; answers `display:ready` with the playlist; broadcasts `playlist:update` on the scheduler's `'update'` and `displayEvents.playlistChanged`, and `display:settings` (only when changed) on a config `'change'` and `displayEvents.displaySettingsChanged`.
+- **Purpose:** the only socket.io module. `initDisplaySocket(httpServer)`: on connect sends `display:build` and `display:settings`; answers `display:ready` with the playlist and then `audio:update`; broadcasts `audio:update` (only when changed) on a config `'change'` and `displayEvents.audioChanged`; broadcasts `playlist:update` on the scheduler's `'update'` and `displayEvents.playlistChanged`, and `display:settings` (only when changed) on a config `'change'` and `displayEvents.displaySettingsChanged`.
 - **State:** inside the function: the io server and the last settings sent.
-- **Imports:** socket.io, schedulerService, configService, displayEvents, playlistService, displaySettings (the payload, and its installer state checked every 5 minutes), displayBuildId, logger, `shared/contract.json`.
+- **Imports:** socket.io, schedulerService, configService, displayEvents, playlistService, audioPlaylist, displaySettings (the payload, and its installer state checked every 5 minutes), displayBuildId, logger, `shared/contract.json`.
 - **Imported by:** index.js only.
 - **Change impact:** `/socket.io`, the event names and the payloads are the contract with screens already open.
 
@@ -784,12 +787,12 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Uses:** mediaTypes (`typeFromMime`), mediaNames, uploadQueue (`queueSize`), uploads (`createUpload`), asyncRoute, logger. **Used by:** slides.js, tracks.js.
 
 **`routes/api/audioshows.js`**
-- **Purpose:** the audio shows: list (with `trackCount`), create, read, change (audioShowRules), delete.
-- **Uses:** audioShowStore, audioShowRules, asyncRoute, logger.
+- **Purpose:** the audio shows: list (with `trackCount`), create, read, change (audioShowRules), delete (also clearing it from the slideshows that chose it, in the same config write: `remove(folder, { slideshows })`).
+- **Uses:** audioShowStore, audioShowRules, slideshowStore, asyncRoute, logger.
 
 **`routes/api/tracks.js`**
-- **Purpose:** the tracks' routes: `createItemsRouter` with the audio show store, `AUDIO_MIME` and the tracks' words; uploads go to `uploadQueue.enqueueProcessing` with that store.
-- **Uses:** mediaItems, audioShowStore, mediaTypes, uploadQueue.
+- **Purpose:** the tracks' routes: `createItemsRouter` with the audio show store, `AUDIO_MIME` and the tracks' words; uploads go to `uploadQueue.enqueueProcessing` with that store; a track processed, deleted or reordered calls `displayEvents.audioChanged`.
+- **Uses:** mediaItems, audioShowStore, mediaTypes, uploadQueue, displayEvents.
 
 ### 12.4 Services
 
@@ -855,7 +858,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Uses:** slideshowStore, mediaTypes (which sample files are slides), configService (`sampleSlideshow`), pathHelpers, slugify, uploadQueue, logger.
 
 **`services/showStore.js`**
-- **Purpose:** `createShowStore({ kind, configKey, rootDir, fileName, itemsKey, mediaDirName, fallbackSlug, newEntry })`: one owner for a kind of show's entries (`config[configKey]`) and folders (the JSON file with its items, and the items' files): `list`, `find`, `create`, `replace`, `remove`, `removeMany`, `commitEntries`, `readItems`, `modifyItems` (locked per `<kind>:<folder>`, written only when changed), `itemCount`, `itemFileExists`, `removeItemFiles`, `mediaDir`.
+- **Purpose:** `createShowStore({ kind, configKey, rootDir, fileName, itemsKey, mediaDirName, fallbackSlug, newEntry })`: one owner for a kind of show's entries (`config[configKey]`) and folders (the JSON file with its items, and the items' files): `list`, `find`, `create`, `replace`, `remove(folder, other?)` (other keys written in the same config write), `removeMany`, `commitEntries`, `readItems`, `modifyItems` (locked per `<kind>:<folder>`, written only when changed), `itemCount`, `itemFileExists`, `removeItemFiles`, `mediaDir`.
 - **Uses:** configService, configIO, folderLock, slugify. **Used by:** slideshowStore, audioShowStore.
 
 **`services/audioShowStore.js`**
@@ -870,7 +873,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Purpose:** the one owner of the slideshow entries (`config.slideshows`) and each `data/slideshows/<folder>/` (its `slideshow.json` and `slides/`): a show store with the slideshows' settings, under the names below; `store` is the show store itself, for code shared by every kind.
 - **API:** `list`, `find`, `create` (folder, `slides/`, an empty `slideshow.json`, an unpublished entry with the next priority), `replace`, `removeMany` (the entries in one config write, then their folders), `remove` (entry, then folder), `commitEntries(entries, other)`, `readSlides` (missing/broken → no slides; other keys kept; no slides list → no slides), `modifySlides(folder, fn)` (locked; written only if fn changed the data), `slideCount`, `slideFileExists`, `removeSlideFiles`.
 - **Uses:** showStore, pathHelpers (`slideshowsDir`).
-- **Used by:** slideshows and slides routes, uploadQueue, sampleSlideshow, schedulerService, playlistService.
+- **Used by:** slideshows and slides routes, uploadQueue, sampleSlideshow, schedulerService, playlistService, audioPlaylist, audioshows.js (clearing a deleted audio show).
 
 **`services/videoConversion.js`**
 - **Purpose:** converting the existing videos (D43): `start()`, `status()` (`running`, `total`, `done`, `converted`, `skipped`, `failed`, `current`, `format`, `finishedAt`), `recover()` (start-up). One video at a time; a video not in the saved format is marked `processing` + `reprocessing` in its turn, converted into `tmp/noticeboard-uploads/convert-*` (update.sh waits for it), moved into place under a new name, its old file deleted, the playlist sent.
@@ -881,9 +884,14 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Uses:** slideshowStore, configService (the default duration), pathHelpers (`mediaUrl`).
 - **Used by:** realtime/displaySocket.js.
 
+**`services/audioPlaylist.js`**
+- **Purpose:** `buildAudio()` → the `audio:update` payload (§3.4): the published audio shows with at least one ready track, each as the engine takes it, and the slideshows whose audio show is among them.
+- **Uses:** audioShowStore, slideshowStore, pathHelpers (`audioUrl`).
+- **Used by:** realtime/displaySocket.js.
+
 **`services/displayEvents.js`**
-- **Purpose:** the explicit channel to the displays: `playlistChanged()`, `displaySettingsChanged()`, and `onPlaylistChanged(fn)` / `onDisplaySettingsChanged(fn)` for displaySocket.
-- **Used by:** slideshows.js, slides.js, settings/logo.js, uploadQueue; displaySocket listens.
+- **Purpose:** the explicit channel to the displays: `playlistChanged()`, `displaySettingsChanged()`, `audioChanged()`, and `onPlaylistChanged(fn)` / `onDisplaySettingsChanged(fn)` / `onAudioChanged(fn)` for displaySocket.
+- **Used by:** slideshows.js, slides.js, tracks.js, settings/logo.js, uploadQueue; displaySocket listens.
 
 **`services/contentReset.js`**
 - **Purpose:** `deleteAllContent()` → `{ deleted: [names] }`: every slideshow but the sample (`store.removeMany`: one config write, then the folders), then `displayEvents.playlistChanged()`. `requestRestore(by)`: the marker, the status and the `restore-defaults` request (D42). `applyPendingRestore()` (start-up): the reset itself. `KEPT_DATA`: `update-branch.env`, `installer.json`.
@@ -894,8 +902,8 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** services/updates (`issueToken`, `takeToken`), settings/maintenance.js.
 
 **`services/slideshowRules.js`**
-- **Purpose:** `parseSlideSeconds` (1–3600, from the contract), `applyHiddenRule(before, updated)` (409 when hiding a published slideshow or publishing a hidden one; `hidden` stored only when true), `isSample(folder)`, `SAMPLE_DELETE_ERROR`.
-- **Used by:** slideshows.js, settingsService (the default duration).
+- **Purpose:** `parseSlideSeconds` (1–3600, from the contract), `applyHiddenRule(before, updated)` (409 when hiding a published slideshow or publishing a hidden one; `hidden` stored only when true), `parseAudioShow(value)` (an existing audio show's folder, or null for none), `isSample(folder)`, `SAMPLE_DELETE_ERROR`.
+- **Uses:** configService, audioShowStore. **Used by:** slideshows.js, settingsService (the default duration).
 
 **`services/settingsService.js`**
 - **Purpose:** `publicSettings()` (config without `passwordHash`, `jwtSecret` and `_comment`) and `applyPatch(body)`: only `port`, `macFiltering` and `display`; display merged and checked (`mergeDisplay`: the duration's range, and `backgroundColor` as `#` and six hex digits, saved in lower case); `port` and `macFiltering` saved as sent (not validated: §16 #4); one `configService.update`. It returns `{ settings, keys }` or `{ status: 400, error }`.
@@ -948,13 +956,14 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | File | Purpose | Uses | Notes |
 |---|---|---|---|
 | `index.html`, `main.js` | mount | App.vue | inline base styles (duplicated in App.vue's `<style>`) |
-| `App.vue` | composition, `?kiosk=off`, idle cursor, the background colour (`--nb-background`) | useSocket, useActivity, recovery, the five components | |
-| `composables/useSocket.js` | socket.io client; playlist, settings, build reload | `@shared` SOCKET_EVENTS, recovery | `'connect'`/`'disconnect'` are socket.io built-ins |
+| `App.vue` | composition, `?kiosk=off`, idle cursor, the background colour (`--nb-background`), the slideshow on air for the background audio | useSocket, useActivity, recovery, the six components | |
+| `composables/useSocket.js` | socket.io client; playlist, settings, background audio, build reload | `@shared` SOCKET_EVENTS, recovery | `'connect'`/`'disconnect'` are socket.io built-ins |
 | `composables/useActivity.js` | activity with real mouse moves; idle after 3 s | none | |
 | `recovery.js` | `reloadWhenServerUp`, `reloadSoon`, `recoverByReloading`, `startDailyReload` | sessionStorage | |
 | `slideshowClock.js` | all slide timing (pure, injectable timers) | none | tested by `client/display/test/slideshowClock.test.mjs` |
 | `composables/usePageWake.js` | `usePageWake(callback, { online })`: visibilitychange, resume, pageshow, focus (and online) | none | |
-| `components/SlideShow.vue` | layers, fade, page lifecycle → `clock.resume` | SlideFrame, clock, recovery, usePageWake (with online) | |
+| `components/BackgroundAudio.vue` | the audio show of the slideshow on air, through the engine; tries refused sound again on a click or key press; `window.noticeboardAudio()` | `@shared/audioPlayer.mjs` | no markup |
+| `components/SlideShow.vue` | layers, fade, page lifecycle → `clock.resume`; emits `on-air` (the slideshow of the slide shown) | SlideFrame, clock, recovery, usePageWake (with online) | |
 | `components/SlideFrame.vue` | image or video with the generation tag | ImageSlide, VideoSlide | |
 | `components/ImageSlide.vue` | `<img>`, `object-fit: contain` (`src` only; the clock decides how long it shows) | none | |
 | `components/VideoSlide.vue` | `<video>` muted autoplay, `object-fit: contain`; plays again when the page wakes | usePageWake (without online) | |
@@ -990,7 +999,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/audio/TrackList.vue` | upload, rows (▶/■ to listen at the show's volume, name with ✎, length, file, status), reorder, delete | useItemList, useRename, CollapsibleCard, `@shared` audioUrl, mediaDisplayName, LIMITS | |
 | `views/SlideshowDetailView.vue` | loads the default duration, the slideshow (404 → the list) and its slides; the header with its tags; the disabled banner | useApi, SlideshowSettingsCard, SlideList, TagPill | |
 | `views/SettingsView.vue` | loads `GET /settings` once for the Display and MAC cards; the cards in order (Display, MAC filtering, Branding, Change password, Software updates, Delete content) | useApi, the settings and updates cards | |
-| `components/slideshow/SlideshowSettingsCard.vue` | the settings facts, publish/disable, hide/unhide, the edit form (name, priority, duration) | useApi, useSlideshowActions, useFlash, ScheduleEditor, StatusBadge, PublishToggle, FlashMessage, `@shared` LIMITS | |
+| `components/slideshow/SlideshowSettingsCard.vue` | the settings facts, publish/disable, hide/unhide, the edit form (name, priority, duration, schedule, background audio: the published audio shows, and the current one marked if it has been unpublished) | useApi, useShowActions, useFlash, ScheduleEditor, StatusBadge, PublishToggle, FlashMessage, `@shared` LIMITS | |
 | `components/slideshow/ScheduleEditor.vue` | always/timed, times, days (v-model; two fields, no wrapper) | none | |
 | `components/slideshow/SlideList.vue` | upload, rows (name, then type and stored file name), rename (✎: Enter or leaving the field saves, Esc cancels), reorder, delete (the question names the slide), missing thumbnails, polling while processing, preview (hover or pinned) | useApi, SlidePreview, `@shared` mediaUrl, mediaDisplayName, LIMITS | |
 | `components/slideshow/SlidePreview.vue` | hover or pinned preview, titled with the slide's name | `@shared` mediaUrl, mediaDisplayName | |
@@ -1177,7 +1186,7 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 
 **Viewer and admin pages already open in browsers**
 16. They keep running old code until they reload, so:
-    - socket.io must stay at `/socket.io`, with the event names `display:build`, `display:ready`, `playlist:update` and `display:settings` and their payloads.
+    - socket.io must stay at `/socket.io`, with the event names `display:build`, `display:ready`, `playlist:update`, `display:settings` and `audio:update` and their payloads (keys may only be added).
     - The viewer reloads when `display:build` changes, after fetching `/` successfully.
     - The admin panel polls `GET /api/settings/updates` and reloads when `commit` changes.
 
@@ -1198,7 +1207,7 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 
 Behaviour kept as it is until a change is planned for it (§18): fixing one changes behaviour, so it is designed, reviewed and tested on its own.
 
-1. **socket.io is not MAC filtered.** An unapproved device can connect and receive playlists: file names and slideshow folders, but not the media, which `/media` blocks.
+1. **socket.io is not MAC filtered.** An unapproved device can connect and receive playlists and the background audio: file names and show folders, but not the media, which `/media` and `/audio` block.
 2. **The server kiosk URL is hard-coded to port 3000.** Changing `config.port` would break the server Pi's own screen until the kiosk script is edited.
 3. **An empty client IP counts as this Pi itself** in the MAC filter (D6).
 4. **`PUT /api/settings` does not validate `port` or the `macFiltering` shape.** A bad value is saved as it is. A port change takes effect only after a restart.
@@ -1215,13 +1224,13 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 
 ## 17. Tests
 
-Run them with `node tests/run.js <group> [filter]` or the npm scripts. `npm run build` must come first for api, browser and upgrade.
+Run them with `node tests/run.js <group> [filter]` or the npm scripts. A file that fails is followed by how it ended (exit code, signal, or why it could not start) and how long it ran. A file whose Node.js process crashed rather than failing a check (a signal, or a Windows crash code such as 0xC0000409, seen now and then on Windows within a second of starting) is run once more, and the summary says so; one that fails a check is never run again. `npm run build` must come first for api, browser and upgrade.
 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|
-| unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (18 tests, including 30 simulated days, and videos with a length keeping to it); the audio engine (12: in order, shuffled, crossfade timing, show volume, switching shows, fading out, the next track on return, failing and stalling tracks, a refused play retried every minute, duck/pause/resume, a simulated day of crossfades); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS), the media name rule and mediaDisplayName (9) | Node 20+ |
-| api (`test:api`) | `tests/api/` | **contract.js**: 106 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), audio shows (`audio-shows.js`: defaults, limits, tracks converted to AAC with their length and name, rename, reorder, delete, `/audio`), the update schedule's routes and the screens' mark (`update-schedule.js`), the video format for new uploads and converting the existing videos (`video-format.js`: H.265 by default, H.264 when chosen, checked with ffprobe; other formats refused; each video's length in the playlist; a conversion showing each video processing in its turn while the screens keep its file, then replacing it; a second run changing nothing; a restart mid-way), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files, default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
-| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), the audio pages (`audio-shows.js`: create, settings, upload through the file picker, ▶/■, "Preview the show" with ⏭ and ■, rename, reorder, delete, the list), Delete All's card and dialogs (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the video format setting, its explanations and warning, and converting the existing videos (`video-format.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
+| unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (18 tests, including 30 simulated days, and videos with a length keeping to it); the audio engine (13: in order, shuffled, crossfade timing, show volume, switching shows, fading out, the next track on return, failing and stalling tracks, a refused play retried every minute or at once with `retryNow`, duck/pause/resume, a simulated day of crossfades); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS), the media name rule and mediaDisplayName (9) | Node 20+ |
+| api (`test:api`) | `tests/api/` | **contract.js**: 106 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), audio shows (`audio-shows.js`: defaults, limits, tracks converted to AAC with their length and name, rename, reorder, delete, `/audio`), background audio (`audio-update.js`: a slideshow's audio show checked and stored only when chosen, `audio:update` with the playlist and only when it changes, published shows with ready tracks only, deleting a show clears it), the update schedule's routes and the screens' mark (`update-schedule.js`), the video format for new uploads and converting the existing videos (`video-format.js`: H.265 by default, H.264 when chosen, checked with ffprobe; other formats refused; each video's length in the playlist; a conversion showing each video processing in its turn while the screens keep its file, then replacing it; a second run changing nothing; a restart mid-way), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files, default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
+| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), the audio pages (`audio-shows.js`: create, settings, upload through the file picker, ▶/■, "Preview the show" with ⏭ and ■, rename, reorder, delete, the list), background audio (`background-audio.js`: the slideshow's choice and fact, the viewer following it, unpublishing, None, a click starting refused sound), Delete All's card and dialogs (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the video format setting, its explanations and warning, and converting the existing videos (`video-format.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
 | installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return, **the schedule** with a fake clock: `update-schedule.sh`; **Restore Defaults**: the clean, the keep list against every file the installer writes, a restart after a failed reinstall: `update-restore.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
@@ -1251,6 +1260,9 @@ Every planned change starts here, before any code: what changes and why, the par
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again | a patch release when fixed |
 | 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) | a patch release when done |
 | 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | In progress on `feature/audio-support`, in phases (approved by the owner 2026-09-28) | 0.6.0 |
+| 18.4 | The words Server and Client everywhere; the supported devices | Planned, after 18.3 (the owner's decisions 2026-09-28) | 0.6.1 |
+| 18.5 | The Known Issues cleared for a stable base (§16) | Planned, after 18.4 | 0.6.2 to 0.6.13 (one per item) |
+| 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, after 18.5 | 0.7.0 |
 
 Design notes D44–D47 are reserved for 18.3.
 
@@ -1306,12 +1318,12 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 1. **Done:** foundations with no visible change: the store factory (`services/showStore.js`), the item-route factory (`routes/api/mediaItems.js`), the shared rename (`composables/useRename.js`), `getMediaDuration`. Every snapshot stayed identical.
 2. **Done:** audio shows in the admin panel: store, routes, `/audio`, processing with loudness levelling, pages, track preview (D44).
 3. **Done:** the audio engine (`shared/audioPlayer.mjs`, 12 unit tests over simulated time) and "Preview the show" (`ShowPreview.vue`). **Still to check on a real Pi:** crossfades on the server screen and a remote display (smoothness, CPU); if they aren't smooth there, "no transition" stays and the limit is documented.
-4. Background audio on the screens, and the installer bump (in progress; the detail below).
-5. Video sound.
+4. **Done:** background audio on the screens (`audio:update`, `BackgroundAudio.vue`, the slideshow's "Background audio"), and the installer bump to version 3 (the kiosk may play sound). Detail below.
+5. Video sound (in progress; the detail below).
 6. Event audio.
 7. Delete All, Restore Defaults and the documents.
 
-**Phase 4 in detail: background audio on the screens**
+**Phase 4 in detail (done): background audio on the screens**
 - **A slideshow's audio show:** a slideshow entry gains `audioShow` (an audio show's folder), stored only when one is chosen, so slideshows without audio keep their exact data (the data-files test). `PUT /api/slideshows/:folder` takes `audioShow` (a folder or null for none); `slideshowRules.parseAudioShow` refuses a folder that isn't an audio show ("Choose an audio show that exists"). Any audio show can be chosen through the API; the admin panel offers the published ones, plus the current choice if it has since been unpublished (marked "not published: silent until it is published again").
 - **Deleting an audio show** also clears it from the slideshows that chose it, in the same config write (`showStore.remove(folder, other)` gains the other keys to write with it), so a later show with the same name doesn't take its place.
 - **What the screens are told:** `services/audioPlaylist.js` `buildAudio()` → `{ shows: { <audio folder>: { id, order, transition, fadeSeconds, volume, tracks: [{ url, length }] } }, slideshows: { <slideshow folder>: <audio folder> }, event: null }`. Only published audio shows with at least one ready track are in `shows`, and only slideshows whose audio show is in `shows` are in `slideshows` (published or not: which slideshows are on air is the playlist's job). `event` stays null until phase 6. The shape of each show is exactly what `shared/audioPlayer.mjs` takes.
@@ -1322,9 +1334,76 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 - **Risks:** the playlist and `display:settings` are unchanged; `audio:update` is new, so open screens and older viewers are unaffected; a screen reloads onto the new viewer as after any update. The admin pages' look snapshot gains the "Background audio" fact (re-recorded on purpose); the socket-events recording gains `audio:update` after the playlist on connect.
 - **Tests:** unit: `retryNow`; api: `audio:update` payloads (published only, ready tracks only, a slideshow's choice, deleting clears it, only sent when changed), `audioShow` validation, the contract gaining the new event; browser: the select and the fact, and a viewer following a slideshow change (the audio elements' sources, as far as a headless browser can tell); installers: the flag in both kiosk scripts, the golden files, installer version 3.
 
+**Phase 5 in detail: video sound**
+- **Data:** a video slide gains `sound: true` (stored only when on), and with it `withSound: 'lower' | 'pause'` (what the background audio does meanwhile) and `lowerTo` (the background's volume while it plays, 0–100 %, default 20). Slides without sound keep their exact data. The limits go in the contract's `audio` section (`withSound`, `lowerTo { min, max, default }`).
+- **The route:** `PUT /api/slideshows/:folder/slides/:id/sound` `{ sound, withSound?, lowerTo? }` (added through the slide routes' `extend`), checked by `slideshowRules.parseVideoSound` (a video only; the choices and limits from the contract); announces a new playlist. Turning sound off removes all three keys.
+- **The playlist:** a video entry gains `sound: true, withSound, lowerTo` only when its sound is on (keys only added: open screens and older viewers are unaffected, and the socket-events recording, which has no sound, stays the same).
+- **The viewer:** `VideoSlide` takes `sound`: such a video starts unmuted; if the browser refuses (a kiosk not yet allowed sound), it plays muted instead, so the slide still plays and keeps to time. `SlideShow`'s `on-air` carries the slide itself (not only its slideshow), and App passes BackgroundAudio the video's sound settings while such a slide is on: **lower** calls `duck(lowerTo / 100, 500 ms)`, **pause** calls `pause()`; when the slide goes, `duck(1, 500 ms)` or `resume()`, carrying on where the track was. The engine already has both (tested); nothing new in its timing.
+- **Admin panel:** in the slide list, each video gets a **Sound** switch; when on, "While it plays, the background audio: lowers to [20] % / pauses". Saved at once, like a rename. The guide explains it and that a slideshow without background audio simply plays the video's sound.
+- **Risks:** only slides with sound on change anything; a refused unmuted play falls back to muted, so no video is skipped because of sound. **Tests:** api (the sound route: videos only, the choices and limits, off removes the keys; the playlist's keys only when on; the data-files and socket-events recordings unchanged); browser (the switch and options in the slide list; on the viewer, a video with sound falling back to muted in a headless browser and still playing, and the background audio lowered to the chosen level, then back, or paused and resumed).
+
 **Risks:** the installer bump asks every Pi for an installer run (the owner accepted it); the playlist and `display:settings` only gain keys, and `audio:update` is new, so open screens and older viewers are unaffected; slideshows' data stays byte-for-byte the same (the data-files test).
 
 **Tests:** `audioPlayer` and `audioEvents` unit tests over simulated time; api tests for audio shows, tracks, processing (ffprobe), `/audio` and `audio:update`; browser tests for the pages, the preview, the slideshow and video settings, the event card; the golden files and installer version for the kiosk flag; the upgrade rehearsal.
+
+### 18.4 The words Server and Client; the supported devices
+
+**Version:** 0.6.1 (a patch: wording and documentation).
+
+**Why:** the Noticeboard will run on more than Raspberry Pis, and a Raspberry Pi can be either role. Words that name the hardware ("the Pi", "the server Pi", "a remote display Pi") are replaced by the role.
+
+**The owner's decisions (2026-09-28):**
+- **Server:** the device running the Noticeboard server. **Client:** a device showing the Noticeboard viewer. The hardware is named only where it matters (installation, video decoding, the device list).
+- **Words only:** everything people read changes: the admin panel, the viewer's texts, the installer's and update.sh's messages, README, the Help guide, this document and code comments. File names, API paths, socket events and data keys stay (e.g. `installers/kiosk/display.sh`, `display:*` events, `displays` in system-requirements.json, `/api/device`): installed Servers, Clients and open screens rely on them (§15).
+- **The supported devices,** at the top of README, the Help guide and this document, with their status:
+
+| Device | Server | Client | Video | Status |
+|---|---|---|---|---|
+| Raspberry Pi 3 | yes | yes | H.264 only, 1080p only | Supported (choose H.264 in Settings) |
+| Raspberry Pi 4 | yes | yes | H.264 and H.265 | Supported |
+| Raspberry Pi 5 | yes | yes | H.264 and H.265 | Supported |
+| Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | Planned: needs a headless Client installer (a later feature; today's Client installer needs a desktop) |
+
+**How:** a word list (Pi → Server/Client by context; "display" as a device → Client; "screen" stays for the physical screen) applied file by file, reading each sentence (no blind search-and-replace). **Risks:** texts only: the look and text snapshots (admin pages, viewer) and the installer's golden files change on purpose; nothing an installed system reads changes. **Tests:** every group; snapshots re-recorded after a reviewed diff.
+
+### 18.5 The Known Issues cleared (§16)
+
+**Why:** a clean, stable base before the next features. Each item is a bug fix with its own patch number (0.6.2 to 0.6.13, in this order), as the owner decided (2026-09-28):
+1. (0.6.2) **socket.io MAC filtered.** A socket.io middleware (`io.use`) in displaySocket applies the same approval rule as `requireApprovedDevice` (macService, one implementation: `middleware/access.js` exports the check it uses) to the connecting address; a refused device gets a connect error and nothing else. The viewer never loads on such a device anyway (`/` is filtered), so screens see no change.
+2. (0.6.3) **The Server's kiosk follows the port.** `installers/kiosk/server.sh` reads the port from `data/config.json` when it starts (as update.sh does, through `configIO.readConfig`), falling back to 3000. `INSTALLER_VERSION` 4 with a changes line; golden files re-recorded on purpose.
+3. (0.6.4) **An empty client address is refused** when MAC filtering is on: `macLookup.isLocalhost` no longer counts `''` as this device (D6 updated); a request without an address is blocked.
+4. (0.6.5) **Settings are checked, and a restart is asked for when needed.** `PUT /api/settings` validates `port` (a whole number 1024–65535, not in use by the Server's other services) and `macFiltering` (item 9). A new **Port** field in Settings. A setting that only applies after a restart (today: the port) makes `GET /api/settings/restart` report `restartNeeded` (the saved port differs from the one the Server is listening on). Like the installer warning, an amber box on every admin page says **Restart the Server** and what the change needs; for the port it also says each Client's installer must be run again with the new address, and the firewall rule changed. Its **Restart the Server now** button asks for the admin password (the shared confirmation, D40) and answers, then ends the Server process, which systemd starts again at once (the service has `Restart=always`; no new rights needed; Clients reconnect by themselves); the box goes away once the Server runs with the saved settings. The Delete content card's port text is corrected.
+5. (0.6.6) **Unused npm packages:** the item and §18.2 are removed (the owner, 2026-09-28); the packages are left as they are.
+6. (0.6.7) **The media route's audio extensions:** reviewed after audio support. Still an issue, and reported only (not fixed here): `/media` still allows `.mp3 .wav .ogg`, which nothing puts there (tracks are `.m4a`, served at `/audio`). Harmless, but a wider allowlist than needed. It stays on the list.
+7. (0.6.8) **Reorder errors shown:** `useItemList.move` shows the error ("Couldn't save the new order: …") and reloads the list from the Server, so what's shown is what's saved.
+8. (0.6.9) **An unreadable config.json is never overwritten.** configService keeps `data/config.last-good.json`, a copy written after every config.json that loads (and every save). On a file that can't be read: it is moved aside as `config.json.broken-<time>` (kept, never deleted), the last good copy is restored and loaded, and an admin warning says what happened and where the broken file is. With no good copy: the Server runs on the defaults **in memory only**, never writing over anything, with an admin warning until the file is fixed or the admin chooses to start from the defaults. A missing file on a first start still creates the defaults, as now (§15: the installer's `init()` call is unchanged).
+9. (0.6.10) **macFiltering handled by settingsService,** like `display`: `enabled` (boolean) and `approved` (a list of `{ mac, label? }`, MACs normalised and checked, no duplicates) validated; only the fields sent change, the rest are kept. `configService.update` stays a plain top-level merge.
+10. (0.6.11) **Kept as it is** (the default duration doesn't resend the playlist).
+11. (0.6.12) **Messages don't clear later ones.** useFlash cancels its timer whenever a new message is shown; a success can still clear itself, an error stays until it's dismissed (a ✕ on the message) or replaced by the next attempt's result.
+12. (0.6.13) **Video formats:** the Display card warns when the videos already uploaded aren't all in the selected format ("3 videos are H.264 while H.265 is selected: screens that can't play them show nothing for their length. *Convert existing videos* fixes this."), from a count by format (`videoFormatOf`). README and the guide say plainly: **H.265 (HEVC) is the default; H.264 is the fallback for older hardware** (Raspberry Pi 3). The viewer plays one format, the selected one; a video in the other format is left to fail on a screen that can't play it, as now (the setting is there to correct it). The item moves from Known Issues to the description of the Display settings (it is the design, not an issue).
+
+**Risks:** the port touches the installer (version 4): the upgrade rehearsal must pass. The restart relies on the service's `Restart=always` (a Server started some other way, e.g. by hand, just stops: the box says so). Refusing an empty address could block a device that was let in before; the MAC filter's tests cover the addresses the server sees. The config recovery changes start-up: tested with a broken file, with and without a good copy. **Tests:** unit (the empty address, the macFiltering rules, the port rule); api (the socket refused for an unapproved device, settings validation, restart needed and the request, config recovery at start-up); browser (the Port field, the restart box and button, reorder errors, messages that stay, the video format warning); installers (the kiosk reading the port, golden files, version 4); the upgrade rehearsal.
+
+### 18.6 Releases: main follows GitHub Releases
+
+**Version:** 0.7.0 (a feature).
+
+**Why:** merging into main should not by itself update every installed Server; publishing a Release should.
+
+**main, the stable channel:** when the followed branch is main, update.sh asks GitHub for the latest published Release (`GET https://api.github.com/repos/fructus-sum/noticeboard/releases/latest`, which never returns drafts or prereleases), fetches its tag and uses the tag's commit as the target. From there the existing install, build, health check, rollback and status run unchanged. Rules:
+- Never backwards automatically: if the Release's commit is already in what's running (a Server installed from main before the first Release, or newer), nothing is installed.
+- No Release yet, or GitHub unreachable: nothing changes (the card says why), as for an unreachable branch today.
+- The API allows 60 unauthenticated requests an hour per address; a Server checks at most every 15 minutes (Clients never check).
+
+**Other branches:** unchanged: the latest commit of the branch, the same install process; manual branch changes work as today. A manual switch to main installs the latest Release even when it is older than what's running: the branch check says so ("main's latest Release, v0.x, is older than what's running; switching goes back to it") and the two confirmations still apply.
+
+**Back to main after a Release:** `branch_merged` becomes "the latest Release contains the branch's work" (the branch's tip, or what's installed if the branch was deleted, is in the Release's commit: an ancestor, or squashed/rebased in, as `contained_in` checks now). Merging into main alone no longer returns a Server to main. Before returning, update.sh compares the Release's `installer.version` (its system-requirements.json) with this Server's installer record: if the installer must be run first, it stays on the branch, and the existing installer warning says so and what running it brings; once the installer has run (or when none is needed), the next due check returns to main. The notice then says the branch's work is in Release v0.x.
+
+**The installer and the system requirements come from the same place:** on main, from the Release's tag (the installer handover, `installerCommand`, the "run the installer" box, update.sh's recovery command, the requirements checked before a switch); on a branch, from that branch as now. The one-line install command in README can stay pointing at main's install.sh: it hands over to the Release's installer (as it hands over to a branch's today).
+
+**What the admin panel shows:** on main, "Version 0.8.0" (the Release name) with its commit, in the sidebar and the Software updates card; on a branch, the branch and commit as now. Publishing a Release: set the `package.json` versions to its number and add its row to §19 before tagging (a checklist in §19).
+
+**Risks:** every Server on main stops following main's commits once this reaches it: it has to arrive through the current mechanism (merged into main), and the first Release must be published straight after, or main's Servers stay on the commit that brought it. The API and the tags are new dependencies of the updater (offline handling as for branches). **Tests:** installers (a stand-in GitHub with Releases: latest, draft and prerelease ignored, none yet, never backwards, a manual switch to an older Release; returning to main only once a Release contains the branch, waiting for the installer when its version rose); api and browser (the version shown, the branch check's older-Release message); the upgrade rehearsal from the version before.
 
 ---
 
@@ -1335,9 +1414,10 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 - A merge into main that brings new features raises MINOR (PATCH back to 0). One that only fixes bugs, or only tidies without changing what users see, raises PATCH.
 - Work in progress names the version it will become (§18's table, and the line at the top of this document). The version of main changes only when that work is merged, in the merge commit, together with this section.
 - A bug fixed on its own (§16, §18) is a patch release, listed here with what it fixed; a bug fixed inside a feature branch is listed with that version.
+- **Each bug fix counts as its own patch number,** even when several are done together (the owner, 2026-09-28): e.g. §18.5's twelve items are 0.6.2 to 0.6.13, and wording or documentation work such as §18.4 is a patch too.
 - `package.json` (the root, `client/admin` and `client/display`) still says 1.0.0, npm's default; nothing reads it. Setting it to the version here is for the owner to decide (by hand, with the matching top entries of `package-lock.json`, never with npm install on Windows).
 
-**Current:** main is **0.5.0**. In progress: **0.6.0** "Audio" on `feature/audio-support` (§18.3; phases 1–3 done, 4 in progress).
+**Current:** main is **0.5.0**. In progress: **0.6.0** "Audio" on `feature/audio-support` (§18.3; phases 1–4 done). Planned: **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item), **0.7.0** (§18.6 Releases).
 
 **History** (numbered after the fact for everything before 0.6.0)
 

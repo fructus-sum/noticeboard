@@ -55,6 +55,7 @@ test('socket event names in the shared contract are the ones open screens use', 
     PLAYLIST_UPDATE: 'playlist:update',
     DISPLAY_BUILD: 'display:build',
     DISPLAY_SETTINGS: 'display:settings',
+    AUDIO_UPDATE: 'audio:update',   // added for background audio (§18.3); older screens ignore it
   });
 });
 

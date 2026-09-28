@@ -2,7 +2,8 @@
   "01 connect": [
     "display:build string",
     "display:settings {\"showDeviceInfo\":true,\"logo\":{\"url\":\"/branding/logo?v=V\"},\"background\":\"#000000\",\"installerNeeded\":false,\"updateAvailable\":false}",
-    "playlist:update (empty)"
+    "playlist:update (empty)",
+    "audio:update"
   ],
   "02 create a slideshow": [],
   "03 upload an image (unpublished)": [

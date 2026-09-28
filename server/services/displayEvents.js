@@ -12,10 +12,14 @@
 //                                    Displays ignore a playlist that hasn't changed
 //   displaySettingsChanged()         the displays' own look may have changed (the logo): send
 //                                    the display settings again (only if they differ)
-//   onPlaylistChanged(fn), onDisplaySettingsChanged(fn)   for realtime/displaySocket.js
+//   audioChanged()                   the background audio may have changed (a track ready,
+//                                    deleted or reordered): send it again (only if it differs)
+//   onPlaylistChanged(fn), onDisplaySettingsChanged(fn), onAudioChanged(fn)   for
+//                                    realtime/displaySocket.js
 //
 // Used by
-//   routes/api/slideshows.js, routes/api/slides.js, routes/api/settings/logo.js (logo),
+//   routes/api/slideshows.js, routes/api/slides.js, routes/api/tracks.js (audio),
+//   routes/api/settings/logo.js (logo),
 //   services/uploadQueue.js, services/contentReset.js (Delete All); realtime/displaySocket.js listens
 //
 // Change impact
@@ -28,6 +32,8 @@ const events = new EventEmitter();
 module.exports = {
   playlistChanged: () => events.emit('playlist'),
   displaySettingsChanged: () => events.emit('settings'),
+  audioChanged: () => events.emit('audio'),
   onPlaylistChanged: (fn) => events.on('playlist', fn),
   onDisplaySettingsChanged: (fn) => events.on('settings', fn),
+  onAudioChanged: (fn) => events.on('audio', fn),
 };

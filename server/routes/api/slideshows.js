@@ -2,14 +2,15 @@
 //
 // Responsibilities
 //   Adds what the admin panel shows but config.json doesn't store (slide counts, the sample flag).
-//   A change the displays can see (publish, schedule, duration…) announces a new playlist.
+//   A change the displays can see (publish, schedule, duration…) announces a new playlist; the
+//   background audio (audioShow) reaches them through the config change (SYSTEM_DESIGN §18.3).
 //
 // Used by
 //   routes/api/index.js; the admin panel (SlideshowsView, SlideshowDetailView)
 //
 // Uses
 //   services/slideshowStore (the data), services/slideshowRules (duration, hide/publish, the
-//   sample's protection), services/displayEvents, middleware/asyncRoute, utils/logger
+//   audio show, the sample's protection), services/displayEvents, middleware/asyncRoute, utils/logger
 const express = require('express');
 const store = require('../../services/slideshowStore');
 const rules = require('../../services/slideshowRules');
@@ -57,6 +58,13 @@ router.put('/:folder', route(async (req, res) => {
     const seconds = rules.parseSlideSeconds(updated.slideDurationSeconds);
     if (seconds.error) return res.status(400).json({ error: seconds.error });
     updated.slideDurationSeconds = seconds.value;
+  }
+  // The background audio: stored only when there is one, so slideshows without it keep their data
+  if (req.body.audioShow !== undefined) {
+    const audio = rules.parseAudioShow(req.body.audioShow);
+    if (audio.error) return res.status(400).json({ error: audio.error });
+    if (audio.value) updated.audioShow = audio.value;
+    else delete updated.audioShow;
   }
   const refused = rules.applyHiddenRule(before, updated);
   if (refused) return res.status(refused.status).json({ error: refused.error });

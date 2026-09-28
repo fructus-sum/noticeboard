@@ -11,10 +11,11 @@ const { makeApp, server, page, check, done, sleep } = require('../helpers/app.js
 
 (async () => {
   const env = makeApp({ port: 3940 });
-  // The installer last ran as version 1, and this version needs 2 (system-requirements.json)
+  // The installer last ran one version before the one this version needs (system-requirements.json)
+  const NEEDED = require('../../system-requirements.json').installer.version;
   const record = (version) => fs.writeFileSync(path.join(env.APP, 'data/installer.json'),
     JSON.stringify({ version, branch: 'main', commit: 'x', time: '2026-09-01T10:00:00Z' }));
-  record(1);
+  record(NEEDED - 1);
   fs.writeFileSync(path.join(env.APP, 'data/update-notice.json'), JSON.stringify({
     type: 'branch-merged', branch: 'feature/a', commit: 'x', time: '2026-09-26T16:00:00Z',
     message: 'The branch feature/a has been merged into main, so its features are now part of main.',
@@ -66,7 +67,7 @@ const { makeApp, server, page, check, done, sleep } = require('../helpers/app.js
   await v.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
   check('Esc closes the message', await v.until(`!document.querySelector('.installer-popup')`, 3000));
   // The installer has run: gone (checked when a display connects)
-  record(2);
+  record(NEEDED);
   await v.go(env.base + '/?kiosk=off');
   await sleep(1500);
   check('once the installer has run, the mark is gone', !(await v.evaluate(`!!document.querySelector('.installer-warning')`)));

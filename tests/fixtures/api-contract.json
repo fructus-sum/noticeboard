@@ -697,6 +697,7 @@
   },
   "socket events": {
     "content": [
+      "audio:update",
       "display:build",
       "display:settings",
       "playlist:update"

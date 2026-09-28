@@ -16,7 +16,8 @@
 //                                       addedAt, its folder, the media folder and an empty JSON file
 //                                       (written atomically)
 //     replace(folder, entry)          → saves a changed entry in its place (null if none)
-//     remove(folder)                  → removes the entry, then deletes the folder (false if none)
+//     remove(folder, other)           → removes the entry (with other keys, if given, in the same
+//                                       config write), then deletes the folder (false if none)
 //     removeMany(folders)             → the entries removed: one config write, then their folders
 //     commitEntries(entries, other)   one config write of the entries plus other keys
 //     readItems(folder)               → the parsed JSON file: { [itemsKey]: [...] }. Missing or broken
@@ -81,11 +82,13 @@ function createShowStore({ kind, configKey, rootDir, fileName, itemsKey, mediaDi
     return entry;
   }
 
-  async function remove(folder) {
+  async function remove(folder, other = null) {
     const all = list();
     const idx = all.findIndex((s) => s.folder === folder);
     if (idx === -1) return false;
-    await configService.set(configKey, all.filter((_, i) => i !== idx));
+    const rest = all.filter((_, i) => i !== idx);
+    if (other) await configService.update({ [configKey]: rest, ...other });
+    else await configService.set(configKey, rest);
     const dir = folderDir(folder);
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
     return true;

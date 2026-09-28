@@ -1,9 +1,9 @@
 // client/display/src/composables/useSocket.js — the viewer's live connection to the server
 //
 // Provides
-//   useSocket() → { playlist, connected, received, settings }
-//   Sends display:ready on every connect; takes playlist:update, display:settings and
-//   display:build. Reconnects by itself after any outage (every 2–10 s, never giving up), and
+//   useSocket() → { playlist, connected, received, settings, audio }
+//   Sends display:ready on every connect; takes playlist:update, display:settings, audio:update
+//   (the background audio: { shows, slideshows, event }, SYSTEM_DESIGN §18.3) and display:build. Reconnects by itself after any outage (every 2–10 s, never giving up), and
 //   reloads onto a new build when display:build changes (once the server answers).
 //
 // Used by: App.vue
@@ -22,6 +22,8 @@ export function useSocket() {
   const received = ref(false);   // true once the server has sent a playlist
   // This display's look, set in the admin panel: the location pin and the logo
   const settings = ref({ showDeviceInfo: true, logo: null, background: DEFAULT_BACKGROUND, installerNeeded: false, updateAvailable: false });
+  // The background audio: none until the server says (an older server never does)
+  const audio = ref({ shows: {}, slideshows: {}, event: null });
 
   // Reconnects on its own after any outage, retrying every 2–10 s for as long as it takes
   const socket = io({
@@ -56,6 +58,10 @@ export function useSocket() {
     };
   });
 
+  socket.on(SOCKET_EVENTS.AUDIO_UPDATE, (data) => {
+    audio.value = { shows: data?.shows ?? {}, slideshows: data?.slideshows ?? {}, event: data?.event ?? null };
+  });
+
   // The server sends its display build on every connect. If it changes (the Pi was
   // updated), reload so this screen runs the new version. reloadSoon only reloads once the
   // server answers, so the kiosk can't end up on the browser's error page.
@@ -67,5 +73,5 @@ export function useSocket() {
 
   onUnmounted(() => socket.disconnect());
 
-  return { playlist, connected, received, settings };
+  return { playlist, connected, received, settings, audio };
 }

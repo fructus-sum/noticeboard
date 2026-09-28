@@ -9,6 +9,8 @@
 //
 // Props
 //   slides (the playlist), connected
+// Emits
+//   on-air(folder): the slideshow of the slide now on screen (for the background audio)
 //
 // Used by
 //   App.vue
@@ -25,6 +27,7 @@ const props = defineProps({
   slides: { type: Array, required: true },
   connected: { type: Boolean, default: true },
 });
+const emit = defineEmits(['on-air']);
 
 // Slides on screen, oldest first: each new slide fades in on top of the previous one, which
 // a timer then removes. This deliberately avoids Vue's <Transition>: its leave step waits for
@@ -36,6 +39,7 @@ let removeOld = null;
 
 function showSlide({ index, generation }) {
   layers.value = [...layers.value.slice(-1), { slide: props.slides[index], generation }];
+  emit('on-air', props.slides[index]?.slideshow ?? null);
   clearTimeout(removeOld);
   removeOld = setTimeout(() => { layers.value = layers.value.slice(-1); }, FADE_MS + 100);
 }

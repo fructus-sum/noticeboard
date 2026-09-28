@@ -2,8 +2,9 @@
 // client/admin/src/components/slideshow/SlideshowSettingsCard.vue — a slideshow's settings on its page
 //
 // Responsibilities
-//   Shows the name, priority, image duration, schedule and status, with the Publish / Disable and
-//   Hide / Unhide buttons; Edit opens the form for the name, priority, duration and schedule.
+//   Shows the name, priority, image duration, schedule, background audio and status, with the
+//   Publish / Disable and Hide / Unhide buttons; Edit opens the form for the name, priority,
+//   duration, schedule and background audio (a published audio show, or none: SYSTEM_DESIGN §18.3).
 //   The form starts from the slideshow as it was loaded, and keeps what was typed when it's closed
 //   and opened again.
 //
@@ -11,9 +12,9 @@
 // Emits: change(patch), the saved fields, which the page merges into its copy
 //
 // Used by: views/SlideshowDetailView
-// Uses: useApi (PUT /slideshows/:folder), useShowActions, useFlash, ScheduleEditor, StatusBadge,
+// Uses: useApi (PUT /slideshows/:folder, GET /audioshows for the choices), useShowActions, useFlash, ScheduleEditor, StatusBadge,
 //   PublishToggle, FlashMessage, CollapsibleCard; LIMITS from @shared (the duration's range, which the server checks)
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
@@ -32,6 +33,15 @@ const props = defineProps({
 const emit = defineEmits(['change']);
 
 const published = computed(() => props.slideshow.enabled !== false);
+
+// Background audio: the audio shows, for the choices and the chosen one's name
+const audioShows = ref([]);
+onMounted(async () => {
+  try { audioShows.value = await api.get('/audioshows'); } catch { /* the choice just shows None */ }
+});
+const chosenAudio = computed(() => audioShows.value.find((a) => a.folder === props.slideshow.audioShow) ?? null);
+// The published ones, and the current choice even if it has since been unpublished
+const audioChoices = computed(() => audioShows.value.filter((a) => a.enabled === true || a.folder === props.slideshow.audioShow));
 
 // Publish / disable, and hide / unhide (only while unpublished; the slideshow is kept exactly as it is)
 const { toggling, hiding, setEnabled, setHidden } = useShowActions();
@@ -52,6 +62,7 @@ const editPrio = ref(props.slideshow.priority);
 const editSched = ref(props.slideshow.schedule ? JSON.parse(JSON.stringify(props.slideshow.schedule)) : { type: 'always' });
 const editOwnDuration = ref(props.slideshow.slideDurationSeconds != null);   // false: the default from Settings
 const editSeconds = ref(props.slideshow.slideDurationSeconds ?? props.defaultSeconds);
+const editAudio = ref(props.slideshow.audioShow ?? '');   // '': none
 const saving = ref(false);
 const saveMsg = useFlash();
 
@@ -64,8 +75,10 @@ async function save() {
       priority: Number(editPrio.value),
       schedule: editSched.value,
       slideDurationSeconds: editOwnDuration.value ? Number(editSeconds.value) : null,
+      audioShow: editAudio.value || null,
     });
-    emit('change', updated);
+    // None is stored as no audioShow at all: say so, or the page's copy would keep the old one
+    emit('change', { ...updated, audioShow: updated.audioShow ?? null });
     editing.value = false;
     saveMsg.ok('Saved.', 2000);
   } catch (e) {
@@ -93,6 +106,11 @@ async function save() {
       </div>
       <div><span style="color:var(--text-muted)">Schedule</span><br>
         {{ slideshow.schedule?.type === 'always' ? 'Always active' : `Timed (${slideshow.schedule.startTime}–${slideshow.schedule.endTime})` }}
+      </div>
+      <div><span style="color:var(--text-muted)">Background audio</span><br>
+        <template v-if="!slideshow.audioShow">None</template>
+        <template v-else-if="chosenAudio">{{ chosenAudio.name }}<span v-if="chosenAudio.enabled !== true" style="color:var(--text-muted)"> (not published: silent until it is)</span></template>
+        <template v-else>…</template>
       </div>
       <div>
         <span style="color:var(--text-muted)">Status</span><br>
@@ -138,6 +156,16 @@ async function save() {
         <p style="color:var(--text-muted);font-size:12px;margin-top:4px">How long each image shows. Videos always play to the end.</p>
       </div>
       <ScheduleEditor v-model="editSched" />
+      <div class="field">
+        <label for="slideshow-audio">Background audio</label>
+        <select id="slideshow-audio" v-model="editAudio">
+          <option value="">None</option>
+          <option v-for="a in audioChoices" :key="a.folder" :value="a.folder">{{ a.name }}{{ a.enabled === true ? '' : ' (not published)' }}</option>
+        </select>
+        <p style="color:var(--text-muted);font-size:12px;margin-top:4px">
+          Plays on every screen while this slideshow is on. Only published audio shows can be chosen (Audio in the menu).
+        </p>
+      </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
         <FlashMessage :flash="saveMsg" />

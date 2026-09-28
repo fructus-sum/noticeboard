@@ -10,6 +10,8 @@
 //   applyHiddenRule(before, updated) → null | { status: 409, error }  only an unpublished slideshow
 //                             can be hidden (or stay hidden). Also tidies `updated.hidden`: stored
 //                             only when true
+//   parseAudioShow(value)     → { value } | { error }  a slideshow's background audio: an audio
+//                             show's folder, or null (none) for null or '' (SYSTEM_DESIGN §18.3)
 //   isSample(folder)          → boolean  the sample slideshow can be hidden but never deleted
 //   SAMPLE_DELETE_ERROR       the message for trying anyway
 //
@@ -18,8 +20,9 @@
 //   services/contentReset.js (isSample: Delete All keeps the sample)
 //
 // Uses
-//   configService (sampleSlideshow), shared/contract.json (limits)
+//   configService (sampleSlideshow), audioShowStore (which audio shows exist), shared/contract.json (limits)
 const configService = require('./configService');
+const audioShowStore = require('./audioShowStore');
 const { limits } = require('../../shared/contract.json');
 
 const { min, max } = limits.slideSeconds;
@@ -45,10 +48,16 @@ function applyHiddenRule(before, updated) {
   return null;
 }
 
+function parseAudioShow(value) {
+  if (value === null || value === '') return { value: null };
+  if (typeof value !== 'string' || !audioShowStore.find(value)) return { error: 'Choose an audio show that exists' };
+  return { value };
+}
+
 function isSample(folder) {
   return configService.get('sampleSlideshow')?.folder === folder;
 }
 
 const SAMPLE_DELETE_ERROR = "The sample slideshow can't be deleted. You can hide it instead.";
 
-module.exports = { parseSlideSeconds, applyHiddenRule, isSample, SAMPLE_DELETE_ERROR };
+module.exports = { parseSlideSeconds, applyHiddenRule, parseAudioShow, isSample, SAMPLE_DELETE_ERROR };

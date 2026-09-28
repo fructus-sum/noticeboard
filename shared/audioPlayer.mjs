@@ -26,6 +26,8 @@
 //     next()             the next track now (with the show's transition)
 //     duck(factor, ms)   the volume times factor (0–1), reached over ms
 //     pause(), resume()  holds the track where it is, and carries on
+//     retryNow()         the browser refused to play: try again now (after a click or key
+//                        press, which lets a browser play sound); nothing otherwise
 //     stop()             everything stops at once, nothing kept
 //     destroy()          stop, and stop its timers too (the page is closing)
 //     state()            → { show, track, playing, paused, blocked, duck } for tests and the admin
@@ -34,7 +36,7 @@
 //   The timing constants: FADE_OUT_MS, RAMP_STEP_MS, ERROR_WAIT_MS, STALL_GRACE_MS, RETRY_BLOCKED_MS
 //
 // Used by
-//   client/admin (components/audio/ShowPreview); the viewer's background audio (a later phase);
+//   client/admin (components/audio/ShowPreview); client/display (components/BackgroundAudio);
 //   client/display/test/audioPlayer.test.mjs
 //
 // Change impact
@@ -224,12 +226,15 @@ export function createAudioPlayer({
     for (const deck of decks) silence(deck);
     changed();
     timers.clearTimeout(retryTimer);
-    retryTimer = timers.setTimeout(() => {
-      retryTimer = null;
-      if (!show) return;
-      blocked = false;
-      start(order[pos] ?? advance(), 0);
-    }, RETRY_BLOCKED_MS);
+    retryTimer = timers.setTimeout(retryNow, RETRY_BLOCKED_MS);
+  }
+
+  function retryNow() {
+    if (!blocked || !show) return;
+    timers.clearTimeout(retryTimer);
+    retryTimer = null;
+    blocked = false;
+    start(order[pos] ?? advance(), 0);
   }
 
   function next(fadeMs = show && show.transition === 'crossfade' ? show.fadeSeconds * 1000 : 0) {
@@ -374,5 +379,5 @@ export function createAudioPlayer({
     rampTimer = null;
   }
 
-  return { setShow, next: () => next(), duck, pause, resume, stop, destroy, state };
+  return { setShow, next: () => next(), duck, pause, resume, retryNow, stop, destroy, state };
 }

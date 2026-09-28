@@ -15,7 +15,8 @@ fi
 FLAGS=(--noerrdialogs --disable-infobars --disable-session-crashed-bubble
        --disable-component-update --check-for-update-interval=31536000
        --no-first-run --no-default-browser-check --disable-search-engine-choice-screen
-       --password-store=basic --user-data-dir="$PROFILE")
+       --password-store=basic --user-data-dir="$PROFILE"
+       --autoplay-policy=no-user-gesture-required)   # background audio plays without a click
 
 # Opening the browser before the server answers would leave it on an error page
 wait_for_server() {

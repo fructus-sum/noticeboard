@@ -217,6 +217,28 @@ test('the browser refuses to play: silent, then tries again every minute', async
   assert.equal(log.length, 1);
 });
 
+test('retryNow: a refused show plays at once when allowed (a click), and does nothing otherwise', async () => {
+  let refusing = true;
+  const a = show('a', 2);
+  const { player, log, run, stats } = setup({ lengths: lengthsOf(a), refuse: () => refusing });
+  player.setShow(a);
+  await run(5_000);
+  assert.equal(player.state().blocked, true);
+  player.retryNow();   // still refused: blocked again, waiting a minute
+  await run(1_000);
+  assert.equal(player.state().blocked, true);
+  refusing = false;
+  player.retryNow();
+  await run(1_000);
+  assert.equal(player.state().blocked, false, 'playing straight away');
+  assert.equal(log.length, 1);
+  const plays = stats.plays;
+  player.retryNow();   // playing: nothing to do
+  await run(1_000);
+  assert.equal(stats.plays, plays, 'no extra play');
+  assert.equal(log.length, 1);
+});
+
 test('duck lowers the volume and brings it back; pause holds the track, resume carries on', async () => {
   const a = show('a', 2);
   const { player, log, run, audible, elements } = setup({ lengths: lengthsOf(a) });

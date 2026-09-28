@@ -18,7 +18,8 @@ fi
 FLAGS=(--noerrdialogs --disable-infobars --disable-session-crashed-bubble
        --disable-component-update --check-for-update-interval=31536000
        --no-first-run --no-default-browser-check --disable-search-engine-choice-screen
-       --password-store=basic)
+       --password-store=basic
+       --autoplay-policy=no-user-gesture-required)   # background audio plays without a click
 
 # Disable display blanking
 xset s off    2>/dev/null || true

@@ -53,8 +53,8 @@ scenario plain "" ""
 [ $RC = 0 ] && [ "$ON" = main ] && [ -z "$SETTING" ] && ! grep -q "follows the branch" "$T/plain.out" \
   && ok "following main: no branch question, installs main, no setting file written" || { bad "plain"; tail -5 "$T/plain.out"; }
 [ "$STATUS_BRANCH" = main ] && ok "status file records the installer run" || bad "status ($STATUS_BRANCH)"
-node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')); process.exit(r.version===2&&r.branch==='main'&&/^[0-9a-f]{40}$/.test(r.commit)&&!isNaN(Date.parse(r.time))?0:1)" "$T/opt/data/installer.json" \
-  && ok "data/installer.json records installer version 2, the branch and commit" || { bad "installer record"; cat "$T/opt/data/installer.json"; }
+node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')); process.exit(r.version===Number(process.argv[2])&&r.branch==='main'&&/^[0-9a-f]{40}$/.test(r.commit)&&!isNaN(Date.parse(r.time))?0:1)" "$T/opt/data/installer.json" "$(sed -n 's/^INSTALLER_VERSION=//p' "$REPO/installers/install.sh")" \
+  && ok "data/installer.json records the installer's version (INSTALLER_VERSION), the branch and commit" || { bad "installer record"; cat "$T/opt/data/installer.json"; }
 [ ! -f "$T/opt/tmp/update-request" ] && ok "a pending admin request is cleared" || bad "request left"
 grep -q "PathExists=$T/opt/tmp/update-request" "$T/upd.path" && grep -q "Unit=noticeboard-update.service" "$T/upd.path" \
   && ok "path unit watches tmp/update-request" || bad "path unit"

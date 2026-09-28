@@ -60,7 +60,7 @@ onUnmounted(() => player.destroy());
       <button type="button" class="btn-ghost" @click="player.next()">⏭ Next track</button>
       <button type="button" class="btn-ghost" @click="stop">■ Stop</button>
       <span class="preview__now">
-        <template v-if="state.blocked">Your browser didn't allow sound. <button type="button" class="btn-ghost" @click="play">▶ Try again</button></template>
+        <template v-if="state.blocked">Your browser didn't allow sound. <button type="button" class="btn-ghost" @click="player.retryNow()">▶ Try again</button></template>
         <template v-else>Playing: <strong>{{ nowPlaying }}</strong></template>
       </span>
     </template>

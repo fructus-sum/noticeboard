@@ -2,21 +2,24 @@
 //
 // Responsibilities
 //   List (with each show's track count), create (unpublished, default settings), read, change
-//   (name, published, order, transition, fade length, volume: checked by audioShowRules) and delete.
+//   (name, published, order, transition, fade length, volume: checked by audioShowRules) and delete
+//   (which also clears it from the slideshows that chose it, in the same config write).
 //   Mounted behind the admin check (api/index.js), with the tracks' routes inside it.
 //
 // Used by
 //   routes/api/index.js; the admin panel (AudioShowsView, AudioShowDetailView)
 //
 // Uses
-//   services/audioShowStore, services/audioShowRules, middleware/asyncRoute, utils/logger
+//   services/audioShowStore, services/audioShowRules, services/slideshowStore (clearing a deleted
+//   show), middleware/asyncRoute, utils/logger
 //
 // Change impact
-//   The entries are config.audioShows (SYSTEM_DESIGN §5.1); the displays will read them once audio
-//   plays on them.
+//   The entries are config.audioShows (SYSTEM_DESIGN §5.1); the displays hear of a change through
+//   the config change (services/audioPlaylist).
 const express = require('express');
 const store = require('../../services/audioShowStore');
 const rules = require('../../services/audioShowRules');
+const slideshowStore = require('../../services/slideshowStore');
 const { route } = require('../../middleware/asyncRoute');
 const logger = require('../../utils/logger');
 
@@ -57,8 +60,14 @@ router.put('/:folder', route(async (req, res) => {
 
 router.delete('/:folder', route(async (req, res) => {
   if (!store.find(req.params.folder)) return res.status(404).json({ error: 'Audio show not found' });
-  await store.remove(req.params.folder);
-  logger.info('Audio show deleted', { folder: req.params.folder });
+  const { folder } = req.params;
+  const slideshows = slideshowStore.list();
+  const users = slideshows.filter((ss) => ss.audioShow === folder);
+  const other = users.length
+    ? { slideshows: slideshows.map((ss) => { if (ss.audioShow !== folder) return ss; const { audioShow, ...rest } = ss; return rest; }) }
+    : null;
+  await store.remove(folder, other);
+  logger.info('Audio show deleted', { folder, clearedFrom: users.map((ss) => ss.folder) });
   res.json({ ok: true });
 }));
 

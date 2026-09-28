@@ -2,23 +2,27 @@
 //
 // Responsibilities
 //   The only module that uses socket.io. It tells each display the build it should run, its own
-//   look (the location pin, the logo) and the playlist, when it connects and whenever they change.
+//   look (the location pin, the logo), the playlist and the background audio, when it connects and
+//   whenever they change.
 //   The event names are shared with the viewer (shared/contract.json).
 //
 // Provides
 //   initDisplaySocket(httpServer) → the socket.io server. On connect: display:build and
-//     display:settings; on display:ready: that display's playlist. Afterwards:
+//     display:settings; on display:ready: that display's playlist, then the audio. Afterwards:
 //       playlist:update to all   on the scheduler's 'update' and on displayEvents.playlistChanged
 //       display:settings to all  on a config 'change', on displayEvents.displaySettingsChanged,
 //                                and when the installer state changes (checked when a display
 //                                connects and every 5 minutes), only when the settings differ
 //                                from the last ones sent
+//       audio:update to all      on a config 'change' and on displayEvents.audioChanged, only
+//                                when it differs from the last one sent (SYSTEM_DESIGN §18.3)
 //
 // Used by
 //   server/index.js
 //
 // Uses
-//   socket.io; services/playlistService (buildPlaylist), services/displaySettings (the payload),
+//   socket.io; services/playlistService (buildPlaylist), services/audioPlaylist (buildAudio),
+//   services/displaySettings (the payload),
 //   services/schedulerService (getActive, 'update'), services/configService ('change'),
 //   services/displayEvents, utils/displayBuildId, utils/logger
 //
@@ -31,6 +35,7 @@ const schedulerService = require('../services/schedulerService');
 const configService = require('../services/configService');
 const displayEvents = require('../services/displayEvents');
 const { buildPlaylist } = require('../services/playlistService');
+const { buildAudio } = require('../services/audioPlaylist');
 const displaySettings = require('../services/displaySettings');
 const { displayBuildId } = require('../utils/displayBuildId');
 const logger = require('../utils/logger');
@@ -54,6 +59,17 @@ function initDisplaySocket(httpServer) {
     logger.info('Socket: display:settings broadcast', settings);
   }
 
+  // The background audio: sent again only when it has changed
+  let lastAudio = JSON.stringify(buildAudio());
+  function broadcastAudio() {
+    const audio = buildAudio();
+    const json = JSON.stringify(audio);
+    if (json === lastAudio) return;
+    lastAudio = json;
+    io.emit(EVENTS.AUDIO_UPDATE, audio);
+    logger.info('Socket: audio:update broadcast', { shows: Object.keys(audio.shows).length, slideshows: Object.keys(audio.slideshows).length });
+  }
+
   function broadcastPlaylist() {
     const playlist = buildPlaylist(schedulerService.getActive());
     io.emit(EVENTS.PLAYLIST_UPDATE, playlist);
@@ -75,6 +91,7 @@ function initDisplaySocket(httpServer) {
       const playlist = buildPlaylist(schedulerService.getActive());
       socket.emit(EVENTS.PLAYLIST_UPDATE, playlist);
       logger.info('Socket: playlist sent to display', { id: socket.id, slideCount: playlist.slides.length });
+      socket.emit(EVENTS.AUDIO_UPDATE, buildAudio());
     });
 
     socket.on('disconnect', () => {
@@ -86,6 +103,8 @@ function initDisplaySocket(httpServer) {
   displayEvents.onPlaylistChanged(broadcastPlaylist);
   configService.on('change', broadcastDisplaySettings);
   displayEvents.onDisplaySettingsChanged(broadcastDisplaySettings);
+  configService.on('change', broadcastAudio);
+  displayEvents.onAudioChanged(broadcastAudio);
 
   logger.info('Socket.io initialised');
   return io;
