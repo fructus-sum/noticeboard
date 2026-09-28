@@ -55,9 +55,11 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:du
   check('a track becoming ready sends the audio', await wait(n + 1, 30000), `${got.length} updates`);
   const a = last();
   const track = (await s.api('GET', `/api/audioshows/${show}/tracks`)).data[0];
+  // startedAt and after (since 0.7.0): the show's timeline, which every screen plays to (SYSTEM_DESIGN §18.8)
+  const startedAt = a.shows?.[show]?.startedAt;
   check('  … the show as the engine takes it, and the slideshow that plays it',
-    JSON.stringify(a) === JSON.stringify({
-      shows: { [show]: { id: show, order: 'in-order', transition: 'none', fadeSeconds: 3, volume: 100, tracks: [{ url: `/audio/${show}/tracks/${track.filename}`, length: track.duration }] } },
+    typeof startedAt === 'number' && Math.abs(startedAt - Date.now()) < 60_000 && JSON.stringify(a) === JSON.stringify({
+      shows: { [show]: { id: show, order: 'in-order', transition: 'none', fadeSeconds: 3, volume: 100, tracks: [{ url: `/audio/${show}/tracks/${track.filename}`, length: track.duration }], startedAt, after: null } },
       slideshows: { [ss]: show },
       event: null,
     }), JSON.stringify(a));

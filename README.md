@@ -24,6 +24,7 @@ New videos are converted to H.265 (HEVC) by default; H.264 is the fallback for o
 ## Features
 
 - **Slideshows on any screen** — images and videos, full screen, on the Server's own screen and on any number of Clients or browsers
+- **Every screen in step** — all screens show the same slide and play the same music at the same moment, kept to the Server's clock, so screens side by side match and screens heard together don't echo (within about a tenth of a second; each TV may add its own sound delay)
 - **Runs unattended** — keeps cycling for months: survives outages, sleeping screens, slides that won't load and browser crashes, and reloads itself after updates
 - **Kiosk with an exit** — screens run full screen; moving the mouse shows an exit button that takes just that screen back to a normal browser window. Kiosk mode never applies to the admin pages, and the cursor hides when the mouse is still
 - **Several slideshows** — with schedules, priorities, and a default image duration (10 seconds) that each slideshow can override; switching slideshows never cuts a slide short

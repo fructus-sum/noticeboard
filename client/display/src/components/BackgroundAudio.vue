@@ -5,10 +5,14 @@
 //   Plays the audio show of the slideshow on screen (SYSTEM_DESIGN §18.3) with the shared engine
 //   (shared/audioPlayer.mjs): a new slideshow switches it at once with the new show's transition,
 //   one without audio fades it out, and two slideshows on the same show carry on without a break.
+//   Since 0.7.0 every screen plays in step (SYSTEM_DESIGN §18.8): each show has a timeline from the
+//   Server (startedAt, after), played on the Server's time (serverNow), so a show is joined where it
+//   is now, like a radio.
 //   While an event is on (audio.event), every screen plays that show instead, even with no
-//   slideshow on; afterwards the slideshow's show carries on with its next track.
+//   slideshow on; afterwards the slideshow's show carries on with its next track (the Server
+//   starts its timeline again there).
 //   While a video plays its own sound, the background is lowered to its lowerTo % or paused, and
-//   brought back (or resumed where it was) when that slide goes.
+//   brought back (or, after a pause, joined where the music is by then) when that slide goes.
 //   If the browser won't play sound (a kiosk whose installer hasn't been run again, or an ordinary
 //   browser tab) it stays silent and tries again every minute, or at once when someone clicks, taps
 //   or presses a key on the screen.
@@ -16,7 +20,7 @@
 // Props
 //   audio (the last audio:update: { shows, slideshows, event }), onAir (the slideshow of the slide on
 //   screen, or null), videoSound (the video on screen's { withSound, lowerTo } while it plays its
-//   own sound, else null)
+//   own sound, else null), serverNow (the Server's time as this screen tells it: useSocket)
 //
 // Used by: App.vue
 // Uses: createAudioPlayer from @shared/audioPlayer.mjs
@@ -27,11 +31,15 @@ const props = defineProps({
   audio: { type: Object, required: true },
   onAir: { type: String, default: null },
   videoSound: { type: Object, default: null },
+  serverNow: { type: Function, default: () => Date.now() },
 });
 
 // The audio elements the engine makes, kept for the read-only diagnostic below
 const elements = [];
-const player = createAudioPlayer({ createElement: () => { const el = new Audio(); elements.push(el); return el; } });
+const player = createAudioPlayer({
+  createElement: () => { const el = new Audio(); elements.push(el); return el; },
+  serverNow: () => props.serverNow(),
+});
 
 // The event's show, else the one for the slideshow on screen; the engine ignores the same show sent again
 const show = computed(() => {

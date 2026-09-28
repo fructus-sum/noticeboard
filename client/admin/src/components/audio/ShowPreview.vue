@@ -48,7 +48,8 @@ function stop() {
   player.stop();
 }
 
-// Changed settings or tracks while it plays: the engine carries on with them
+// Changed settings or tracks while it plays: the engine carries on with them (a new volume at
+// once; a change to the tracks, order, transition or fade starts its next track)
 watch(asPlayed, (s) => { if (on.value) player.setShow(s); }, { deep: true });
 onUnmounted(() => player.destroy());
 </script>

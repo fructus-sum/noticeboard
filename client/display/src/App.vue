@@ -56,7 +56,7 @@ if (kiosk) startDailyReload(() => connected.value);
     <DeviceInfo v-if="settings.showDeviceInfo" />
     <ExitKiosk v-if="kiosk" :visible="active" />
     <AdminWarning v-if="settings.installerNeeded || settings.updateAvailable || settings.restartNeeded" />
-    <BackgroundAudio :audio="audio" :on-air="audioFor" :video-sound="videoSound" />
+    <BackgroundAudio :audio="audio" :on-air="audioFor" :video-sound="videoSound" :server-now="serverNow" />
     <AudioDebug v-if="audioDebug" />
   </div>
 </template>

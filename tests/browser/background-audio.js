@@ -111,7 +111,9 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:
   check('  … and the volume while it plays is saved', saved?.sound === true && saved.withSound === 'lower' && saved.lowerTo === 30, JSON.stringify(saved));
   // The viewer's tab to the front, as on a real screen: Chrome holds back media in a tab behind another
   await v.send('Page.bringToFront');
-  const videoPlaying = `(() => { const v = document.querySelector('video'); return !!v && v.currentTime > 0.3 && !v.paused; })()`;
+  // From the start of its slot: a video that starts late joins its slot part-way (every screen in
+  // step, SYSTEM_DESIGN §18.8), which could leave too little of it to see the volume settle
+  const videoPlaying = `(() => { const v = document.querySelector('video'); return !!v && v.currentTime > 0.3 && v.currentTime < 1.5 && !v.paused; })()`;
   check('on screen the video plays (aloud, or muted if the browser won\'t)', await v.until(videoPlaying, 20000), JSON.stringify(await v.evaluate(`(() => { const x = document.querySelector('video'); return x && { t: x.currentTime, paused: x.paused, muted: x.muted }; })()`)));
   check('  … with the background audio lowered to 30 %', await v.until(`Math.abs((${audioState}?.duck ?? 1) - 0.3) < 0.01`, 3000), JSON.stringify(await v.evaluate(audioState)));
   check('  … and back to full once it has gone', await v.until(`!document.querySelector('video') && ${audioState}?.duck === 1`, 15000), JSON.stringify(await v.evaluate(audioState)));

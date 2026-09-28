@@ -23,9 +23,11 @@
 //                                from the last ones sent
 //     time:ping → time:pong { sent, server }: the Server's clock, which every screen keeps its
 //       slides and music to (SYSTEM_DESIGN §18.8)
-//       audio:update to all      on a config 'change', on displayEvents.audioChanged and on the
-//                                event clock's 'update', only when it differs from the last one
-//                                sent (SYSTEM_DESIGN §18.3)
+//       audio:update to all      on a config 'change', on displayEvents.audioChanged, on the
+//                                event clock's 'update' and when a show's timeline changes
+//                                (services/audioTimeline: each show carries startedAt and after,
+//                                which every screen plays to), only when it differs from the last
+//                                one sent (SYSTEM_DESIGN §18.3, §18.8)
 //
 // Used by
 //   server/index.js
@@ -33,7 +35,7 @@
 // Uses
 //   socket.io; services/macService (resolveAddress: who may connect), services/playlistService
 //   (buildPlaylist), services/playlistTimeline (when a change takes effect), services/audioPlaylist (buildAudio),
-//   services/audioEventClock (the event playing, 'update'),
+//   services/audioTimeline (each show's timeline), services/audioEventClock (the event playing, 'update'),
 //   services/displaySettings (the payload),
 //   services/schedulerService (getActive, 'update'), services/configService ('change'),
 //   services/displayEvents, utils/displayBuildId, utils/logger
@@ -48,6 +50,7 @@ const configService = require('../services/configService');
 const displayEvents = require('../services/displayEvents');
 const { buildPlaylist } = require('../services/playlistService');
 const { createPlaylistTimeline } = require('../services/playlistTimeline');
+const { createAudioTimeline } = require('../services/audioTimeline');
 const { buildAudio } = require('../services/audioPlaylist');
 const audioEventClock = require('../services/audioEventClock');
 const displaySettings = require('../services/displaySettings');
@@ -105,8 +108,14 @@ function initDisplaySocket(httpServer) {
     logger.info('Socket: display:settings broadcast', settings);
   }
 
-  // The background audio: sent again only when it has changed
-  const currentAudio = () => buildAudio({ event: audioEventClock.getActive() });
+  // The background audio, each show with the timeline every screen plays it to: sent again only
+  // when it has changed (a change to a show's timeline takes effect when its track on air ends)
+  const audioTimeline = createAudioTimeline({ onSwitch: () => broadcastAudio() });
+  function currentAudio() {
+    const audio = buildAudio({ event: audioEventClock.getActive() });
+    audioTimeline.offer(audio.shows, audio.event);
+    return { ...audio, shows: audioTimeline.current() };
+  }
   let lastAudio = JSON.stringify(currentAudio());
   function broadcastAudio() {
     const audio = currentAudio();

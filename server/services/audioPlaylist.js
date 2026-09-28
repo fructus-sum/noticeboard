@@ -12,7 +12,7 @@
 //                 is in shows; else null
 //
 // Used by
-//   realtime/displaySocket.js
+//   realtime/displaySocket.js (which adds each show's startedAt and after: services/audioTimeline)
 //
 // Uses
 //   audioShowStore, slideshowStore, pathHelpers (audioUrl)
