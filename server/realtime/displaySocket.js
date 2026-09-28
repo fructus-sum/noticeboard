@@ -1,7 +1,10 @@
 // server/realtime/displaySocket.js — the live connection to every display (socket.io)
 //
 // Responsibilities
-//   The only module that uses socket.io. It tells each display the build it should run, its own
+//   The only module that uses socket.io. Only approved devices may connect: MAC filtering applies
+//   here as it does to the pages (a device it blocks gets a connect error and nothing else), and
+//   when the approved list or the switch changes, connections no longer approved are closed.
+//   It tells each display the build it should run, its own
 //   look (the location pin, the logo), the playlist and the background audio, when it connects and
 //   whenever they change.
 //   The event names are shared with the viewer (shared/contract.json).
@@ -22,7 +25,8 @@
 //   server/index.js
 //
 // Uses
-//   socket.io; services/playlistService (buildPlaylist), services/audioPlaylist (buildAudio),
+//   socket.io; services/macService (resolveAddress: who may connect), services/playlistService
+//   (buildPlaylist), services/audioPlaylist (buildAudio),
 //   services/audioEventClock (the event playing, 'update'),
 //   services/displaySettings (the payload),
 //   services/schedulerService (getActive, 'update'), services/configService ('change'),
@@ -40,6 +44,7 @@ const { buildPlaylist } = require('../services/playlistService');
 const { buildAudio } = require('../services/audioPlaylist');
 const audioEventClock = require('../services/audioEventClock');
 const displaySettings = require('../services/displaySettings');
+const macService = require('../services/macService');
 const { displayBuildId } = require('../utils/displayBuildId');
 const logger = require('../utils/logger');
 const { socketEvents: EVENTS } = require('../../shared/contract.json');
@@ -47,6 +52,37 @@ const { socketEvents: EVENTS } = require('../../shared/contract.json');
 function initDisplaySocket(httpServer) {
   // The displays are always served from this server, so no cross-origin access is needed
   const io = new Server(httpServer);
+
+  // MAC filtering, as for the pages (middleware/access.js): an unapproved device, or one that
+  // can't be identified, isn't let in
+  const approved = async (address) => {
+    try {
+      return (await macService.resolveAddress(address)).approved;
+    } catch (err) {
+      logger.error('Socket: MAC check error', { err: err.message });
+      return false;
+    }
+  };
+  io.use((socket, next) => {
+    approved(socket.handshake.address).then((ok) => {
+      if (ok) return next();
+      logger.warn('Display: MAC denied (socket)', { ip: socket.handshake.address });
+      next(new Error('Not Found'));
+    });
+  });
+  // A change to MAC filtering: close the connections it no longer allows
+  let lastFiltering = JSON.stringify(configService.get('macFiltering'));
+  configService.on('change', async () => {
+    const now = JSON.stringify(configService.get('macFiltering'));
+    if (now === lastFiltering) return;
+    lastFiltering = now;
+    for (const socket of io.of('/').sockets.values()) {
+      if (!(await approved(socket.handshake.address))) {
+        logger.warn('Display: MAC no longer approved, disconnected', { ip: socket.handshake.address });
+        socket.disconnect(true);
+      }
+    }
+  });
 
   // Sent on every connect: a display that sees it change reloads to pick up the new build
   const buildId = displayBuildId();
