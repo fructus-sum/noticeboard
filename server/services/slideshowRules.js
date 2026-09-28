@@ -14,7 +14,8 @@
 //   SAMPLE_DELETE_ERROR       the message for trying anyway
 //
 // Used by
-//   routes/api/slideshows.js, routes/api/settings.js (the default duration)
+//   routes/api/slideshows.js, services/settingsService.js (the default duration),
+//   services/contentReset.js (isSample: Delete All keeps the sample)
 //
 // Uses
 //   configService (sampleSlideshow), shared/contract.json (limits)

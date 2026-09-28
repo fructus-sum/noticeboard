@@ -276,11 +276,11 @@ A Vue Router SPA under `/admin/`:
 | `GET /api/device` | macFilter | server IPs (the one used first) and port | `DeviceInfo.vue` |
 | `POST /api/device/kiosk-exit` | macFilter | stores an exit request for the caller's IP | `ExitKiosk.vue` |
 | `POST /api/device/kiosk-exit/claim` | macFilter | `{"exit":true\|false}`, consuming the request | **kiosk scripts** (curl, exact string compare) |
-| `GET/PUT /api/settings` | adminAuth | sanitised config / partial update of `port`, `macFiltering`, `display` | SettingsView (for DisplaySettingsCard and MacFilterCard), LogoSettings, SlideshowDetailView (the default duration) |
+| `GET/PUT /api/settings` | adminAuth | sanitised config / partial update of `port`, `macFiltering`, `display` | SettingsView (for DisplaySettingsCard and MacFilterCard), BrandingSettings, SlideshowDetailView (the default duration) |
 | `GET /api/settings/device` | adminAuth | LAN interfaces with MACs | SlideshowsView banner |
 | `GET /api/settings/my-device` | adminAuth | `{ local, mac }` of the caller | MacFilterWarning |
 | `GET /api/settings/security` | adminAuth | `{ defaultPassword }` | useSecurity |
-| `GET/POST/DELETE /api/settings/logo` | adminAuth | logo info / upload / reset | useBranding, LogoSettings |
+| `GET/POST/DELETE /api/settings/logo` | adminAuth | logo info / upload / reset | useBranding, BrandingSettings |
 | `PUT /api/settings/password` | adminAuth | change the password (403 when the current one is wrong) | PasswordCard |
 | `GET /api/settings/updates` | adminAuth | update info (git, the status and check files, systemd unit presence, the schedule, the waiting version) | useUpdateInfo, UpdateAvailableNotice |
 | `PUT /api/settings/updates/schedule` | adminAuth | `{ every, time, day }` → saves the schedule, asks update.sh to check (400 not valid, 409 without the updater) | UpdateSchedule |
@@ -355,7 +355,7 @@ Read with JSON5, so comments and `_comment` keys are allowed. Written as plain J
 | `macFiltering.enabled` | bool | false | macService | `PUT /settings` |
 | `macFiltering.approved[]` | `{ mac, label, addedAt }` | `[{ mac:'localhost', label:'Server itself' }]` | macService, my-device (client side) | `PUT /settings` (the whole list, **not validated**) |
 | `display.defaultSlideDurationSeconds` | int 1–3600 | 10 | playlistService.buildPlaylist; the admin panel | `PUT /settings` (validated in settingsService `mergeDisplay`) |
-| `display.showDeviceInfo` | bool | true | brandingService.displaySettings | `PUT /settings` |
+| `display.showDeviceInfo` | bool | true | services/displaySettings | `PUT /settings` |
 | `display.logo.enabled` | bool | true | brandingService | `PUT /settings` |
 | `display.backgroundColor` | `#rrggbb`, lower case | absent (black, `shared/contract.json` `display.defaultBackground`) | brandingService.backgroundColour | `PUT /settings` (checked in settingsService `mergeDisplay`) |
 | `slideshows[]` | see below | `[]` | slideshowStore only (for the scheduler, the playlist, the routes and the sample sync) | slideshowStore (the routes, the sample sync) |
@@ -445,7 +445,7 @@ Outside the install folder:
 | Slides shown whole, as large as fits, never cut off or stretched, on the chosen background colour | `ImageSlide.vue`, `VideoSlide.vue` (`contain`), `App.vue` (`--nb-background`), `brandingService.backgroundColour` |
 | Slides cycle with a fade; each image for its duration; videos to the end; unattended for months | `slideshowClock.js`, `SlideShow.vue`, `SlideFrame.vue`, `ImageSlide.vue`, `VideoSlide.vue` |
 | A playlist change waits for the current slide to finish | `slideshowClock.setSlides` (pending) |
-| "No slideshow published" with the logo; a pulsing dot while disconnected | `WaitingScreen.vue`, `brandingService.displaySettings` |
+| "No slideshow published" with the logo; a pulsing dot while disconnected | `WaitingScreen.vue`, `services/displaySettings` |
 | Location pin with the server's address | `DeviceInfo.vue` → `GET /api/device` (`network.lanInterfaces`) |
 | The updater's notices on every admin page; the warning mark on every screen while the installer needs running again, or (manual updates) a new version waits | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`, `UpdateAvailableNotice`; `AdminWarning.vue`, `services/displaySettings` (`installerNeeded`, `updateAvailable`), `updates/installerVersion`, `services/updates` |
 | Update schedule: every 15 minutes, every 2 hours, daily or weekly at a time, or manual; a waiting version with Update now, Set a time, or the automatic install | `UpdateSchedule`, `UpdateStatus`, `settings/updates.js`, `services/updates` (`schedule.js`, `updateFiles`), `installers/lib/schedule.sh`, update.sh |
@@ -1008,7 +1008,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `schedulerService.computeActive` | services/schedulerService.js | interval, config change, init | `_matchesSchedule` | config.slideshows | emits `'update'` when the folder list changes | which slideshows air; playlist broadcasts |
 | `buildPlaylist` | services/playlistService.js | displaySocket (broadcast, `display:ready`) | slideshowStore, pathHelpers | config, slideshow.json (via the store) | none | **the viewer contract** (`{ slides: [{ type, url, duration, slideshow }] }`); the clock's change detection (JSON signature) |
 | `broadcastPlaylist` (inside displaySocket) | realtime/displaySocket.js | scheduler `'update'`, `displayEvents.playlistChanged` (slideshows PUT, slide DELETE/reorder, uploadQueue) | buildPlaylist, io.emit | as above | socket emit | every display |
-| `broadcastDisplaySettings` (inside displaySocket) | realtime/displaySocket.js | config `'change'`, `displayEvents.displaySettingsChanged` (logo) | brandingService.displaySettings | config, logo mtime | socket emit (deduplicated) | pin and logo on the displays |
+| `broadcastDisplaySettings` (inside displaySocket) | realtime/displaySocket.js | config `'change'`, `displayEvents.displaySettingsChanged` (logo), the installer and update state (every 5 minutes, and when a display connects) | services/displaySettings (`current`, `refresh`) | config, logo mtime, installer.json, update-check.json, update-schedule.env | socket emit (deduplicated) | pin and logo on the displays |
 | `macService.resolveRequest` | services/macService.js | macFilter, adminAuth | macLookup, isMacApproved | config.macFiltering, ARP | none | who can reach anything; `/settings/my-device` via `req.clientMac` |
 | `store.modifySlides` | services/slideshowStore.js | slides.js (4×), uploadQueue.updateSlide, sampleSlideshow.replaceSlides | withSlideshowLock, readSlides, writeConfig | slideshow.json | writes it only when changed | every change to a slideshow's slides; the lock prevents lost writes |
 | `writeConfig` | utils/configIO.js | configService, slideshowStore | fs | none | atomic JSON write (`.tmp` + rename) | every persisted JSON written by Node |

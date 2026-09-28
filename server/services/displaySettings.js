@@ -19,7 +19,7 @@
 // Uses
 //   services/configService (display.showDeviceInfo), services/brandingService (the logo URL and
 //   the background colour), services/updates/installerVersion (status), services/updates
-//   (manualUpdateWaiting)
+//   (manualUpdateWaiting), utils/logger
 //
 // Change impact
 //   The payload is a contract with open screens (SYSTEM_DESIGN §3.4, §15): keys may be added,

@@ -5,11 +5,11 @@
 // change tells the displays (displayEvents.displaySettingsChanged).
 //
 // Used by
-//   routes/api/settings/index.js; the admin panel (useBranding, LogoSettings)
+//   routes/api/settings/index.js; the admin panel (useBranding, BrandingSettings)
 //
 // Uses
 //   services/brandingService, services/displayEvents, services/mediaTypes (LOGO_MIME),
-//   middleware/uploads
+//   middleware/uploads, utils/logger
 const express = require('express');
 const fs = require('fs');
 const brandingService = require('../../../services/brandingService');

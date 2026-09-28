@@ -11,7 +11,7 @@
 // Uses
 //   services/slideshowStore, services/configService (sampleSlideshow), services/uploadQueue (its
 //   video's thumbnail), services/mediaTypes, services/mediaNames (each slide's name is its sample
-//   file's), utils/slugify, utils/pathHelpers
+//   file's), utils/slugify, utils/pathHelpers, utils/logger
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

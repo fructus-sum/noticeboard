@@ -30,12 +30,12 @@
 //                            switch (services/actionTokens, action 'switch')
 //
 // Used by
-//   routes/api/settings/updates.js
+//   routes/api/settings/updates.js, services/displaySettings.js (manualUpdateWaiting),
+//   services/contentReset.js (updaterReady, getInfo)
 //
 // Uses
 //   ./git, ./branchName, ./updateFiles, ./installerVersion, ./schedule, services/actionTokens,
-//   utils/systemCheck,
-//   utils/logger
+//   utils/systemCheck, utils/logger
 //
 // Change impact
 //   checkBranch must refuse what update.sh refuses (files in data/, tmp/, logs/ or .env; an

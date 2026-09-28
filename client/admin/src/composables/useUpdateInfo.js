@@ -19,7 +19,9 @@
 //   canSwitch(info)       branch switching is set up (the updater's timer or path unit)
 //   missingSoftware(checked)  what a checked branch needs that this noticeboard lacks
 //
-// Used by: components/updates (SoftwareUpdates, UpdateStatus, BranchSwitcher, SwitchDialogs)
+// Used by: components/updates (SoftwareUpdates, UpdateStatus, UpdateSchedule, BranchSwitcher,
+//   SwitchDialogs)
+// Uses: useApi (GET /settings/updates, /settings/updates/branches)
 import { ref, onUnmounted } from 'vue';
 import { api } from './useApi.js';
 

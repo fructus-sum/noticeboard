@@ -8,7 +8,8 @@
 //
 // Uses
 //   services/updates (every route's work), services/adminPassword, middleware/asyncRoute,
-//   middleware/passwordLimiter (wrong passwords, counted with the other password checks)
+//   middleware/passwordLimiter (wrong passwords, counted with the other password checks),
+//   utils/logger
 //
 // Change impact
 //   The admin panel of the running version reads these; update.sh never calls them (it shares

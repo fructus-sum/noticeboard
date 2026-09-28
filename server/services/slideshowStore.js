@@ -27,7 +27,8 @@
 //
 // Used by
 //   routes/api/slideshows.js, routes/api/slides.js, services/uploadQueue.js,
-//   services/sampleSlideshow.js, services/playlistService.js, services/schedulerService.js
+//   services/sampleSlideshow.js, services/playlistService.js, services/schedulerService.js,
+//   services/contentReset.js (removeMany: Delete All)
 //
 // Uses
 //   configService (the entries; its 'change' event tells the scheduler and the displays),

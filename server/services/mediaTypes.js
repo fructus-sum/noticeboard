@@ -13,7 +13,7 @@
 //   SAMPLE_IMAGE_EXT, SAMPLE_VIDEO_EXT  which files in sample-data/sample-slideshow/ are slides
 //
 // Used by
-//   routes/api/slides.js (uploads), routes/api/settings.js (logo upload), routes/index.js (/media),
+//   routes/api/slides.js (uploads), routes/api/settings/logo.js (logo upload), routes/index.js (/media),
 //   services/uploadQueue.js, services/sampleSlideshow.js
 //
 // Change impact

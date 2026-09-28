@@ -1,7 +1,8 @@
 <script setup>
 // client/admin/src/components/ui/FlashMessage.vue — shows a useFlash() message, green or red
 // Props: flash (from useFlash), tag ('span', or 'p' on its own line). Nothing shows without text.
-// Used by: the Settings cards, the slideshow settings card
+// Used by: the Settings cards (including Delete content), updates/UpdateSchedule, the slideshow
+//   settings card
 defineProps({
   flash: { type: Object, required: true },
   tag: { type: String, default: 'span' },

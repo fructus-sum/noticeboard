@@ -33,10 +33,12 @@
 //                                put back as they were and the error is thrown
 //
 // Used by
-//   services/updates/index.js, services/updates/installerVersion.js (the branch)
+//   services/updates/index.js, services/updates/installerVersion.js (the branch),
+//   services/contentReset.js (the Restore Defaults request)
 //
 // Uses
-//   utils/configIO (writeFileAtomic, readJsonFile), utils/pathHelpers
+//   utils/configIO (writeFileAtomic, readJsonFile), utils/pathHelpers, services/updates/schedule
+//   (the defaults)
 const fs = require('fs/promises');
 const path = require('path');
 const { writeFileAtomic, readJsonFile } = require('../../utils/configIO');

@@ -7,6 +7,7 @@
 // Props: slide ({ type, url, … }), generation
 // Emits: ready, progress, ended, failed (each with the generation)
 // Used by: SlideShow
+// Uses: ImageSlide, VideoSlide
 import ImageSlide from './ImageSlide.vue';
 import VideoSlide from './VideoSlide.vue';
 

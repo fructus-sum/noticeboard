@@ -5,7 +5,8 @@
 // notices ("back on main", "Run the installer again on this Pi"). The frame stays while moving
 // between pages, so a notice is the same on every page, and closing one closes it everywhere.
 // Used by: main.js
-// Uses: NavBar, DefaultPasswordWarning, updates/UpdateNotice, updates/InstallerNotice, useNav (the
+// Uses: NavBar, DefaultPasswordWarning, updates/UpdateNotice, updates/InstallerNotice,
+//   updates/UpdateAvailableNotice, useNav (the
 //   collapsed sidebar), the router's page
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';

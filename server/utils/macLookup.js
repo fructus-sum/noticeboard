@@ -7,6 +7,9 @@
 //
 // Used by
 //   services/macService, server/test/foundations.test.js
+//
+// Uses
+//   node-arp, utils/network (plainAddress)
 const { promisify } = require('util');
 const arp = require('node-arp');
 const { plainAddress } = require('./network');

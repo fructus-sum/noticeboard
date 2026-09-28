@@ -1,7 +1,7 @@
 // Branch switching end to end, minus systemd: the real server runs from a git clone whose origin
 // (a local bare repo) has several branches, with fake systemd unit files. The real update.sh
 // (with systemctl, npm, curl, sleep and flock stand-ins) acts on what the server writes.
-//   node test-branch-api.js
+//   node tests/run.js api branch-switching
 const { spawn, execFileSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const { copyChanges } = require('../helpers/app.js');

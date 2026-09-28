@@ -12,6 +12,11 @@
 // Used by
 //   server/app.js
 //
+// Uses
+//   middleware/macFilter, middleware/asyncRoute, routes/spa, routes/api, utils/pathHelpers (the
+//   built apps, the guide), services/brandingService (the logo), services/mediaTypes (what /media
+//   serves)
+//
 // Change impact
 //   The URLs are a contract with kiosk scripts, help shortcuts and open browser tabs: they must
 //   not change (SYSTEM_DESIGN §15).

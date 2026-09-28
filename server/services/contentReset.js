@@ -26,7 +26,7 @@
 //
 // Uses
 //   services/slideshowStore (removeMany), services/slideshowRules (isSample),
-//   services/displayEvents (playlistChanged), services/updates (updaterReady, and its files),
+//   services/displayEvents (playlistChanged), services/updates (updaterReady), services/updates/updateFiles (saveRestoreRequest),
 //   utils/pathHelpers, utils/logger
 //
 // Change impact

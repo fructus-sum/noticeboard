@@ -1,7 +1,8 @@
 // server/utils/pathHelpers.js — every file and folder the server uses, in one place
 //
 // Provides
-//   ROOT; data/ (config, slideshows, branding, the update files); logs/; tmp/ (uploads); the built
+//   ROOT; data/ (config, slideshows, branding, the update files and schedule, the Restore Defaults
+//   marker); logs/; tmp/ (tmpRootDir, and tmpDir: the uploads); the built
 //   apps; the guide; sample-data/; what the installer set up (installer.json, the server kiosk
 //   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); mediaUrl(folder, file)
 //

@@ -9,7 +9,8 @@
 //   health check (GET /status must answer 2xx after a restart)
 //
 // Uses
-//   services/adminPassword (verify), services/adminSession (the cookie), middleware/asyncRoute
+//   services/adminPassword (verify), services/adminSession (the cookie), middleware/asyncRoute,
+//   utils/logger
 //
 // Change impact
 //   GET /api/auth/status is update.sh's health check on every installed Pi: it must keep answering

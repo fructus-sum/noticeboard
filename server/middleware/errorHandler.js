@@ -5,6 +5,7 @@
 // themselves (asyncRoute's jsonRoute).
 //
 // Used by: app.js (after all routes)
+// Uses: utils/logger
 const logger = require('../utils/logger');
 
 function errorHandler(err, req, res, next) {

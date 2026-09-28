@@ -12,7 +12,7 @@
 // Uses
 //   services/slideshowStore (the data), services/uploadQueue (processing), services/mediaTypes,
 //   services/mediaNames (the name rule), middleware/uploads, middleware/asyncRoute,
-//   services/displayEvents (playlistChanged)
+//   services/displayEvents (playlistChanged), utils/logger
 //
 // Change impact
 //   The slide fields are read by the viewer's playlist and the admin panel (SYSTEM_DESIGN

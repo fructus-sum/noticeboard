@@ -6,6 +6,9 @@
 //
 // Used by
 //   services/slideshowStore (create), services/sampleSlideshow
+//
+// Uses
+//   utils/pathHelpers (slideshowsDir, for uniqueSlug)
 const fs = require('fs');
 const path = require('path');
 const { slideshowsDir } = require('./pathHelpers');

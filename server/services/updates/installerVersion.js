@@ -19,7 +19,8 @@
 //                                 (the branch the installer command should come from)
 //
 // Used by
-//   services/updates/index.js (the branch check, the home page status),
+//   services/updates/index.js (the branch check, the home page status), services/displaySettings.js
+//   (the screens' warning mark),
 //   server/test/installer.test.js
 //
 // Uses

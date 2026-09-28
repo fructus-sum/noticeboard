@@ -2,7 +2,7 @@
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
 # update.sh going back to main once the followed branch has been merged into it: merge commit,
 # squash, fast-forward, deleted after merging; and the cases where it must stay on the branch.
-# Same stand-ins as test-update-branches.sh.
+# Same stand-ins as tests/installers/update-branches.sh.
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T=$(mktemp -d); BIN="$T/bin"; export MOCK="$T/mock"; mkdir -p "$BIN" "$MOCK"

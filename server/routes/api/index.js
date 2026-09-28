@@ -9,6 +9,10 @@
 // Used by
 //   routes/index.js
 //
+// Uses
+//   express-rate-limit, middleware/macFilter (auth, device), middleware/adminAuth (the rest), and
+//   the routers: auth, device, settings, slideshows, slides
+//
 // Change impact
 //   The URLs, status codes and JSON shapes are a contract with open admin panels, the kiosk scripts
 //   and update.sh's health check (SYSTEM_DESIGN §4.1, §15).
