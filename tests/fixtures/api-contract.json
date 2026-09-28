@@ -245,6 +245,30 @@
     "type": "application/json",
     "content": "{\"error\":\"The slide duration must be a whole number of seconds from 1 to 3600\"}"
   },
+  "videos: conversion status": {
+    "method": "GET",
+    "path": "/api/settings/videos/convert",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "converted": "number",
+      "current": "null",
+      "done": "number",
+      "failed": "number",
+      "finishedAt": "null",
+      "format": "null",
+      "running": "boolean",
+      "skipped": "number",
+      "total": "number"
+    }
+  },
+  "settings: bad video format": {
+    "method": "PUT",
+    "path": "/api/settings",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"videoFormat must be one of: h265, h264\"}"
+  },
   "settings: nothing to change": {
     "method": "PUT",
     "path": "/api/settings",

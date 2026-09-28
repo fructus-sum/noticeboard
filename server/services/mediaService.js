@@ -2,12 +2,15 @@
 //
 // Provides
 //   processImage(input, outDir, id) → a PNG
-//   processVideo(input, outDir, id) → an H.265 (HEVC) MP4 with AAC sound. Videos processed before
-//                                     H.265 (H.264) are left as they are (SYSTEM_DESIGN §16)
+//   processVideo(input, outDir, id, format) → an MP4 with AAC sound, its video 'h265' (HEVC, the
+//                                     default: smaller) or 'h264' (plays everywhere), as chosen in
+//                                     Settings → Display. Videos already processed keep their format
+//                                     (SYSTEM_DESIGN §16 #12)
 //   getVideoDuration(file), createThumbnail(video, outDir, id) → a still for the admin panel
+//   videoFormatOf(file) → 'h265' | 'h264' | another codec's name | null (ffprobe)
 //
 // Used by
-//   services/uploadQueue
+//   services/uploadQueue, services/videoConversion
 //
 // Uses
 //   sharp, fluent-ffmpeg (ffmpeg and ffprobe: FFMPEG_PATH / FFPROBE_PATH, else the PATH), utils/logger
@@ -25,26 +28,30 @@ async function processImage(inputPath, outDir, slideId) {
   return outFilename;
 }
 
-function processVideo(inputPath, outDir, slideId) {
+// The encoder settings for each video format: about the same quality, H.265 in a smaller file
+const VIDEO_ENCODING = {
+  h265: { codec: 'libx265', options: ['-crf 28', '-preset fast', '-tag:v hvc1', '-x265-params log-level=error'] },   // hvc1: the tag browsers expect in an MP4
+  h264: { codec: 'libx264', options: ['-crf 23', '-preset fast'] },
+};
+
+function processVideo(inputPath, outDir, slideId, format = 'h265') {
+  const encoding = VIDEO_ENCODING[format] ?? VIDEO_ENCODING.h265;
   const outFilename = `${slideId}.mp4`;
   const outPath = path.join(outDir, outFilename);
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
-      .videoCodec('libx265')
+      .videoCodec(encoding.codec)
       .audioCodec('aac')
       .outputOptions([
-        '-crf 28',                      // about the quality of H.264 at 23, in a smaller file
-        '-preset fast',
+        ...encoding.options,
         '-pix_fmt yuv420p',
-        '-tag:v hvc1',                  // the HEVC tag browsers expect in an MP4
-        '-x265-params log-level=error',
         '-movflags +faststart',
         '-map 0:v:0',
         '-map 0:a:0?',   // audio optional — handles silent videos
       ])
       .on('end', () => {
-        logger.info('Video processed', { slideId, outFilename });
+        logger.info('Video processed', { slideId, outFilename, format });
         resolve(outFilename);
       })
       .on('error', (err) => {
@@ -52,6 +59,17 @@ function processVideo(inputPath, outDir, slideId) {
         reject(err);
       })
       .save(outPath);
+  });
+}
+
+// The format a video is in, as Settings → Display names them
+function videoFormatOf(filePath) {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      const codec = metadata?.streams?.find((s) => s.codec_type === 'video')?.codec_name;
+      if (err || !codec) return resolve(null);
+      resolve({ hevc: 'h265', h264: 'h264' }[codec] ?? codec);
+    });
   });
 }
 
@@ -87,4 +105,4 @@ async function createThumbnail(videoPath, outDir, slideId) {
   return outFilename;
 }
 
-module.exports = { processImage, processVideo, getVideoDuration, createThumbnail };
+module.exports = { processImage, processVideo, getVideoDuration, createThumbnail, videoFormatOf };

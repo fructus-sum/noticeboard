@@ -1152,7 +1152,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.265 (HEVC) MP4, which keeps them small; videos uploaded before this change stay as they were (H.264). A browser that can't play H.265, such as Firefox, shows no preview of a new video in the admin panel, and a screen that can't play one skips it. Images take a few seconds. Videos take longer: a large or long video can take several minutes on a Raspberry Pi. The slide shows <span class="pill amber">processing</span> meanwhile. You don't need to wait: carry on uploading, arranging and setting up your slideshows, and the video appears by itself once it's ready.</div>
+        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.265 (HEVC) MP4, which keeps them small, or to H.264 if you choose it in <strong>Settings → Display → Video format for new uploads</strong>; videos already uploaded keep their format. A browser that can't play H.265, such as Firefox, shows no preview of a new video in the admin panel, and a screen that can't play one skips it. Images take a few seconds. Videos take longer: a large or long video can take several minutes on a Raspberry Pi. The slide shows <span class="pill amber">processing</span> meanwhile. You don't need to wait: carry on uploading, arranging and setting up your slideshows, and the video appears by itself once it's ready.</div>
       </div>
 
       <h3>Uploading a slide</h3>
@@ -1212,7 +1212,7 @@
       <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide.</p>
       <p>When one slideshow follows another on screen, each slide keeps its own slideshow's duration. And when what's on air changes (a slideshow is published, disabled, scheduled on or off, edited or reordered), the slide on screen still gets its full time before the new running order starts.</p>
 
-      <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If a slide hasn't appeared after 30 seconds (a file that won't download, a video that won't start), the display skips it, and a video that stops playing for 30 seconds is skipped too. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
+      <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If an image hasn't appeared after 30 seconds (a file that won't download), the display skips it. A video that won't play (for example one in a format the screen can't decode), won't start or stops keeps its place for its own length, then the slideshow carries on, so the timing stays as you planned it. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
 
       <h3>Reordering slides</h3>
       <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The screens pick up the new order within seconds, once the slide they're showing has had its full time.</p>
@@ -1481,6 +1481,11 @@
             <td><strong>Default image duration</strong> (Display)</td>
             <td>How many seconds each image shows, in every slideshow that doesn't set its own duration. Videos always play their full length. Updating the software never changes this setting.</td>
             <td>10 seconds</td>
+          </tr>
+          <tr>
+            <td><strong>Video format for new uploads</strong> (Display)</td>
+            <td>What uploaded videos are converted to. <strong>H.265</strong> makes files about half the size, but converting takes longer and a screen can only play it if its browser can decode it (on a Raspberry Pi, with its hardware decoder); a screen that can't shows nothing for the video's length, then carries on, and some browsers (e.g. Firefox) can't preview it. <strong>H.264</strong> plays everywhere. The card explains both and shows this warning while H.265 is chosen. Videos already uploaded keep their format until you convert them (<strong>Convert existing videos…</strong>, below the setting: one video after another, each shown as <em>processing</em> in its slideshow in its turn while the screens keep showing it as it is; it takes a long time and slows the Pi meanwhile, and the card warns about that first).</td>
+            <td>H.265</td>
           </tr>
           <tr>
             <td><strong>Location pin</strong> (Display)</td>

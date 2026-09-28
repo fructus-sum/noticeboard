@@ -240,6 +240,38 @@ test('videos play to the end; stalled, unplayable or never-starting videos are s
   assert.ok(never >= LOAD_TIMEOUT_MS && never <= LOAD_TIMEOUT_MS + WATCHDOG_MS + RETRY_MS, `never-starts gap ${never}`);
 });
 
+test('a video with a length moves on at its expected end, even if it never plays or stops', () => {
+  const withLength = { ...video('l'), length: VIDEO_MS / 1000 };
+  const run = (problem) => {
+    const { sched, log } = setup([images(1, 3)[0], withLength, images(1, 3, 'c')[0]], {
+      trouble: (s) => (s.type === 'video' ? problem : null),
+    });
+    sched.run(3 * MINUTE);
+    const at = log.findIndex((e) => e.index === 1);
+    return log[at + 1].t - log[at].t;
+  };
+  assert.equal(run(null), LOAD_MS + VIDEO_MS, 'played: moves on when it ends');
+  assert.equal(run('error'), VIDEO_MS, "can't be played: holds its place for its length");
+  assert.equal(run('never-loads'), VIDEO_MS, 'never starts: moves on at its expected end');
+  const stalled = run('stall');
+  assert.ok(stalled >= VIDEO_MS && stalled <= VIDEO_MS + GRACE_MS + WATCHDOG_MS, `stops half way: moves on around its expected end (${stalled})`);
+});
+
+test('a video with a length that buffers keeps playing past its expected end while it moves', () => {
+  const withLength = { ...video('b'), length: 10 };   // the fake video really plays for 20 s
+  const { sched, log } = setup([images(1, 3)[0], withLength, images(1, 3, 'c')[0]]);
+  sched.run(3 * MINUTE);
+  const at = log.findIndex((e) => e.index === 1);
+  assert.equal(log[at + 1].t - log[at].t, LOAD_MS + VIDEO_MS, 'it was still moving: played to its end');
+});
+
+test('an unplayable video with a length on every screen still reaches the recovery after three rounds', () => {
+  const withLength = { ...video('u'), length: 5 };
+  const { sched, stuck } = setup([withLength, { ...video('w'), length: 5 }], { trouble: () => 'error' });
+  sched.run(10 * MINUTE);
+  assert.ok(stuck.length >= 1, 'onStuck was called');
+});
+
 test('a lost timer cannot stop the slideshow: the watchdog moves on', () => {
   const { sched, log } = setup(images(3, 3));
   const realSetTimeout = sched.timers.setTimeout;

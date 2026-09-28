@@ -3,7 +3,8 @@
 // Provides
 //   enqueueProcessing({ folder, slideId, tmpPath, mime })
 //       converts the upload, marks the slide ready (or failed) and announces a new playlist
-//   enqueueThumbnail({ folder, slideId, filename })   a video's still, for the admin panel
+//   enqueueThumbnail({ folder, slideId, filename })   a video's still, for the admin panel, and its
+//       length if it has none yet (the sample's videos): the screens need it (SYSTEM_DESIGN §3.5)
 //   queueSize()
 //
 // Used by
@@ -11,7 +12,8 @@
 //
 // Uses
 //   services/mediaService, services/slideshowStore (modifySlides: locked), services/displayEvents,
-//   services/mediaTypes, utils/pathHelpers, utils/logger
+//   services/mediaTypes, services/settingsService (videoFormat: H.265 or H.264), utils/pathHelpers,
+//   utils/logger
 //
 // Change impact
 //   Uploads wait in tmp/noticeboard-uploads until processed: update.sh waits while it has a recent
@@ -21,6 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const { slidesDir } = require('../utils/pathHelpers');
 const { processImage, processVideo, getVideoDuration, createThumbnail } = require('./mediaService');
+const { videoFormat } = require('./settingsService');
 const { typeFromMime } = require('./mediaTypes');
 const store = require('./slideshowStore');
 const displayEvents = require('./displayEvents');
@@ -42,13 +45,14 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
 
   queue.add(async () => {
     const outDir = slidesDir(folder);
-    let filename, duration = null, thumbnail = null;
+    let filename, duration = null, thumbnail = null, format = null;
 
     try {
       if (type === 'image') {
         filename = await processImage(tmpPath, outDir, slideId);
       } else {
-        filename = await processVideo(tmpPath, outDir, slideId);
+        format = videoFormat();
+        filename = await processVideo(tmpPath, outDir, slideId, format);
         duration = await getVideoDuration(path.join(outDir, filename));
         // Only for the admin panel: a video without one still plays
         thumbnail = await createThumbnail(path.join(outDir, filename), outDir, slideId).catch((err) => {
@@ -57,7 +61,7 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
         });
       }
 
-      await updateSlide(folder, slideId, { filename, duration, status: 'ready', ...(thumbnail ? { thumbnail } : {}) });
+      await updateSlide(folder, slideId, { filename, duration, status: 'ready', ...(format ? { format } : {}), ...(thumbnail ? { thumbnail } : {}) });
       displayEvents.playlistChanged();
       logger.info('Slide ready', { folder, slideId, type });
     } catch (err) {
@@ -75,8 +79,18 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
 function enqueueThumbnail({ folder, slideId, filename }) {
   queue.add(async () => {
     try {
-      const thumbnail = await createThumbnail(path.join(slidesDir(folder), filename), slidesDir(folder), slideId);
+      const file = path.join(slidesDir(folder), filename);
+      const thumbnail = await createThumbnail(file, slidesDir(folder), slideId);
       await updateSlide(folder, slideId, { thumbnail, thumbnailPending: undefined, thumbnailError: undefined });
+      // A video without its length yet (the sample's): the screens use it to keep to time
+      const slide = store.readSlides(folder).slides.find((s) => s.id === slideId);
+      if (slide && slide.duration == null) {
+        const duration = await getVideoDuration(file);
+        if (duration) {
+          await updateSlide(folder, slideId, { duration });
+          displayEvents.playlistChanged();
+        }
+      }
     } catch (err) {
       await updateSlide(folder, slideId, { thumbnailPending: undefined, thumbnailError: err.message });
       logger.warn('Video thumbnail failed', { folder, slideId, err: err.message });

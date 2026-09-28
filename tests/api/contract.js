@@ -88,6 +88,8 @@ function lanAddress() {
   await a('settings: security', 'GET', '/api/settings/security', { exact: true });
   await a('settings: logo', 'GET', '/api/settings/logo');
   await a('settings: bad duration', 'PUT', '/api/settings', { body: { display: { defaultSlideDurationSeconds: 0 } }, exact: true });
+  await a('videos: conversion status', 'GET', '/api/settings/videos/convert');
+  await a('settings: bad video format', 'PUT', '/api/settings', { body: { display: { videoFormat: 'av1' } }, exact: true });
   await a('settings: nothing to change', 'PUT', '/api/settings', { body: { nope: 1 }, exact: true });
   await a('settings: display saved', 'PUT', '/api/settings', { body: { display: { defaultSlideDurationSeconds: 10, showDeviceInfo: true } } });
   await a('password: wrong current', 'PUT', '/api/settings/password', { body: { current: 'nope', newPassword: 'longenough1' }, exact: true });

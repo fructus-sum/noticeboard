@@ -7,6 +7,7 @@
 //   logo.js       /logo
 //   updates.js    /updates…, /version
 //   maintenance.js  /maintenance/… (Delete All, Restore Defaults)
+//   videos.js     /videos/convert (converting the videos already uploaded)
 //
 // Used by
 //   routes/api/index.js
@@ -18,5 +19,6 @@ router.use(require('./security'));
 router.use(require('./logo'));
 router.use(require('./updates'));
 router.use(require('./maintenance'));
+router.use(require('./videos'));
 
 module.exports = router;

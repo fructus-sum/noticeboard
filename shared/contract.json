@@ -13,6 +13,8 @@
   },
   "display": {
     "defaultBackground": "#000000",
-    "colourPattern": "^#[0-9a-fA-F]{6}$"
+    "colourPattern": "^#[0-9a-fA-F]{6}$",
+    "videoFormats": ["h265", "h264"],
+    "defaultVideoFormat": "h265"
   }
 }

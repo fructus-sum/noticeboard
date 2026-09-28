@@ -5,6 +5,11 @@
 // loads, a video that stalls, a page that was hidden, frozen or asleep). Plain JavaScript with
 // injectable timers, so the behaviour can be tested over simulated weeks.
 //
+// A video whose length the playlist gives (length, in seconds) keeps its place for that long even
+// if it can't be played (e.g. a format this screen can't decode) or stops: the slideshow moves on
+// when it ends, or at its expected end, never earlier (SYSTEM_DESIGN §3.5). A video without a
+// length (from an older server) is skipped when it fails or stalls, as before.
+//
 // Provides
 //   createSlideshowClock({ onChange, onStuck, now, timers }) → a clock: it calls onChange({ index,
 //   generation }) to show a slide, and onStuck after three whole rounds fail; the slide's events
@@ -36,7 +41,8 @@ export function createSlideshowClock({
   let pending = null;      // { slides, signature }: a new playlist, waiting for the slide on screen
   let index = 0;
   let generation = 0;      // a new number for every slide start, so the view always remounts
-  let phase = 'idle';      // idle | loading | showing | playing | retrying
+  let phase = 'idle';      // idle | loading | showing | playing | holding | retrying
+  let expectedEnd = Infinity;   // a video with a length: when the slideshow moves on at the latest
   let deadline = Infinity;
   let failures = 0;        // slides that failed in a row
   let timer = null;
@@ -62,7 +68,11 @@ export function createSlideshowClock({
     index = i;
     generation += 1;
     phase = 'loading';
-    deadline = now() + LOAD_TIMEOUT_MS;
+    const length = slides[i].type === 'video' ? slides[i].length : null;
+    expectedEnd = length > 0 ? now() + length * 1000 : Infinity;
+    deadline = expectedEnd === Infinity ? now() + LOAD_TIMEOUT_MS : expectedEnd + GRACE_MS;
+    // A video that never starts still moves on at its expected end
+    if (expectedEnd !== Infinity) schedule(length * 1000, () => { if (phase === 'loading') fail(); });
     onChange({ index, generation });
   }
 
@@ -91,6 +101,13 @@ export function createSlideshowClock({
   function fail() {
     failures += 1;
     if (failures % (slides.length * 3) === 0) onStuck(failures);
+    // A video with a length keeps its place until its expected end, then the next slide
+    if (expectedEnd !== Infinity) {
+      phase = 'holding';
+      deadline = expectedEnd + GRACE_MS;
+      schedule(Math.max(0, expectedEnd - now()), next);
+      return;
+    }
     // Skip quickly past a broken slide, but once a whole round has failed the server is
     // probably unreachable: slow down instead of spinning through slides that can't load
     const wait = failures >= slides.length ? OUTAGE_RETRY_MS : RETRY_MS;
@@ -101,8 +118,18 @@ export function createSlideshowClock({
 
   function check() {
     if (!slides.length || now() <= deadline) return;
-    if (phase === 'loading' || phase === 'playing') fail();
+    // A video with a length that hasn't ended by its expected end (plus the grace): its time is up
+    if (expectedEnd !== Infinity && phase === 'playing') next();
+    else if (phase === 'loading' || phase === 'playing') fail();
     else next();   // a timer that should have fired didn't: move on anyway
+  }
+
+  // A playing video's deadline. Without a length: a stall's time from its last movement. With one:
+  // its expected end, or, while it's still moving after that (it buffered), a moment after its last
+  // movement; a video that stopped moving goes at its expected end
+  function playingDeadline() {
+    if (expectedEnd === Infinity) return now() + STALL_TIMEOUT_MS;
+    return Math.max(expectedEnd + GRACE_MS, now() + GRACE_MS);
   }
 
   const isCurrent = (gen) => gen === generation;
@@ -132,7 +159,7 @@ export function createSlideshowClock({
     ready(gen) {
       if (!isCurrent(gen)) return;
       if (phase === 'playing') {
-        deadline = now() + STALL_TIMEOUT_MS;   // a video playing again after buffering
+        deadline = playingDeadline();   // a video playing again after buffering
         return;
       }
       if (phase !== 'loading') return;
@@ -140,7 +167,7 @@ export function createSlideshowClock({
       const slide = slides[index];
       if (slide.type === 'video') {
         phase = 'playing';
-        deadline = now() + STALL_TIMEOUT_MS;
+        deadline = playingDeadline();
       } else {
         const ms = (slide.duration ?? DEFAULT_IMAGE_SECONDS) * 1000;
         phase = 'showing';
@@ -151,7 +178,7 @@ export function createSlideshowClock({
 
     // A playing video moved forward
     progress(gen) {
-      if (isCurrent(gen) && phase === 'playing') deadline = now() + STALL_TIMEOUT_MS;
+      if (isCurrent(gen) && phase === 'playing') deadline = playingDeadline();
     },
 
     ended(gen) {
@@ -182,6 +209,6 @@ export function createSlideshowClock({
     },
 
     // For tests and debugging
-    state: () => ({ index, generation, phase, deadline, failures, waitingPlaylist: !!pending }),
+    state: () => ({ index, generation, phase, deadline, expectedEnd, failures, waitingPlaylist: !!pending }),
   };
 }
