@@ -1450,6 +1450,7 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 - A merge into main that brings new features raises MINOR (PATCH back to 0). One that only fixes bugs, or only tidies without changing what users see, raises PATCH.
 - Work in progress names the version it will become (§18's table, and the line at the top of this document). The version of main changes only when that work is merged, in the merge commit, together with this section.
 - A bug fixed on its own (§16, §18) is a patch release, listed here with what it fixed; a bug fixed inside a feature branch is listed with that version.
+- **Merged together** (the owner, 2026-09-28): the words Server and Client (§18.4) and the Known Issues fixes (§18.5) are built on `feature/audio-support` and merge into main with audio as one item, after the check on a real Pi; each keeps its own version number here, and main moves from 0.5.0 to the last of them at that merge.
 - **Each bug fix counts as its own patch number,** even when several are done together (the owner, 2026-09-28): e.g. §18.5's twelve items are 0.6.2 to 0.6.13, and wording or documentation work such as §18.4 is a patch too.
 - `package.json` (the root, `client/admin` and `client/display`) still says 1.0.0, npm's default; nothing reads it. Setting it to the version here is for the owner to decide (by hand, with the matching top entries of `package-lock.json`, never with npm install on Windows).
 
