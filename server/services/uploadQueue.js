@@ -8,7 +8,7 @@
 //   queueSize()
 //
 // Used by
-//   routes/api/slides.js, services/sampleSlideshow
+//   routes/api/slides.js, routes/api/mediaItems.js (queueSize), services/sampleSlideshow
 //
 // Uses
 //   services/mediaService, services/slideshowStore (modifySlides: locked), services/displayEvents,
@@ -22,7 +22,7 @@ const PQueue = require('p-queue').default;
 const fs = require('fs');
 const path = require('path');
 const { slidesDir } = require('../utils/pathHelpers');
-const { processImage, processVideo, getVideoDuration, createThumbnail } = require('./mediaService');
+const { processImage, processVideo, getMediaDuration, createThumbnail } = require('./mediaService');
 const { videoFormat } = require('./settingsService');
 const { typeFromMime } = require('./mediaTypes');
 const store = require('./slideshowStore');
@@ -53,7 +53,7 @@ function enqueueProcessing({ folder, slideId, tmpPath, mime }) {
       } else {
         format = videoFormat();
         filename = await processVideo(tmpPath, outDir, slideId, format);
-        duration = await getVideoDuration(path.join(outDir, filename));
+        duration = await getMediaDuration(path.join(outDir, filename));
         // Only for the admin panel: a video without one still plays
         thumbnail = await createThumbnail(path.join(outDir, filename), outDir, slideId).catch((err) => {
           logger.warn('Video thumbnail failed', { folder, slideId, err: err.message });
@@ -85,7 +85,7 @@ function enqueueThumbnail({ folder, slideId, filename }) {
       // A video without its length yet (the sample's): the screens use it to keep to time
       const slide = store.readSlides(folder).slides.find((s) => s.id === slideId);
       if (slide && slide.duration == null) {
-        const duration = await getVideoDuration(file);
+        const duration = await getMediaDuration(file);
         if (duration) {
           await updateSlide(folder, slideId, { duration });
           displayEvents.playlistChanged();

@@ -13,10 +13,11 @@
 //
 // Used by: views/SlideshowDetailView
 // It stays open while a slide or an upload has failed (a warning).
-// Uses: useApi (the slides routes), SlidePreview, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+// Uses: useApi (the slides routes), useRename, SlidePreview, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { mediaUrl, mediaDisplayName, LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
+import { useRename } from '../../composables/useRename.js';
 import SlidePreview from './SlidePreview.vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 
@@ -115,34 +116,10 @@ watch(hasProcessing, (v) => {
 }, { immediate: true });
 
 // Renaming: one slide at a time, in place of its name
-const renaming = ref(null);   // { id, value, saving, error }
-const renameInput = ref(null);
-
-async function startRename(slide) {
-  renaming.value = { id: slide.id, value: slide.name || slide.originalName || '', saving: false, error: '' };
-  await nextTick();
-  renameInput.value?.[0]?.select();
-}
-function cancelRename() {
-  renaming.value = null;
-}
-async function saveRename() {
-  const r = renaming.value;
-  if (!r || r.saving) return;
-  const slide = slides.value.find(s => s.id === r.id);
-  if (!slide) return cancelRename();
-  const name = r.value.trim();
-  if (name === (slide.name || slide.originalName || '') || (!name && !slide.name)) return cancelRename();
-  r.saving = true;
-  try {
-    const saved = await api.patch(`/slideshows/${props.folder}/slides/${r.id}`, { name });
-    slides.value = slides.value.map(s => (s.id === saved.id ? saved : s));
-    renaming.value = null;
-  } catch (e) {
-    r.saving = false;
-    r.error = e.message;
-  }
-}
+const { renaming, renameInput, startRename, cancelRename, saveRename } = useRename({
+  items: slides,
+  path: (slide) => `/slideshows/${props.folder}/slides/${slide.id}`,
+});
 
 async function deleteSlide(slide) {
   if (!confirm(`Delete “${mediaDisplayName(slide)}”?`)) return;

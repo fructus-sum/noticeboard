@@ -20,7 +20,7 @@
 //   routes/api/settings/videos.js, server/index.js (recover)
 //
 // Uses
-//   services/slideshowStore, services/mediaService (processVideo, getVideoDuration, videoFormatOf),
+//   services/slideshowStore, services/mediaService (processVideo, getMediaDuration, videoFormatOf),
 //   services/settingsService (videoFormat), services/displayEvents, utils/pathHelpers, utils/logger
 //
 // Change impact
@@ -30,7 +30,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const store = require('./slideshowStore');
-const { processVideo, getVideoDuration, videoFormatOf } = require('./mediaService');
+const { processVideo, getMediaDuration, videoFormatOf } = require('./mediaService');
 const { videoFormat } = require('./settingsService');
 const displayEvents = require('./displayEvents');
 const { slidesDir, tmpDir } = require('../utils/pathHelpers');
@@ -76,7 +76,7 @@ async function convertOne({ folder, id }, format) {
   try {
     fs.mkdirSync(work, { recursive: true });
     const made = await processVideo(source, work, `${id}-${crypto.randomBytes(3).toString('hex')}`, format);
-    const duration = await getVideoDuration(path.join(work, made));
+    const duration = await getMediaDuration(path.join(work, made));
     // Deleted meanwhile: the new file isn't needed
     const kept = await patchSlide(folder, id, () => {});
     if (!kept) return 'skipped';

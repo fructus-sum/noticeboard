@@ -6,7 +6,8 @@
 //                                     default: smaller) or 'h264' (plays everywhere), as chosen in
 //                                     Settings → Display. Videos already processed keep their format
 //                                     (SYSTEM_DESIGN §16 #12)
-//   getVideoDuration(file), createThumbnail(video, outDir, id) → a still for the admin panel
+//   getMediaDuration(file) → a video's or audio file's length in whole seconds, or null (ffprobe)
+//   createThumbnail(video, outDir, id) → a still for the admin panel
 //   videoFormatOf(file) → 'h265' | 'h264' | another codec's name | null (ffprobe)
 //
 // Used by
@@ -73,7 +74,7 @@ function videoFormatOf(filePath) {
   });
 }
 
-function getVideoDuration(filePath) {
+function getMediaDuration(filePath) {
   return new Promise((resolve) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
       if (err || !metadata?.format?.duration) return resolve(null);
@@ -86,7 +87,7 @@ function getVideoDuration(filePath) {
 // frame of the second or so starting 10% of the way in (between 1 and 5 s, so not a black
 // opening frame), at most 640 × 640 px. The video itself is only read.
 async function createThumbnail(videoPath, outDir, slideId) {
-  const seconds = await getVideoDuration(videoPath);
+  const seconds = await getMediaDuration(videoPath);
   const at = seconds ? Math.min(5, Math.max(1, seconds * 0.1), Math.max(0, seconds - 0.5)) : 0;
   const outFilename = `${slideId}-thumb.jpg`;
   await new Promise((resolve, reject) => {
@@ -105,4 +106,4 @@ async function createThumbnail(videoPath, outDir, slideId) {
   return outFilename;
 }
 
-module.exports = { processImage, processVideo, getVideoDuration, createThumbnail, videoFormatOf };
+module.exports = { processImage, processVideo, getMediaDuration, createThumbnail, videoFormatOf };

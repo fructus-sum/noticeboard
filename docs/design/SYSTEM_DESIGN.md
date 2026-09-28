@@ -116,14 +116,14 @@ noticeboard/
 │   │                          asyncRoute.js, uploads.js, passwordLimiter.js, errorHandler.js
 │   ├── realtime/              displaySocket.js (socket.io: the live connection to the displays)
 │   ├── routes/                index.js (mounting), spa.js (the apps' catch-all and "not built" page)
-│   │   └── api/               index.js, auth.js, device.js, slideshows.js, slides.js
+│   │   └── api/               index.js, auth.js, device.js, slideshows.js, slides.js, mediaItems.js (the items' routes)
 │   │       └── settings/      index.js, general.js, security.js, logo.js, updates.js, maintenance.js (the Settings page)
-│   ├── services/              configService, slideshowStore, slideshowRules, playlistService, displayEvents,
+│   ├── services/              configService, showStore, slideshowStore, slideshowRules, playlistService, displayEvents,
 │   │                          schedulerService, settingsService, adminPassword, adminSession, macService,
 │   │                          mediaService, mediaTypes, mediaNames, uploadQueue, brandingService, sampleSlideshow,
 │   │                          contentReset, actionTokens
 │   │   └── updates/           index.js, git.js, branchName.js, updateFiles.js, installerVersion.js, schedule.js
-│   ├── utils/                 pathHelpers, configIO, logger, macLookup, network, slugify, slideshowLock,
+│   ├── utils/                 pathHelpers, configIO, logger, macLookup, network, slugify, folderLock,
 │   │                          displayBuildId, systemCheck
 │   └── test/                  unit tests (node:test): foundations, installer version, Node.js version rule
 ├── shared/                    public values shared by the server and both web apps (alias @shared)
@@ -760,10 +760,13 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Uses:** slideshowStore (list, find, create, replace, remove, slideCount), slideshowRules (duration, hide rule, `isSample`, the sample message), asyncRoute, displayEvents (`playlistChanged` after a change), logger.
 
 **`routes/api/slides.js`**
-- **Purpose:** slide upload (recording each file's `originalName`), list, rename, delete, reorder, thumbnails, thin.
-- **Owns:** a slideshow-exists middleware and its multer error handler.
-- **Uses:** slideshowStore (find, readSlides, modifySlides, slideFileExists, removeSlideFiles), mediaNames (`nameFromUpload`, `cleanName`, `MAX_LENGTH`), uploads (`createUpload`: prefix `upload`, 500 MB, the media MIME types), mediaTypes, uploadQueue, asyncRoute, displayEvents, logger.
+- **Purpose:** the slides' routes: `createItemsRouter` (routes/api/mediaItems.js) with the slideshow store, the image and video types and the slides' words, plus `POST /thumbnails`.
+- **Uses:** mediaItems, slideshowStore (`store`), mediaTypes, uploadQueue (`enqueueProcessing`, `enqueueThumbnail`), asyncRoute, displayEvents, logger.
 - **Side effects:** `displayEvents.playlistChanged()` after delete and reorder.
+
+**`routes/api/mediaItems.js`**
+- **Purpose:** `createItemsRouter({ store, allowed, words, enqueue, changed, extend })`: the routes every show's items share: a show-exists check, upload (recording each file's `originalName`; 50 files, 500 MB each), list, rename, delete, reorder, and the upload error handler. Each kind passes its store, its MIME types, its words (so its messages and log lines are its own) and what to do after a change; `extend` adds its own routes.
+- **Uses:** mediaTypes (`typeFromMime`), mediaNames, uploadQueue (`queueSize`), uploads (`createUpload`), asyncRoute, logger. **Used by:** slides.js.
 
 ### 12.4 Services
 
@@ -796,7 +799,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/mediaService.js`**
 - **Purpose:** converting uploads into slides.
-- **API:** `processImage` (sharp → PNG), `processVideo(input, outDir, id, format)` (ffmpeg → H.265 MP4: libx265, CRF 28, `hvc1` tag; or H.264: libx264, CRF 23), `videoFormatOf` (ffprobe: `h265`, `h264`, …), `getVideoDuration` (ffprobe), `createThumbnail`.
+- **API:** `processImage` (sharp → PNG), `processVideo(input, outDir, id, format)` (ffmpeg → H.265 MP4: libx265, CRF 28, `hvc1` tag; or H.264: libx264, CRF 23), `videoFormatOf` (ffprobe: `h265`, `h264`, …), `getMediaDuration` (ffprobe), `createThumbnail`.
 - **Used by:** uploadQueue.
 
 **`services/mediaNames.js`**
@@ -828,10 +831,14 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Replacing the slides:** `store.modifySlides` saves the new list first; the old files are deleted after, so `slideshow.json` never points at missing files. The config (entries + `sampleSlideshow`, without the older flag) is written in one `store.commitEntries`.
 - **Uses:** slideshowStore, mediaTypes (which sample files are slides), configService (`sampleSlideshow`), pathHelpers, slugify, uploadQueue, logger.
 
+**`services/showStore.js`**
+- **Purpose:** `createShowStore({ kind, configKey, rootDir, fileName, itemsKey, mediaDirName, fallbackSlug, newEntry })`: one owner for a kind of show's entries (`config[configKey]`) and folders (the JSON file with its items, and the items' files): `list`, `find`, `create`, `replace`, `remove`, `removeMany`, `commitEntries`, `readItems`, `modifyItems` (locked per `<kind>:<folder>`, written only when changed), `itemCount`, `itemFileExists`, `removeItemFiles`, `mediaDir`.
+- **Uses:** configService, configIO, folderLock, slugify. **Used by:** slideshowStore.
+
 **`services/slideshowStore.js`**
-- **Purpose:** the one owner of the slideshow entries (`config.slideshows`) and each `data/slideshows/<folder>/` (its `slideshow.json` and `slides/`).
+- **Purpose:** the one owner of the slideshow entries (`config.slideshows`) and each `data/slideshows/<folder>/` (its `slideshow.json` and `slides/`): a show store with the slideshows' settings, under the names below; `store` is the show store itself, for code shared by every kind.
 - **API:** `list`, `find`, `create` (folder, `slides/`, an empty `slideshow.json`, an unpublished entry with the next priority), `replace`, `removeMany` (the entries in one config write, then their folders), `remove` (entry, then folder), `commitEntries(entries, other)`, `readSlides` (missing/broken → no slides; other keys kept; no slides list → no slides), `modifySlides(folder, fn)` (locked; written only if fn changed the data), `slideCount`, `slideFileExists`, `removeSlideFiles`.
-- **Uses:** configService, configIO, slideshowLock, pathHelpers, slugify.
+- **Uses:** showStore, pathHelpers (`slideshowsDir`).
 - **Used by:** slideshows and slides routes, uploadQueue, sampleSlideshow, schedulerService, playlistService.
 
 **`services/videoConversion.js`**
@@ -894,10 +901,10 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** device.js, settings/general.js, macLookup, macService.
 
 **`utils/slugify.js`**
-- **Purpose:** `slugify`, and `uniqueSlug`, which checks folder existence under `data/slideshows`.
+- **Purpose:** `slugify(name, fallback)`, and `uniqueSlug(name, { dir, fallback })`, which checks folder existence under `dir` (`data/slideshows` by default).
 
-**`utils/slideshowLock.js`**
-- **Purpose:** `withSlideshowLock(folder, fn)`, a per-folder promise chain. Only slideshowStore uses it.
+**`utils/folderLock.js`**
+- **Purpose:** `withFolderLock(key, fn)`, a per-key promise chain. Only showStore uses it (keys `<kind>:<folder>`).
 
 **`utils/displayBuildId.js`**
 - **Purpose:** a hash of the built display `index.html`.
@@ -936,6 +943,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `App.vue` | the layout: the sidebar, the warnings and the updater's notices (every page but the login page), then the page | NavBar, DefaultPasswordWarning, UpdateNotice, InstallerNotice, UpdateAvailableNotice, useNav | |
 | `composables/useApi.js` | one `request` core behind `api.get/post/put/patch/del/upload`; a 401 → the login page, unless `redirectOn401: false` (then thrown like any error); errors carry `status` and `serverMessage` | none | |
 | `composables/useSlideshowActions.js` | `setEnabled`, `setHidden` (errors shown in an alert) with `toggling` / `hiding` busy state | useApi | |
+| `composables/useRename.js` | `useRename({ items, path })` → `{ renaming, renameInput, startRename, cancelRename, saveRename }`: renaming an item of a list in place (D38) | useApi | used by SlideList |
 | `composables/useFlash.js` | a reactive `{ text, tone, ok(text, clearAfterMs), error(text), clear() }` for "Saved." and error messages | none | |
 | `composables/useUpdateInfo.js` | the Software updates data: `GET /settings/updates` and `/branches`, polling every 3 s while an update runs or the server restarts, reloading the page when another version runs; helpers `short`, `when`, `runningName`, `canSwitch`, `missingSoftware` | useApi | |
 | `composables/useBranding.js`, `useSecurity.js`, `useNav.js` | shared singleton state | useApi / localStorage | |
@@ -1020,7 +1028,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `broadcastPlaylist` (inside displaySocket) | realtime/displaySocket.js | scheduler `'update'`, `displayEvents.playlistChanged` (slideshows PUT, slide DELETE/reorder, uploadQueue) | buildPlaylist, io.emit | as above | socket emit | every display |
 | `broadcastDisplaySettings` (inside displaySocket) | realtime/displaySocket.js | config `'change'`, `displayEvents.displaySettingsChanged` (logo), the installer and update state (every 5 minutes, and when a display connects) | services/displaySettings (`current`, `refresh`) | config, logo mtime, installer.json, update-check.json, update-schedule.env | socket emit (deduplicated) | pin and logo on the displays |
 | `macService.resolveRequest` | services/macService.js | macFilter, adminAuth | macLookup, isMacApproved | config.macFiltering, ARP | none | who can reach anything; `/settings/my-device` via `req.clientMac` |
-| `store.modifySlides` | services/slideshowStore.js | slides.js (4×), uploadQueue.updateSlide, sampleSlideshow.replaceSlides | withSlideshowLock, readSlides, writeConfig | slideshow.json | writes it only when changed | every change to a slideshow's slides; the lock prevents lost writes |
+| `store.modifySlides` | services/slideshowStore.js | mediaItems (4×), slides.js (thumbnails), uploadQueue.updateSlide, sampleSlideshow.replaceSlides, videoConversion | withFolderLock, readSlides, writeConfig | slideshow.json | writes it only when changed | every change to a slideshow's slides; the lock prevents lost writes |
 | `writeConfig` | utils/configIO.js | configService, slideshowStore | fs | none | atomic JSON write (`.tmp` + rename) | every persisted JSON written by Node |
 | `enqueueProcessing` | services/uploadQueue.js | slides.js POST | mediaService, updateSlide (store.modifySlides), displayEvents.playlistChanged | tmp upload | media file, slideshow.json, deletes the tmp file | upload pipeline; update.sh's upload-wait |
 | `syncSampleSlideshow` | services/sampleSlideshow.js | index.js | uniqueSlug, replaceSlides (store.modifySlides), store.commitEntries, enqueueThumbnail | sample-data, config | copies files, writes slideshow.json and config | sample behaviour after every update |
@@ -1047,8 +1055,8 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 
 | # | Behaviour | Where it lives | Notes |
 |---|---|---|---|
-| D1 | Read `slideshow.json` | `slideshowStore.readSlides`, the only reader | A missing or unparseable file, or one without a slides list, gives no slides; other keys are kept. |
-| D2 | Write `slideshow.json` | `slideshowStore` (`create`, `modifySlides`), atomic | `modifySlides` is locked per slideshow and writes only when something changed. |
+| D1 | Read `slideshow.json` (and any show's JSON file) | `slideshowStore.readSlides` (`showStore.readItems`), the only reader | A missing or unparseable file, or one without a slides list, gives no slides; other keys are kept. |
+| D2 | Write `slideshow.json` (and any show's JSON file) | `slideshowStore` (`create`, `modifySlides`), i.e. `showStore`, atomic | `modifySlides` is locked per slideshow and writes only when something changed. |
 | D3 | The slideshow entries in `config.slideshows` | `slideshowStore` (`list`, `find`, and the writes) | |
 | D4 | Slide duration rule (whole seconds, 1–3600) | `shared/contract.json` `limits.slideSeconds`: the server checks it (`slideshowRules.parseSlideSeconds`), the admin inputs use it (`LIMITS`) | `null` is allowed only for a slideshow's own duration (use the default). |
 | D5 | Image duration fallback, 10 s | `config/defaults.js` (a new config), playlistService (`?? 10`), slideshowClock (`DEFAULT_IMAGE_SECONDS`), the admin panel (`?? 10` until the settings arrive) | Only fallbacks: the saved setting always wins. |
@@ -1249,7 +1257,7 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 - Delete All and Restore Defaults include audio shows.
 
 **Phases** (each designed here in detail before its code, tested with every group and committed):
-1. Foundations with no visible change: the store factory, the item-route factory, the shared rename field, `getMediaDuration`. Every snapshot must stay identical.
+1. **Done:** foundations with no visible change: the store factory (`services/showStore.js`), the item-route factory (`routes/api/mediaItems.js`), the shared rename (`composables/useRename.js`), `getMediaDuration`. Every snapshot stayed identical.
 2. Audio shows in the admin panel: store, routes, `/audio`, processing, pages, track preview.
 3. The audio engine and the show preview; a crossfade test on a real Pi (if it isn't smooth there, "no transition" stays and the limit is documented).
 4. Background audio on the screens, and the installer bump.

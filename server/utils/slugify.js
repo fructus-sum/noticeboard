@@ -1,19 +1,21 @@
-// server/utils/slugify.js — folder names for new slideshows
+// server/utils/slugify.js — folder names for new shows (slideshows, audio shows)
 //
 // Provides
-//   slugify(name) → lower-case letters, digits and hyphens
-//   uniqueSlug(name) → a slug no existing folder in data/slideshows uses (adds -2, -3…)
+//   slugify(name, fallback) → lower-case letters, digits and hyphens (fallback when nothing is left;
+//                             'slideshow' unless given)
+//   uniqueSlug(name, { dir, fallback }) → a slug no existing folder in dir uses (adds -2, -3…);
+//                             dir is data/slideshows unless given
 //
 // Used by
-//   services/slideshowStore (create), services/sampleSlideshow
+//   services/showStore (create), services/sampleSlideshow
 //
 // Uses
-//   utils/pathHelpers (slideshowsDir, for uniqueSlug)
+//   utils/pathHelpers (slideshowsDir, the default folder for uniqueSlug)
 const fs = require('fs');
 const path = require('path');
 const { slideshowsDir } = require('./pathHelpers');
 
-function slugify(name) {
+function slugify(name, fallback = 'slideshow') {
   return (
     name
       .toLowerCase()
@@ -21,13 +23,12 @@ function slugify(name) {
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') || 'slideshow'
+      .replace(/^-|-$/g, '') || fallback
   );
 }
 
-function uniqueSlug(name) {
-  const base = slugify(name);
-  const dir = slideshowsDir();
+function uniqueSlug(name, { dir = slideshowsDir(), fallback } = {}) {
+  const base = slugify(name, fallback);
 
   if (!fs.existsSync(path.join(dir, base))) return base;
 
