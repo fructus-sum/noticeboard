@@ -73,7 +73,8 @@ function setup() {
   // Stand-ins for update.sh
   const bin = path.join(T, 'bin');
   fs.mkdirSync(bin);
-  const script = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`);
+  // Executable: Linux only runs a stand-in on the PATH if it is (Windows doesn't care)
+  const script = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
   // A new (made-up, out of range) server PID after every look, as if systemd restarted it
   script('systemctl', `case "$1" in is-active) echo active ;; show) n=$(cat "$(dirname "$0")/pid" 2>/dev/null || echo 3999000); echo "$n"; echo $((n + 1)) > "$(dirname "$0")/pid" ;; esac`);
   script('npm', '[ "$1" = run ] && [ -f BUILD_FAILS ] && exit 1\nexit 0');

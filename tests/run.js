@@ -130,16 +130,20 @@ async function runGroup(group, filter) {
     chrome = await startChrome();
     if (!chrome) return files.map((f) => ({ name: path.basename(f), result: 'skipped (no Chrome)' }));
   }
+  // The browser tests talk to Chrome through the global WebSocket, which Node.js 20 (what the Pi
+  // runs, and CI) only has behind a flag
+  const nodeArgs = group === 'browser' && typeof WebSocket === 'undefined' ? ['--experimental-websocket'] : [];
   try {
     for (const file of files) {
       console.log(`\n━━ ${group}/${path.basename(file)}`);
-      let { code, how, crashed, ms } = await run(isShell ? bash : process.execPath, [file]);
+      const args = isShell ? [file] : [...nodeArgs, file];
+      let { code, how, crashed, ms } = await run(isShell ? bash : process.execPath, args);
       if (code !== 0) console.log(`(${path.basename(file)} ended: ${how})`);
       let note = code === 0 ? '' : how;
       if (crashed) {
         console.log(`(${path.basename(file)}: the process crashed rather than failing a check; running it once more)`);
         const first = how;
-        const again = await run(isShell ? bash : process.execPath, [file]);
+        const again = await run(isShell ? bash : process.execPath, args);
         ({ code, how } = again);
         ms += again.ms;
         if (code !== 0) console.log(`(${path.basename(file)} ended: ${how})`);

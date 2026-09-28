@@ -33,7 +33,11 @@ stubs() {
 }
 
 # ── Server, re-run on an existing install (Enter accepts the default) ──
-git clone -q "$REPO" "$T/opt-noticeboard" 2>/dev/null
+# Its GitHub: a bare copy of this repository whose main is the commit checked out here (a CI
+# checkout has no local main branch)
+git clone -q --bare "$REPO" "$T/origin.git" 2>/dev/null
+git -C "$T/origin.git" update-ref refs/heads/main "$(git -C "$REPO" rev-parse HEAD)"
+git clone -q "$T/origin.git" "$T/opt-noticeboard" 2>/dev/null
 (
   load_installer
   stubs

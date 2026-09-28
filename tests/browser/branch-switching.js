@@ -68,7 +68,8 @@ function setup() {
   fs.writeFileSync(path.join(SYSTEMD, 'paths.target.wants/noticeboard-update.path'), '');
   const bin = path.join(T, 'bin');
   fs.mkdirSync(bin);
-  const script = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`);
+  // Executable: Linux only runs a stand-in on the PATH if it is (Windows doesn't care)
+  const script = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
   script('systemctl', 'case "$1" in is-active) echo active ;; show) n=$(cat "$(dirname "$0")/pid" 2>/dev/null || echo 3999000); echo "$n"; echo $((n + 1)) > "$(dirname "$0")/pid" ;; esac');
   script('npm', 'exit 0');
   script('curl', 'case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac\nexit 0');
