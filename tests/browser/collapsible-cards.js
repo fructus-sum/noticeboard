@@ -25,7 +25,7 @@ const state = (title) => `(() => { const c = ${card(title)}; if (!c) return null
   await c.go(`${env.base}/admin/settings`);
   await c.until(`document.querySelectorAll('section.card .card-toggle').length === 6`);
   const titles = await c.evaluate(`[...document.querySelectorAll('.card-toggle')].map((t) => t.textContent.trim())`);
-  check('the six Settings cards can fold', titles.join('|') === 'Display|MAC filtering|Branding|Change password|Software updates|Delete content', titles.join('|'));
+  check('the seven Settings cards can fold', titles.join('|') === 'Display|MAC filtering|Port|Branding|Change password|Software updates|Delete content', titles.join('|'));
   check('every card starts open', (await c.evaluate(`[...document.querySelectorAll('.card-toggle')].every((t) => t.getAttribute('aria-expanded') === 'true')`)));
 
   // Fold Display and Branding
