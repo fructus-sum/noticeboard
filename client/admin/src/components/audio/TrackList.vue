@@ -23,7 +23,7 @@ const props = defineProps({
 });
 const tracks = defineModel('tracks', { type: Array, required: true });
 
-const { fileInput, uploading, uploadErr, uploadCount, upload, remove, move, stop } = useItemList({
+const { fileInput, uploading, uploadErr, uploadCount, upload, remove, move, moveErr, stop } = useItemList({
   items: tracks,
   path: () => `/audioshows/${props.folder}/tracks`,
 });
@@ -33,7 +33,7 @@ const { renaming, renameInput, startRename, cancelRename, saveRename } = useRena
 });
 
 // Something the admin must see: a track that failed to process, or an upload that failed
-const attention = computed(() => !!uploadErr.value || tracks.value.some(t => t.status === 'error'));
+const attention = computed(() => !!uploadErr.value || !!moveErr.value || tracks.value.some(t => t.status === 'error'));
 
 const length = (seconds) => (seconds == null ? '' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
 
@@ -63,6 +63,7 @@ onUnmounted(() => {
   <CollapsibleCard :title="`Tracks (${tracks.length})`" name="audio-tracks" :attention="attention">
     <template #actions>
       <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
+      <span v-if="moveErr" class="error-msg move-error">{{ moveErr }}</span>
       <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
         {{ uploading ? `Uploading${uploadCount > 1 ? ` ${uploadCount} files` : ''}…` : '+ Upload' }}
         <input ref="fileInput" type="file" accept="audio/*" multiple style="display:none" :disabled="uploading" @change="upload" />

@@ -30,7 +30,7 @@ const slides = defineModel('slides', { type: Array, required: true });
 // Upload, reloading while a slide is processed or its thumbnail made, delete, reorder
 const {
   load: loadSlides, fileInput, uploading, uploadErr, uploadCount, upload: uploadFile,
-  remove: deleteSlide, move, stop,
+  remove: deleteSlide, move, moveErr, stop,
 } = useItemList({
   items: slides,
   path: () => `/slideshows/${props.folder}/slides`,
@@ -83,7 +83,7 @@ async function createThumbnails() {
 }
 
 // Something the admin must see: a slide that failed to process, or an upload that failed
-const attention = computed(() => !!uploadErr.value || slides.value.some(s => s.status === 'error'));
+const attention = computed(() => !!uploadErr.value || !!moveErr.value || slides.value.some(s => s.status === 'error'));
 
 // Renaming: one slide at a time, in place of its name
 const { renaming, renameInput, startRename, cancelRename, saveRename } = useRename({
@@ -103,6 +103,7 @@ onUnmounted(() => {
   <CollapsibleCard :title="`Slides (${slides.length})`" name="slideshow-slides" :attention="attention">
     <template #actions>
         <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
+        <span v-if="moveErr" class="error-msg move-error">{{ moveErr }}</span>
         <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
           {{ uploading ? `Uploading${uploadCount > 1 ? ` ${uploadCount} files` : ''}…` : '+ Upload' }}
           <input ref="fileInput" type="file" accept="image/*,video/*" multiple style="display:none" :disabled="uploading" @change="uploadFile" />

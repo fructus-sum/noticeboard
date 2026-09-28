@@ -2,9 +2,10 @@
 //
 // What every item list does: reload it, upload several files at once, reload every 2 seconds while
 // an item is being processed (or `busy` says so), delete one (after a question naming it), and move
-// one up or down (the new order is saved; a failure is ignored, SYSTEM_DESIGN §16 #7).
+// one up or down (the new order is saved; if saving fails, moveErr says so and the list is loaded
+// again, so what's shown is what's saved: SYSTEM_DESIGN §18.5 item 7).
 // Provides: useItemList({ items, path, busy }) → { load(), fileInput, uploading, uploadErr,
-//   uploadCount, upload(event), remove(item), move(index, dir), stop() }. `items` is the list (a
+//   uploadCount, upload(event), remove(item), move(index, dir), moveErr, stop() }. `items` is the list (a
 //   ref, e.g. a v-model); `path()` is the list's API path, e.g. /slideshows/<folder>/slides;
 //   `busy(item)` adds to "processing" what keeps the list reloading (e.g. a thumbnail being made).
 //   Call stop() when the component goes (it clears the reload timer).
@@ -67,13 +68,20 @@ export function useItemList({ items, path, busy = () => false }) {
     }
   }
 
+  const moveErr = ref('');
   async function move(index, dir) {
     const list = [...items.value];
     const target = index + dir;
     if (target < 0 || target >= list.length) return;
     [list[index], list[target]] = [list[target], list[index]];
     items.value = list;
-    await api.put(`${path()}/reorder`, { order: list.map(s => s.id) }).catch(() => {});
+    moveErr.value = '';
+    try {
+      await api.put(`${path()}/reorder`, { order: list.map(s => s.id) });
+    } catch (e) {
+      moveErr.value = `Couldn't save the new order: ${e.message} The list shows the order that is saved.`;
+      await load().catch(() => {});
+    }
   }
 
   function stop() {
@@ -81,5 +89,5 @@ export function useItemList({ items, path, busy = () => false }) {
     pollTimer = null;
   }
 
-  return { load, fileInput, uploading, uploadErr, uploadCount, upload, remove, move, stop };
+  return { load, fileInput, uploading, uploadErr, uploadCount, upload, remove, move, moveErr, stop };
 }
