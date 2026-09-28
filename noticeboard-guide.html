@@ -1436,7 +1436,23 @@
         <li>Staff Room Display: <code>192.168.1.22</code></li>
       </ul>
       <p>All of these devices are connected to the same local network. When one of the displays connects to Noticeboard, the server can identify its IP address and determine its MAC address from the local network. Noticeboard can then use that MAC address for MAC address filtering: deciding which devices can see the slideshows and the admin panel.</p>
-      <p><strong>Devices on different networks.</strong> If a display is located behind another router or on a different routed network, the Noticeboard server may only see the router rather than the individual display's MAC address. In that situation, MAC address filtering may not work for that device. For installations using MAC address filtering, keep the Noticeboard server and display devices on the same local network.</p>
+      <div class="callout warning">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body">
+          <strong>Limitations while MAC filtering is on.</strong> MAC filtering is off by default, and none of this applies then.
+          <ul style="margin:8px 0 0 18px;line-height:1.6">
+            <li><strong>A device on another network is blocked.</strong> A device behind another router, on a different VLAN or subnet, or connected over a VPN reaches the server through a router, so the server can't see its MAC address and treats it as not approved: it gets "Not Found" for the slideshow and the admin panel. A remote display Pi stays on its waiting screen. Adding the MAC address the device shows doesn't help, because the server never sees it.</li>
+            <li><strong>Behind a router that shares one address (NAT), every device looks the same.</strong> The server sees only that router's MAC address, so approving it approves every device behind that router, not just one display.</li>
+            <li><strong>Some Wi-Fi range extenders (repeaters) do the same:</strong> they replace each device's MAC address with their own. Mesh Wi-Fi systems normally don't.</li>
+            <li><strong>This includes the devices you manage it from.</strong> MAC filtering also guards the admin panel, so a computer or phone on another network is locked out too. The server Pi itself is always allowed.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body"><strong>Recommended: one network for everything.</strong> When using MAC filtering, put the Noticeboard server, every display and the computers or phones you manage it from on the same local network: the same subnet, or the same VLAN if your network uses VLANs. Devices on different VLANs are routed between them, so they have the same limitations as separate networks. If some displays have to be on another network, leave MAC filtering off.</div>
+      </div>
 
       <h3>Enabling MAC filtering and adding a device</h3>
       <div class="steps">
@@ -1471,7 +1487,7 @@
 
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
-        <div class="callout-body"><strong>Add your own device to the approved list before enabling MAC filtering.</strong> If you enable it without adding the browser you're using, you will be locked out of the admin panel. If this happens, SSH into the Pi, edit <code>/opt/noticeboard/data/config.json</code>, and set <code>"enabled": false</code> in the <code>macFiltering</code> section, then restart the service.</div>
+        <div class="callout-body"><strong>Add your own device to the approved list before enabling MAC filtering</strong>, and make sure it's on the same local network as the server (see <a href="#mac-network" style="color:var(--amber)">MAC address network requirements</a>). If you enable it without adding the browser you're using, you will be locked out of the admin panel. If this happens, SSH into the Pi, edit <code>/opt/noticeboard/data/config.json</code>, and set <code>"enabled": false</code> in the <code>macFiltering</code> section, then restart the service.</div>
       </div>
 
       <p>When you tick <strong>Enable MAC filter</strong>, a pop-up reminds you of this before anything changes. If the noticeboard can tell the MAC address of the device you're using, the pop-up shows it with an <strong>Add it to the list</strong> button. <strong>How to find your MAC address</strong> opens simple steps for Windows, Mac and Linux; its <strong>OK</strong> takes you back. <strong>Cancel</strong> unticks the box, and <strong>Turn on MAC filtering</strong> keeps it ticked: filtering starts when you click <strong>Save</strong>. Addresses copied from Windows, with dashes, are fine.</p>

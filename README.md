@@ -48,7 +48,14 @@ For example:
 
 If these devices are on the same local network, the server can identify the displays by their MAC addresses and apply the filtering.
 
-Devices located behind another router or on a different routed network may not have their MAC address visible to the Noticeboard server.
+**Limitations while MAC filtering is on** (it's off by default, and none of this applies then):
+
+- **A device on another network is blocked.** A device behind another router, on a different VLAN or subnet, or connected over a VPN reaches the server through a router, so the server can't see its MAC address and treats it as not approved: it gets "Not Found" for the slideshow and the admin panel. Adding the MAC address the device shows doesn't help, because the server never sees it.
+- **Behind a router that shares one address (NAT), every device looks the same.** The server sees only that router's MAC address, so approving it approves every device behind that router.
+- **Some Wi-Fi range extenders (repeaters) do the same:** they replace each device's MAC address with their own. Mesh Wi-Fi systems normally don't.
+- **This includes the devices you manage it from.** Filtering also guards the admin panel, so a computer or phone on another network is locked out too. The server Pi itself is always allowed.
+
+**Recommendation:** when using MAC filtering, put the Noticeboard server, every display and the devices you manage it from on the same local network: the same subnet, or the same VLAN if your network uses VLANs. Devices on different VLANs are routed between them, so they have the same limitations as separate networks.
 
 ## Installation
 
