@@ -4,6 +4,8 @@
 
 **Keeping it up to date:** every planned change starts in §18, before any code. Then change this document in the same commit as the code it describes, so it is always a live view of the software and of the work in progress. Code comments refer to it as `SYSTEM_DESIGN §<n>`, and to the entries of §14 by their D-number: when a number changes, update those comments too (search the code for `SYSTEM_DESIGN`).
 
+**Version:** main is **0.5.0**; `feature/audio-support` will be **0.6.0** ("Audio"). 1.0.0 is the version with Display Groups. The rules and the history are in §19.
+
 **Module headers:** every module starts with a header in this form (`//` comments in JavaScript and inside a Vue file's `<script setup>`, `#` in bash). Comments inside a module explain intent, compatibility constraints and anything non-obvious, not what each line does.
 
 ```
@@ -49,6 +51,7 @@
 16. [Known issues](#16-known-issues)
 17. [Tests](#17-tests)
 18. [Planned and in-progress changes](#18-planned-and-in-progress-changes)
+19. [Versions](#19-versions)
 
 ---
 
@@ -1243,11 +1246,11 @@ The snapshot files in `tests/fixtures/` were recorded from known-good code. They
 
 Every planned change starts here, before any code: what changes and why, the parts affected, the risks to existing users and installed Pis, and how it will be tested. A change to behaviour or structure is reviewed with the owner before coding. Once it's done, the sections above describe it and it leaves this list.
 
-| # | Change | Status |
-|---|---|---|
-| 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
-| 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
-| 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | In progress on `feature/audio-support`, in phases (approved by the owner 2026-09-28) |
+| # | Change | Status | Version (§19) |
+|---|---|---|---|
+| 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again | a patch release when fixed |
+| 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) | a patch release when done |
+| 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | In progress on `feature/audio-support`, in phases (approved by the owner 2026-09-28) | 0.6.0 |
 
 Design notes D44–D47 are reserved for 18.3.
 
@@ -1303,11 +1306,46 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 1. **Done:** foundations with no visible change: the store factory (`services/showStore.js`), the item-route factory (`routes/api/mediaItems.js`), the shared rename (`composables/useRename.js`), `getMediaDuration`. Every snapshot stayed identical.
 2. **Done:** audio shows in the admin panel: store, routes, `/audio`, processing with loudness levelling, pages, track preview (D44).
 3. **Done:** the audio engine (`shared/audioPlayer.mjs`, 12 unit tests over simulated time) and "Preview the show" (`ShowPreview.vue`). **Still to check on a real Pi:** crossfades on the server screen and a remote display (smoothness, CPU); if they aren't smooth there, "no transition" stays and the limit is documented.
-4. Background audio on the screens, and the installer bump.
+4. Background audio on the screens, and the installer bump (in progress; the detail below).
 5. Video sound.
 6. Event audio.
 7. Delete All, Restore Defaults and the documents.
 
+**Phase 4 in detail: background audio on the screens**
+- **A slideshow's audio show:** a slideshow entry gains `audioShow` (an audio show's folder), stored only when one is chosen, so slideshows without audio keep their exact data (the data-files test). `PUT /api/slideshows/:folder` takes `audioShow` (a folder or null for none); `slideshowRules.parseAudioShow` refuses a folder that isn't an audio show ("Choose an audio show that exists"). Any audio show can be chosen through the API; the admin panel offers the published ones, plus the current choice if it has since been unpublished (marked "not published: silent until it is published again").
+- **Deleting an audio show** also clears it from the slideshows that chose it, in the same config write (`showStore.remove(folder, other)` gains the other keys to write with it), so a later show with the same name doesn't take its place.
+- **What the screens are told:** `services/audioPlaylist.js` `buildAudio()` → `{ shows: { <audio folder>: { id, order, transition, fadeSeconds, volume, tracks: [{ url, length }] } }, slideshows: { <slideshow folder>: <audio folder> }, event: null }`. Only published audio shows with at least one ready track are in `shows`, and only slideshows whose audio show is in `shows` are in `slideshows` (published or not: which slideshows are on air is the playlist's job). `event` stays null until phase 6. The shape of each show is exactly what `shared/audioPlayer.mjs` takes.
+- **The socket:** a new event, `audio:update` (`socketEvents.AUDIO_UPDATE` in the contract), sent to a display with its playlist on `display:ready`, and to all when it changes: on a config `change` (a slideshow's audio show, an audio show's settings, publishing, deleting) and on `displayEvents.audioChanged()` (a track ready, renamed, reordered or deleted), only when it differs from the last one sent (like `display:settings`). Older viewers ignore an event they don't know.
+- **The viewer:** `useSocket` gains `audio` (the last `audio:update`, empty until one arrives). `SlideShow.vue` emits `on-air` with the slideshow of the slide on screen (the playlist's `slideshow` key); App.vue keeps it (null while the waiting screen shows) and gives it with `audio` to a new `BackgroundAudio.vue` (no markup), which calls `player.setShow(audio.shows[audio.slideshows[onAir]] ?? null)` on the engine. So a change of slideshow switches the audio at once with the new show's transition, a slideshow without audio fades it out, and two slideshows on the same audio show carry on without a break. A refused play (a kiosk not yet allowed sound, or an ordinary browser tab) stays silent and tries again every minute, or at once when someone clicks or presses a key on the screen (the engine gains `retryNow()`).
+- **The kiosk:** both kiosk scripts (`installers/kiosk/server.sh`, `display.sh`) add `--autoplay-policy=no-user-gesture-required` to the browser's flags. `INSTALLER_VERSION` 3, with `installer.version` 3 and a changes line ("Background audio: the kiosk may play sound", displays: true) in system-requirements.json, and the golden files re-recorded on purpose. Until a Pi's installer runs again its screens stay silent and the admin panel asks for the installer run as it does today; nothing else changes.
+- **Admin panel:** SlideshowSettingsCard shows "Background audio" (the show's name, or None) and has a "Background audio" select in its form (GET /api/audioshows for the choices). The guide explains choosing it, that the sound comes out of the screen's usual output (HDMI on most TVs), and that a Pi needs its installer run again first.
+- **Risks:** the playlist and `display:settings` are unchanged; `audio:update` is new, so open screens and older viewers are unaffected; a screen reloads onto the new viewer as after any update. The admin pages' look snapshot gains the "Background audio" fact (re-recorded on purpose); the socket-events recording gains `audio:update` after the playlist on connect.
+- **Tests:** unit: `retryNow`; api: `audio:update` payloads (published only, ready tracks only, a slideshow's choice, deleting clears it, only sent when changed), `audioShow` validation, the contract gaining the new event; browser: the select and the fact, and a viewer following a slideshow change (the audio elements' sources, as far as a headless browser can tell); installers: the flag in both kiosk scripts, the golden files, installer version 3.
+
 **Risks:** the installer bump asks every Pi for an installer run (the owner accepted it); the playlist and `display:settings` only gain keys, and `audio:update` is new, so open screens and older viewers are unaffected; slideshows' data stays byte-for-byte the same (the data-files test).
 
 **Tests:** `audioPlayer` and `audioEvents` unit tests over simulated time; api tests for audio shows, tracks, processing (ffprobe), `/audio` and `audio:update`; browser tests for the pages, the preview, the slideshow and video settings, the event card; the golden files and installer version for the kiosk flag; the upgrade rehearsal.
+
+---
+
+## 19. Versions
+
+**Rules** (the owner, 2026-09-28)
+- Versions are MAJOR.MINOR.PATCH. **1.0.0 is the version with Display Groups**; until then they are 0.x.
+- A merge into main that brings new features raises MINOR (PATCH back to 0). One that only fixes bugs, or only tidies without changing what users see, raises PATCH.
+- Work in progress names the version it will become (§18's table, and the line at the top of this document). The version of main changes only when that work is merged, in the merge commit, together with this section.
+- A bug fixed on its own (§16, §18) is a patch release, listed here with what it fixed; a bug fixed inside a feature branch is listed with that version.
+- `package.json` (the root, `client/admin` and `client/display`) still says 1.0.0, npm's default; nothing reads it. Setting it to the version here is for the owner to decide (by hand, with the matching top entries of `package-lock.json`, never with npm install on Windows).
+
+**Current:** main is **0.5.0**. In progress: **0.6.0** "Audio" on `feature/audio-support` (§18.3; phases 1–3 done, 4 in progress).
+
+**History** (numbered after the fact for everything before 0.6.0)
+
+| Version | Date | Reached main | What it brought | Bugs fixed |
+|---|---|---|---|---|
+| 0.1.0 | 2026-04-28 | direct commits | The prototype: the server foundation (config, MAC filter, routing), the admin panel, multiple file uploads | |
+| 0.2.0 | 2026-09-26 | direct commits | Installable and unattended: one installer with auto-update and a sudo check, fast restart and display reload after updates, the device address button, the sample slideshow and "No slideshow published" screen, the user guide in the admin panel, displays that keep cycling for months, choosing the update branch in the admin panel and returning to main after a merge, the optional firewall check, the kiosk only for the viewer with an exit button, system-requirements.json | the kiosk on newer Raspberry Pi OS; slides stuck on processing when several were uploaded at once; the admin login page reloading itself endlessly |
+| 0.3.0 | 2026-09-27 | PR #1 "QALife updates" (8c39d54), then fc4ba53 | The viewer's exit control, location pin setting, cursor hiding and logo; the password warning; the admin at /admin on one port; slideshow durations, hide and unhide, sample protection, previews and video thumbnails; the admin panel on phones; the MAC filtering warning; the software check before switching branch; "run the installer again" notices; the sidebar's "Last updated" | |
+| 0.4.0 | 2026-09-27 | PR #2 "Reorganise the code…" (3b4f77c) | The refactor (12 stages, the test suite in the repository, the System Design); slides that always fit the screen on a background colour; the updater's warnings on every admin page and a warning mark on every screen | the location pin's pop-up pointing the public to the admin panel |
+| 0.5.0 | 2026-09-28 | merge of QALife-updates (e2deb54) | Slide names; admin cards that fold to their title; Delete All; the update schedule; Restore Defaults; new videos in H.265 with a format setting, converting existing videos, and videos keeping to time; module comments brought up to date; MAC filtering's network requirements in the README and Help | the merged-notice test failing on a clean working tree |
+| 0.6.0 | in progress | `feature/audio-support` | "Audio": audio shows with tracks, order, crossfades, volume and a preview; background audio for slideshows; video sound; event audio (§18.3). The README's new opening | |
