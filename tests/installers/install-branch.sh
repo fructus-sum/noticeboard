@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
-# install.sh on a server Pi that follows another branch: keep it, go back to main, or fall back
+# install.sh on a Server that follows another branch: keep it, go back to main, or fall back
 # to main when the branch is gone. Real git against a local origin; system commands are stand-ins.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO/tests/helpers/installer.sh"

@@ -1,6 +1,6 @@
 # Noticeboard — System Design
 
-**What this document is:** how the Noticeboard code works: its parts and how they talk to each other, the files and formats it keeps, the operating-system set-up, what installed Pis and open screens rely on, and what is shared or still written twice. It describes only what exists in the code, and (§18) the changes planned or in progress. The README gives an overview and says how to install it; the user guide (`noticeboard-guide.html`) is for the people running a noticeboard.
+**What this document is:** how the Noticeboard code works: its parts and how they talk to each other, the files and formats it keeps, the operating-system set-up, what installed Servers and Clients and open screens rely on, and what is shared or still written twice. It describes only what exists in the code, and (§18) the changes planned or in progress. The README gives an overview and says how to install it; the user guide (`noticeboard-guide.html`) is for the people running a noticeboard.
 
 **Keeping it up to date:** every planned change starts in §18, before any code. Then change this document in the same commit as the code it describes, so it is always a live view of the software and of the work in progress. Code comments refer to it as `SYSTEM_DESIGN §<n>`, and to the entries of §14 by their D-number: when a number changes, update those comments too (search the code for `SYSTEM_DESIGN`).
 
@@ -67,7 +67,7 @@ Noticeboard is a self-hosted slideshow system for Raspberry Pis on a local netwo
          (installer)           │            │ (installers/update.sh)
                                │            │
 ┌──────────────────────────────┴────────────┴───────────────────────────┐
-│ Server Pi   /opt/noticeboard  (git clone, owned by the desktop user)  │
+│ Server      /opt/noticeboard  (git clone, owned by the desktop user)  │
 │                                                                       │
 │  systemd: noticeboard.service ── node server/index.js  (port 3000)   │
 │             Express: /  /admin  /admin/help  /api/*  /media  /branding│
@@ -78,7 +78,7 @@ Noticeboard is a self-hosted slideshow system for Raspberry Pis on a local netwo
 └──────────────▲───────────────────────────────────▲────────────────────┘
                │ HTTP + socket.io                  │ HTTP (admin panel)
 ┌──────────────┴──────────────┐           ┌────────┴───────────────┐
-│ Remote display Pi (0..n)    │           │ Any browser on the LAN │
+│ Client (0..n)               │           │ Any browser on the LAN │
 │ /usr/local/bin/             │           │ /admin (password)      │
 │   noticeboard-kiosk.sh      │           │ / (viewer)             │
 │   ── chromium --kiosk URL   │           └────────────────────────┘
@@ -86,10 +86,21 @@ Noticeboard is a self-hosted slideshow system for Raspberry Pis on a local netwo
 └─────────────────────────────┘
 ```
 
-Two kinds of Pi are set up by the same installer:
+Two roles, set up by the same installer (the owner's words, §18.4: hardware is named only where it matters):
 
-- **Server + display.** The Pi runs the Node.js server, stores all content, hosts the admin panel, updates itself from GitHub, and shows the slideshow full screen on its own monitor.
-- **Remote display.** The Pi only runs Chromium full screen, pointed at the server's URL. It has no copy of the repository and does not update itself: the viewer it shows is served by the server, so it gets new viewer code when the server updates.
+- **Server:** the device running the Noticeboard server. It runs Node.js, stores all content, hosts the admin panel, updates itself from GitHub, and shows the slideshow full screen on its own monitor.
+- **Client:** a device showing the Noticeboard viewer. It only runs Chromium full screen, pointed at the Server's URL. It has no copy of the repository and does not update itself: the viewer it shows is served by the Server, so it gets new viewer code when the Server updates.
+
+**Supported devices:**
+
+| Device | Server | Client | Video | Status |
+|---|---|---|---|---|
+| Raspberry Pi 3 | yes | yes | H.264 only, 1080p only | Supported (H.264 chosen in Settings) |
+| Raspberry Pi 4 | yes | yes | H.264 and H.265 | Supported |
+| Raspberry Pi 5 | yes | yes | H.264 and H.265 | Supported |
+| Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | Planned: needs a headless Client installer (today's Client installer needs a desktop) |
+
+New videos are H.265 (HEVC) by default; H.264 is the fallback for older hardware (`display.videoFormat`, D43). The viewer plays one format, the one selected; a video in the other format is left to fail on a screen that can't play it.
 
 ---
 
@@ -100,7 +111,7 @@ noticeboard/
 ├── package.json               npm workspaces root (server, client/display, client/admin); build, start and test scripts
 ├── package-lock.json          lockfile for all three workspaces (contains linux-arm64 optional deps: never regenerate on Windows)
 ├── system-requirements.json   system software each branch needs, and the installer version (read by the server and tests)
-├── noticeboard-guide.html     user guide (self-contained HTML; served at /admin/help, opened as file:// on the Pi)
+├── noticeboard-guide.html     user guide (self-contained HTML; served at /admin/help, opened as file:// on the Server or Client)
 ├── README.md, LICENSE, .env.example
 ├── docs/design/SYSTEM_DESIGN.md   this document
 ├── sample-data/
@@ -111,7 +122,7 @@ noticeboard/
 │   ├── lib/                   its steps: ui, branch, json, system, sudo, server, display, kiosk, desktop, firewall
 │   │                          (branch.sh and json.sh are also loaded by update.sh; schedule.sh only by update.sh)
 │   ├── kiosk/                 server.sh, display.sh: the kiosk scripts it installs, as they are installed
-│   └── update.sh              the self-updater run by systemd on the server Pi
+│   └── update.sh              the self-updater run by systemd on the Server
 ├── server/                    CommonJS, Express 4, socket.io 4
 │   ├── index.js, app.js       the entry point (systemd runs server/index.js) and the Express app
 │   ├── config/                defaults.js (a new config.json), passwordDefaults.js (the default password)
@@ -151,7 +162,7 @@ Git ignores the runtime folders `data/`, `tmp/` and `logs/`, the built apps in `
 
 ## 3. Runtime architecture
 
-### 3.1 Processes on a server Pi
+### 3.1 Processes on a Server
 
 | Process | Started by | Runs as | What it is |
 |---|---|---|---|
@@ -160,7 +171,7 @@ Git ignores the runtime folders `data/`, `tmp/` and `logs/`, the built apps in `
 | `/opt/noticeboard/start-kiosk.sh` | XDG autostart `/etc/xdg/autostart/noticeboard-kiosk.desktop` at desktop login | desktop user | Bash loop that keeps Chromium in kiosk mode on `http://localhost:3000/` |
 | Chromium | the kiosk script | desktop user | Shows the viewer (`/`) |
 
-On a remote display Pi, `/usr/local/bin/noticeboard-kiosk.sh` is started by the same autostart entry. It shows a local waiting page until the server answers, then runs Chromium in kiosk mode on the server's URL.
+On a Client, `/usr/local/bin/noticeboard-kiosk.sh` is started by the same autostart entry. It shows a local waiting page until the server answers, then runs Chromium in kiosk mode on the server's URL.
 
 ### 3.2 Server start-up (`server/index.js`)
 
@@ -270,7 +281,7 @@ A Vue Router SPA under `/admin/`:
 
 ### 3.8 Running it
 
-`npm run build` builds both web apps into `client/*/dist`; `npm start` (on a Pi, systemd's `node server/index.js`) runs the server, which serves them. A PC runs it exactly as a Pi does. Changes are tried out on a GitHub branch, which a Pi can follow (§9). The log level can be raised for troubleshooting (§5.2).
+`npm run build` builds both web apps into `client/*/dist`; `npm start` (on a Server, systemd's `node server/index.js`) runs the server, which serves them. A PC runs it exactly as a Server does. Changes are tried out on a GitHub branch, which a Server can follow (§9). The log level can be raised for troubleshooting (§5.2).
 
 ---
 
@@ -418,7 +429,7 @@ A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'alway
 
 ## 6. Persistent data
 
-Under `/opt/noticeboard` on a server Pi.
+Under `/opt/noticeboard` on a Server.
 
 | Item | Format | Created by | Read by | Changed by | Depended on by |
 |---|---|---|---|---|---|
@@ -452,7 +463,7 @@ Outside the install folder:
 |---|---|---|
 | `/etc/systemd/system/noticeboard.service`, `noticeboard-update.{service,timer,path}` | install.sh | server and updater |
 | `/etc/xdg/autostart/noticeboard-kiosk.desktop` | install.sh | starts the kiosk script at login |
-| `/usr/local/bin/noticeboard-kiosk.sh` | install.sh (remote display) | display kiosk |
+| `/usr/local/bin/noticeboard-kiosk.sh` | install.sh (Client) | Client kiosk |
 | `~/Desktop/noticeboard-help.desktop` (or the XDG desktop directory) | install.sh | Help shortcut (`file:///opt/noticeboard/noticeboard-guide.html` on a server, `<SERVER_URL>/admin/help` on a display) |
 | `~/.config/noticeboard-kiosk/` | Chromium | kiosk browser profile |
 | `/tmp/noticeboard-waiting.html`, `/tmp/noticeboard-waiting-profile/` | display kiosk | waiting page |
@@ -506,7 +517,7 @@ Entry point: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboa
 
 1. **Root check** (`EUID`).
 2. **`use_latest_installer`**. Unless `NOTICEBOARD_INSTALLER_SHA` is set:
-   - Find the branch this Pi follows from `data/update-branch.env` (`followed_branch`), else `main`.
+   - Find the branch this Server follows from `data/update-branch.env` (`followed_branch`), else `main`.
    - `run_installer_from <branch>`:
      - `GET api.github.com/repos/…/commits/<branch>` with the `vnd.github.sha` header, to get the SHA.
      - Download `raw.githubusercontent.com/…/<sha>/installers/install.sh` to `/tmp`.
@@ -591,7 +602,7 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
     - On failure, roll back and restart again.
 17. Success: remove the failed-commit file, write the status (`updated`, the switched message, or the merged notice), `remember_main` (records `NOTICEBOARD_MAIN_AT_SWITCH` after a switch to a non-main branch), `check: up-to-date`.
 
-Every `write_check` also records `installCheckedAt`, `fetchedAt` and `nextInstall` (`next_install`), so the admin panel shows when the next automatic install is without working it out itself. **The schedule's rules** (`lib/schedule.sh`, D41): 15 minutes, every run; 2 hours, 2 hours since the last run that could install (or since the schedule was chosen, `SINCE`); daily and weekly, the first run at or after the chosen time since then, so a Pi that was off catches up at its next run; manual, never by itself. A set time (`AT`) takes the place of the automatic install until it has come. Times are the Pi's local clock; `NOTICEBOARD_NOW` sets the time for tests.
+Every `write_check` also records `installCheckedAt`, `fetchedAt` and `nextInstall` (`next_install`), so the admin panel shows when the next automatic install is without working it out itself. **The schedule's rules** (`lib/schedule.sh`, D41): 15 minutes, every run; 2 hours, 2 hours since the last run that could install (or since the schedule was chosen, `SINCE`); daily and weekly, the first run at or after the chosen time since then, so a Server that was off catches up at its next run; manual, never by itself. A set time (`AT`) takes the place of the automatic install until it has come. Times are the Server's local clock; `NOTICEBOARD_NOW` sets the time for tests.
 
 `write_json` (`lib/json.sh`, shared with the installer) builds flat JSON objects from strings in bash, stripping control characters and escaping `\` and `"`, and replaces the file atomically.
 
@@ -940,10 +951,10 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** configService, slideshowStore, updates/updateFiles, updates/installerVersion, and **install.sh and update.sh** (the port, via `node -e`).
 
 **`utils/logger.js`**
-- **Purpose:** the winston logger. Creates `logs/` when first required. JSON lines to the console (the journal on a Pi) and to `logs/app.log`; info and above, or debug too with `NOTICEBOARD_LOG_LEVEL=debug`.
+- **Purpose:** the winston logger. Creates `logs/` when first required. JSON lines to the console (the journal on an installed Server) and to `logs/app.log`; info and above, or debug too with `NOTICEBOARD_LOG_LEVEL=debug`.
 
 **`utils/macLookup.js`**
-- **Purpose:** `isLocalhost` ("this Pi itself" for MAC filtering: the set `127.0.0.1`, `::1`, `::ffff:127.0.0.1`, `localhost`, **empty string**, kept on purpose: §14 D6) and `lookupMac` (node-arp, lower-cased).
+- **Purpose:** `isLocalhost` ("the Server itself" for MAC filtering: the set `127.0.0.1`, `::1`, `::ffff:127.0.0.1`, `localhost`, **empty string**, kept on purpose: §14 D6) and `lookupMac` (node-arp, lower-cased).
 - **Uses:** `network.plainAddress`.
 
 **`utils/network.js`**
@@ -1113,7 +1124,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `install_server` | installers/lib/server.sh | main | many | several | the whole server set-up | installations |
 | `install_commit` / `restart_server` | update.sh | main | git, npm, kill, curl | config port | the code on disk, restart | every automatic update |
 | `branch_merged` | update.sh | main | git fetch, ls-remote, merge-base, merge-tree | update-branch.env | none | auto-return to main |
-| `install_due` / `next_install` | installers/lib/schedule.sh | update.sh | date | update-schedule.env, update-check.json | none | when every Pi installs updates; what the admin panel says about it |
+| `install_due` / `next_install` | installers/lib/schedule.sh | update.sh | date | update-schedule.env, update-check.json | none | when every Server installs updates; what the admin panel says about it |
 
 ---
 
@@ -1172,15 +1183,15 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 
 ## 15. External contracts an installed system relies on
 
-An installed Pi receives new code through the `update.sh` that is **already on disk**. The installer, the kiosk scripts and the systemd units change only when the installer is run again. The new code must therefore keep every one of these working:
+An installed Server receives new code through the `update.sh` that is **already on disk**. The installer, the kiosk scripts and the systemd units change only when the installer is run again. The new code must therefore keep every one of these working:
 
-**Run by systemd and by the updater already on the Pi**
+**Run by systemd and by the updater already on the Server**
 1. **`installers/update.sh`** must stay at that path: the update service runs it.
 2. **`server/index.js`** must stay the entry point, run from `/opt/noticeboard` with `/usr/bin/node`. The root `package.json` must keep the scripts `npm install`, `npm run build` and `npm prune --omit=dev`, run from the repository root, and `build` must produce `client/display/dist` and `client/admin/dist`.
 3. **`GET /api/auth/status`** must answer 2xx on `localhost:<config.port>` within 90 s of a restart. This is the health check of the update.sh that installs the new code; failing it causes a rollback.
 4. **`server/utils/configIO.js`** must keep exporting `readConfig(path)` returning a promise of the parsed config. `update.sh` and `install.sh` load it with `node -e` to read the port.
 5. **`server/services/configService.js`** must keep exporting `init()`: `install.sh` calls it on the first install.
-6. The **new update.sh must still contain the text `update-branch.env`**. Otherwise older Pis refuse to switch to the branch.
+6. The **new update.sh must still contain the text `update-branch.env`**. Otherwise older Servers refuse to switch to the branch.
 7. **Nothing may be tracked under `data/`, `tmp/`, `logs/` or `.env`.** Otherwise every updater refuses the commit.
 8. The **`tmp/noticeboard-uploads/`** folder must stay the place where uploads wait, because update.sh waits for it.
 9. **`tmp/update-request`** starts update.sh; the server writes it, and the systemd path unit watches for it. An older update.sh treats any text in it as a request to install, which is only what `check` avoids.
@@ -1222,8 +1233,8 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 Behaviour kept as it is until a change is planned for it (§18): fixing one changes behaviour, so it is designed, reviewed and tested on its own.
 
 1. **socket.io is not MAC filtered.** An unapproved device can connect and receive playlists and the background audio: file names and show folders, but not the media, which `/media` and `/audio` block.
-2. **The server kiosk URL is hard-coded to port 3000.** Changing `config.port` would break the server Pi's own screen until the kiosk script is edited.
-3. **An empty client IP counts as this Pi itself** in the MAC filter (D6).
+2. **The server kiosk URL is hard-coded to port 3000.** Changing `config.port` would break the Server's own screen until the kiosk script is edited.
+3. **An empty client IP counts as the Server itself** in the MAC filter (D6).
 4. **`PUT /api/settings` does not validate `port` or the `macFiltering` shape.** A bad value is saved as it is. A port change takes effect only after a restart.
 5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.2).
 6. The media route allows audio extensions (`.mp3 .wav .ogg`) that nothing produces there (audio shows' tracks are served at `/audio`).
@@ -1232,7 +1243,7 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 9. `configService.update` merges only the top level. `PUT /settings` therefore replaces the whole `macFiltering` object, which is intended (the admin panel sends everything).
 10. **Changing the default image duration doesn't resend the playlist** (`tests/api/socket-events.js` records this). Slideshows without their own duration keep the old one on screen until the playlist is next sent: a publish, upload, reorder or delete, a scheduler change, or a display reconnecting.
 11. **A message's clear timer can clear a later message:** "Saved." clears itself after 2 seconds (3 for "Password changed."), whatever the card shows by then. Saving twice within 2 seconds, the second failing, shows its error only briefly (`useFlash`).
-12. **New videos are H.265 (HEVC) by default from 2026-09-28** (the owner's choice), to make them smaller; Settings → Display → *Video format for new uploads* can choose H.264 instead (`display.videoFormat`), and says why while H.265 is chosen. Videos keep the format they were converted to (earlier ones H.264). A browser plays H.265 only if it can decode it: Chromium on a Pi relies on the Pi's hardware decoder, and a PC's browser on its own (e.g. Firefox can't, so the admin panel's preview of a new video stays blank there). A screen that can't play a video shows nothing for the video's length, then the slideshow carries on (the slide clock, §3.5). Encoding H.265 takes several times longer than H.264 on a Pi. *Convert existing videos* (same card) converts the videos already uploaded to the saved format (D43).
+12. **New videos are H.265 (HEVC) by default from 2026-09-28** (the owner's choice), to make them smaller; Settings → Display → *Video format for new uploads* can choose H.264 instead (`display.videoFormat`), and says why while H.265 is chosen. Videos keep the format they were converted to (earlier ones H.264). A browser plays H.265 only if it can decode it: Chromium on a Raspberry Pi 4 or 5 relies on its hardware decoder (a Raspberry Pi 3 has none for H.265), and a PC's browser on its own (e.g. Firefox can't, so the admin panel's preview of a new video stays blank there). A screen that can't play a video shows nothing for the video's length, then the slideshow carries on (the slide clock, §3.5). Encoding H.265 takes several times longer than H.264 on a Raspberry Pi. *Convert existing videos* (same card) converts the videos already uploaded to the saved format (D43).
 
 ---
 
@@ -1249,7 +1260,7 @@ Run them with `node tests/run.js <group> [filter]` or the npm scripts. A file th
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
 The upgrade rehearsal works like this:
-1. An installed older version (`NB_BASELINE`, default `fc4ba53`), with data seeded through its own API, takes the working tree through **its own** update.sh, as a real Pi does.
+1. An installed older version (`NB_BASELINE`, default `fc4ba53`), with data seeded through its own API, takes the working tree through **its own** update.sh, as a real Server does.
 2. The new update.sh installs a following commit.
 3. It goes back to the baseline.
 
@@ -1267,14 +1278,14 @@ The snapshot files in `tests/fixtures/` were recorded from known-good code. They
 
 ## 18. Planned and in-progress changes
 
-Every planned change starts here, before any code: what changes and why, the parts affected, the risks to existing users and installed Pis, and how it will be tested. A change to behaviour or structure is reviewed with the owner before coding. Once it's done, the sections above describe it and it leaves this list.
+Every planned change starts here, before any code: what changes and why, the parts affected, the risks to existing users and installed Servers and Clients, and how it will be tested. A change to behaviour or structure is reviewed with the owner before coding. Once it's done, the sections above describe it and it leaves this list.
 
 | # | Change | Status | Version (§19) |
 |---|---|---|---|
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again | a patch release when fixed |
 | 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) | a patch release when done |
 | 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); to check on a real Pi, then merge into main with the owner's OK | 0.6.0 |
-| 18.4 | The words Server and Client everywhere; the supported devices | Planned, after 18.3 (the owner's decisions 2026-09-28) | 0.6.1 |
+| 18.4 | The words Server and Client everywhere; the supported devices | Done on the local branch `fix/server-client-terms` (after 18.3 merges); the kiosk scripts' text waits for 18.5's installer version | 0.6.1 |
 | 18.5 | The Known Issues cleared for a stable base (§16) | Planned, after 18.4 | 0.6.2 to 0.6.13 (one per item) |
 | 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, after 18.5 | 0.7.0 |
 
@@ -1307,13 +1318,13 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 ### 18.2 Remove the unused npm packages
 
-Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Pi's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
+Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Server's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
 
 ### 18.3 Audio
 
 **What changes (the owner's 2do features "Audio Support" and "Master / Event Audio Override"):** audio shows (tracks uploaded, named, ordered, played in order or shuffled, with no transition or a crossfade of a chosen length, a show volume, previewed in the admin panel, published or not); a slideshow's background audio (one published audio show, or none); a video's own sound, with the background audio lowered or paused while it plays; and event audio, which takes over from the background audio at a time.
 
-**The owner's decisions:** every screen plays the audio; the kiosk is allowed to play sound through an installer bump (`INSTALLER_VERSION` 3: until a Pi's installer is run again its screen stays silent, nothing breaks); moving to a slideshow with another audio show switches at once with that show's transition (none: fade out); loudness is evened out when a track is uploaded; when an event ends, background audio starts its next track; events start now (until stopped, and never past the next scheduled event), once (from a date and time to another) or repeat (days and times, like a slideshow's schedule); saving an event that overlaps another is refused.
+**The owner's decisions:** every screen plays the audio; the kiosk is allowed to play sound through an installer bump (`INSTALLER_VERSION` 3: until the installer is run again on a Server or Client its screen stays silent, nothing breaks); moving to a slideshow with another audio show switches at once with that show's transition (none: fade out); loudness is evened out when a track is uploaded; when an event ends, background audio starts its next track; events start now (until stopped, and never past the next scheduled event), once (from a date and time to another) or repeat (days and times, like a slideshow's schedule); saving an event that overlaps another is refused.
 
 **Data (new; nothing existing changes shape):**
 - `config.audioShows[]`: `{ folder, name, enabled, order: 'in-order' | 'shuffle', transition: 'none' | 'crossfade', fadeSeconds, volume, event?, addedAt }`; `event`: `{ mode: 'now' | 'once' | 'repeat', from?, to?, days?, startTime?, endTime? }`.
@@ -1331,7 +1342,7 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 **Phases** (each designed here in detail before its code, tested with every group and committed):
 1. **Done:** foundations with no visible change: the store factory (`services/showStore.js`), the item-route factory (`routes/api/mediaItems.js`), the shared rename (`composables/useRename.js`), `getMediaDuration`. Every snapshot stayed identical.
 2. **Done:** audio shows in the admin panel: store, routes, `/audio`, processing with loudness levelling, pages, track preview (D44).
-3. **Done:** the audio engine (`shared/audioPlayer.mjs`, 12 unit tests over simulated time) and "Preview the show" (`ShowPreview.vue`). **Still to check on a real Pi:** crossfades on the server screen and a remote display (smoothness, CPU); if they aren't smooth there, "no transition" stays and the limit is documented.
+3. **Done:** the audio engine (`shared/audioPlayer.mjs`, 12 unit tests over simulated time) and "Preview the show" (`ShowPreview.vue`). **Still to check on a real Pi:** crossfades on the Server's screen and a Client (smoothness, CPU); if they aren't smooth there, "no transition" stays and the limit is documented.
 4. **Done:** background audio on the screens (`audio:update`, `BackgroundAudio.vue`, the slideshow's "Background audio"), and the installer bump to version 3 (the kiosk may play sound). Detail below.
 5. **Done:** video sound: a video's Sound switch, and the background audio lowered or paused while it plays. Detail below.
 6. **Done:** event audio: an audio show that every screen plays instead while its event is on (start now, once, or repeating; overlaps refused). Detail below.
@@ -1343,8 +1354,8 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 - **What the screens are told:** `services/audioPlaylist.js` `buildAudio()` → `{ shows: { <audio folder>: { id, order, transition, fadeSeconds, volume, tracks: [{ url, length }] } }, slideshows: { <slideshow folder>: <audio folder> }, event: null }`. Only published audio shows with at least one ready track are in `shows`, and only slideshows whose audio show is in `shows` are in `slideshows` (published or not: which slideshows are on air is the playlist's job). `event` stays null until phase 6. The shape of each show is exactly what `shared/audioPlayer.mjs` takes.
 - **The socket:** a new event, `audio:update` (`socketEvents.AUDIO_UPDATE` in the contract), sent to a display with its playlist on `display:ready`, and to all when it changes: on a config `change` (a slideshow's audio show, an audio show's settings, publishing, deleting) and on `displayEvents.audioChanged()` (a track ready, renamed, reordered or deleted), only when it differs from the last one sent (like `display:settings`). Older viewers ignore an event they don't know.
 - **The viewer:** `useSocket` gains `audio` (the last `audio:update`, empty until one arrives). `SlideShow.vue` emits `on-air` with the slideshow of the slide on screen (the playlist's `slideshow` key); App.vue keeps it (null while the waiting screen shows) and gives it with `audio` to a new `BackgroundAudio.vue` (no markup), which calls `player.setShow(audio.shows[audio.slideshows[onAir]] ?? null)` on the engine. So a change of slideshow switches the audio at once with the new show's transition, a slideshow without audio fades it out, and two slideshows on the same audio show carry on without a break. A refused play (a kiosk not yet allowed sound, or an ordinary browser tab) stays silent and tries again every minute, or at once when someone clicks or presses a key on the screen (the engine gains `retryNow()`).
-- **The kiosk:** both kiosk scripts (`installers/kiosk/server.sh`, `display.sh`) add `--autoplay-policy=no-user-gesture-required` to the browser's flags. `INSTALLER_VERSION` 3, with `installer.version` 3 and a changes line ("Background audio: the kiosk may play sound", displays: true) in system-requirements.json, and the golden files re-recorded on purpose. Until a Pi's installer runs again its screens stay silent and the admin panel asks for the installer run as it does today; nothing else changes.
-- **Admin panel:** SlideshowSettingsCard shows "Background audio" (the show's name, or None) and has a "Background audio" select in its form (GET /api/audioshows for the choices). The guide explains choosing it, that the sound comes out of the screen's usual output (HDMI on most TVs), and that a Pi needs its installer run again first.
+- **The kiosk:** both kiosk scripts (`installers/kiosk/server.sh`, `display.sh`) add `--autoplay-policy=no-user-gesture-required` to the browser's flags. `INSTALLER_VERSION` 3, with `installer.version` 3 and a changes line ("Background audio: the kiosk may play sound", displays: true) in system-requirements.json, and the golden files re-recorded on purpose. Until the installer runs again on a Server or Client its screen stays silent and the admin panel asks for the installer run as it does today; nothing else changes.
+- **Admin panel:** SlideshowSettingsCard shows "Background audio" (the show's name, or None) and has a "Background audio" select in its form (GET /api/audioshows for the choices). The guide explains choosing it, that the sound comes out of the screen's usual output (HDMI on most TVs), and that a Server or Client needs its installer run again first.
 - **Risks:** the playlist and `display:settings` are unchanged; `audio:update` is new, so open screens and older viewers are unaffected; a screen reloads onto the new viewer as after any update. The admin pages' look snapshot gains the "Background audio" fact (re-recorded on purpose); the socket-events recording gains `audio:update` after the playlist on connect.
 - **Tests:** unit: `retryNow`; api: `audio:update` payloads (published only, ready tracks only, a slideshow's choice, deleting clears it, only sent when changed), `audioShow` validation, the contract gaining the new event; browser: the select and the fact, and a viewer following a slideshow change (the audio elements' sources, as far as a headless browser can tell); installers: the flag in both kiosk scripts, the golden files, installer version 3.
 
@@ -1367,7 +1378,7 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 - **Admin panel:** an **Event audio** card on the audio show's page (CollapsibleCard): Off / Start now / Once (from and to) / Repeat (days, start and end: the days-and-times fields moved out of ScheduleEditor into `WeeklyTimesEditor.vue`, used by both, the slideshow form looking exactly as before). It shows the state: "Playing now on every screen", "Next: Sat 10:00", "Ended", or "Not published: it won't play", with **Stop** for a start-now event, and the clash message when saving is refused. The audio show list shows "Event" on a show that has one. `GET /api/audioshows` adds `eventState` (`playing`, `next` time, `ended`).
 - **Risks:** the scheduler's rule moves to a shared module (its tests and the slideshow schedule's behaviour must stay the same); the payload only fills a key that was null. **Tests:** unit (`audioEvents`: each mode, the boundaries, start-now ended by a scheduled event, clashes of every pair of modes, `nextChange`; `weeklyTimes` against the scheduler's cases); api (the event route: validation, clashes refused, removing; `audio:update`'s `event` for a start-now event and a once event already running; `eventState`); browser (the event card: Start now and Stop on a screen following it, back to the slideshow's show; a clash message; the slideshow form unchanged).
 
-**Risks:** the installer bump asks every Pi for an installer run (the owner accepted it); the playlist and `display:settings` only gain keys, and `audio:update` is new, so open screens and older viewers are unaffected; slideshows' data stays byte-for-byte the same (the data-files test).
+**Risks:** the installer bump asks every Server and Client for an installer run (the owner accepted it); the playlist and `display:settings` only gain keys, and `audio:update` is new, so open screens and older viewers are unaffected; slideshows' data stays byte-for-byte the same (the data-files test).
 
 **Tests:** `audioPlayer` and `audioEvents` unit tests over simulated time; api tests for audio shows, tracks, processing (ffprobe), `/audio` and `audio:update`; browser tests for the pages, the preview, the slideshow and video settings, the event card; the golden files and installer version for the kiosk flag; the upgrade rehearsal.
 
@@ -1389,7 +1400,7 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 | Raspberry Pi 5 | yes | yes | H.264 and H.265 | Supported |
 | Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | Planned: needs a headless Client installer (a later feature; today's Client installer needs a desktop) |
 
-**How:** a word list (Pi → Server/Client by context; "display" as a device → Client; "screen" stays for the physical screen) applied file by file, reading each sentence (no blind search-and-replace). **Risks:** texts only: the look and text snapshots (admin pages, viewer) and the installer's golden files change on purpose; nothing an installed system reads changes. **Tests:** every group; snapshots re-recorded after a reviewed diff.
+**Done (2026-09-28), except** the text inside the files the installer copies onto each device (the kiosk scripts): changing it changes the recorded installer output, which needs an installer version, so it goes with §18.5 item 2 (installer version 4). **How:** a word list (Pi → Server/Client by context; "display" as a device → Client; "screen" stays for the physical screen) applied file by file, reading each sentence (no blind search-and-replace). **Risks:** texts only: the look and text snapshots (admin pages, viewer) and the installer's golden files change on purpose; nothing an installed system reads changes. **Tests:** every group; snapshots re-recorded after a reviewed diff.
 
 ### 18.5 The Known Issues cleared (§16)
 

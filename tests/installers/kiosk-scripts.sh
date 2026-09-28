@@ -69,7 +69,7 @@ waitfor "$T/launch.log" "LAUNCH --no-first-run http://localhost:3000/?kiosk=off"
 [ "$(kiosk_launches)" = "$before" ] && grep -q "Leaving kiosk mode" "$T/logger.log" && ok "server kiosk: logged, and the kiosk browser isn't relaunched" || bad "server no relaunch"
 [ -z "$(ps -ef | grep '/usr/bin/sleep 1000' | grep -v grep)" ] && ok "server kiosk: the full-screen browser was closed" || { bad "server browser still running"; stray_kill; }
 
-# ── Remote display ──
+# ── Client ──
 reset; printf '000\n404\n200\n' > "$T/answers"
 HOME="$T/home" PATH="$T/bin:/usr/bin:/bin" bash "$T/noticeboard-kiosk.sh" & K=$!
 waitfor "$T/logger.log" "starting it again" && waitfor "$T/launch.log" "LAUNCH .*--kiosk http://192.168.1.10:3000$"
