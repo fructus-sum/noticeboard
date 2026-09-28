@@ -32,6 +32,24 @@ Everything is on one port, `3000`:
 
 There's no separate admin port. **Default admin password: `Admin@12345`** — change it after the first login; the admin panel warns you until you do.
 
+## MAC Address Filtering
+
+MAC address filtering requires the Noticeboard server and display devices to be on the same local network.
+
+The server identifies display devices by resolving their IP address to a MAC address using the local network.
+
+For example:
+
+`Noticeboard Server → 192.168.1.10`
+
+`Display 1 → 192.168.1.20`
+
+`Display 2 → 192.168.1.21`
+
+If these devices are on the same local network, the server can identify the displays by their MAC addresses and apply the filtering.
+
+Devices located behind another router or on a different routed network may not have their MAC address visible to the Noticeboard server.
+
 ## Installation
 
 One installer sets up either kind of Pi, running Raspberry Pi OS with the desktop (the current release, Trixie, or Bookworm). Run it on the Pi, from a terminal:

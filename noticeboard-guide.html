@@ -1424,6 +1424,20 @@
         <div class="callout-body">MAC filtering is <strong>disabled by default</strong>. You only need to enable it if you want to restrict which screens can show your content — for example, in a public-facing installation.</div>
       </div>
 
+      <h3 id="mac-network" style="scroll-margin-top:80px">MAC address network requirements</h3>
+      <p>Noticeboard uses the server to identify display devices by their MAC address.</p>
+      <p>The MAC address is not supplied by the display's web browser. Instead, the Noticeboard server identifies the device's IP address and uses the local network to determine the corresponding MAC address.</p>
+      <p>Because of this, the Noticeboard server and the display devices must normally be on the same local network for MAC address filtering to work correctly.</p>
+      <p><strong>Example.</strong> A typical setup could look like this:</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li>Noticeboard Server: <code>192.168.1.10</code></li>
+        <li>Reception Display: <code>192.168.1.20</code></li>
+        <li>Meeting Room Display: <code>192.168.1.21</code></li>
+        <li>Staff Room Display: <code>192.168.1.22</code></li>
+      </ul>
+      <p>All of these devices are connected to the same local network. When one of the displays connects to Noticeboard, the server can identify its IP address and determine its MAC address from the local network. Noticeboard can then use that MAC address for MAC address filtering: deciding which devices can see the slideshows and the admin panel.</p>
+      <p><strong>Devices on different networks.</strong> If a display is located behind another router or on a different routed network, the Noticeboard server may only see the router rather than the individual display's MAC address. In that situation, MAC address filtering may not work for that device. For installations using MAC address filtering, keep the Noticeboard server and display devices on the same local network.</p>
+
       <h3>Enabling MAC filtering and adding a device</h3>
       <div class="steps">
         <div class="step">
