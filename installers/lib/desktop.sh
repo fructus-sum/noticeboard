@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# installers/lib/desktop.sh — entries for the Pi's desktop
+# installers/lib/desktop.sh — entries for the desktop
 #
 # Provides
 #   write_autostart <command>      starts the kiosk when the desktop starts
@@ -14,7 +14,7 @@
 # Change impact
 #   Compared with tests/fixtures/installer-golden (autostart-*.desktop, help-*.desktop).
 
-# XDG autostart entry (works with LXDE, labwc, GNOME and most Pi OS desktops)
+# XDG autostart entry (works with LXDE, labwc, GNOME and most Raspberry Pi OS desktops)
 write_autostart() {
   cat > "$AUTOSTART_FILE" <<DESK
 [Desktop Entry]

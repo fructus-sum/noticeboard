@@ -53,7 +53,7 @@ const logger = require('../../utils/logger');
 // update.sh only installs another branch whose own update.sh mentions this file too (branch
 // switching exists there), so the noticeboard can always be switched back
 const SUPPORT_MARKER = 'update-branch.env';
-// A requested or running update older than this didn't finish (e.g. the Pi lost power)
+// A requested or running update older than this didn't finish (e.g. the Server lost power)
 const STALE_MS = 60 * 60 * 1000;
 
 // An error whose message is meant for the admin
@@ -129,7 +129,7 @@ async function updaterReady() {
   const info = await getInfo();
   if (!info.available) throw userError(409, info.reason);
   if (!info.autoUpdates && !info.instant) {
-    throw userError(409, "Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.");
+    throw userError(409, "Automatic updates aren't set up on this noticeboard. Run the installer on the Server to set them up.");
   }
   return info;
 }
@@ -258,7 +258,7 @@ async function requestSwitch(name, by, { acceptMissing = false } = {}) {
   const info = await getInfo();
   if (!info.available) throw userError(409, info.reason);
   if (!info.autoUpdates && !info.instant) {
-    throw userError(409, "Automatic updates aren't set up on this noticeboard, so a switch would never be installed. Run the installer on the Pi to set them up.");
+    throw userError(409, "Automatic updates aren't set up on this noticeboard, so a switch would never be installed. Run the installer on the Server to set them up.");
   }
   if (info.busy) throw userError(409, 'An update is already in progress. Wait for it to finish, then try again.');
   if (name === info.branch && name === info.configuredBranch) {

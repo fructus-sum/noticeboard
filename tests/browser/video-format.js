@@ -36,7 +36,7 @@ const { connect } = require('../helpers/cdp.js');
   let question = '';
   c.on((msg) => { if (msg.method === 'Page.javascriptDialogOpening') { question = msg.params.message; c.send('Page.handleJavaScriptDialog', { accept: true }); } });
   await c.evaluate(`${convertButton}.click()`);
-  check('it warns about the time and the Pi being slower', question.includes('long time') && question.includes('slower'), question.slice(0, 120));
+  check('it warns about the time and the Server being slower', question.includes('long time') && question.includes('slower'), question.slice(0, 120));
   check('then it shows how it went', await c.until(`document.body.innerText.includes('Last conversion to H.264')`, 120000));
   const summary = await c.evaluate(`document.querySelector('.convert__done')?.innerText ?? ''`);
   check('  … the sample\'s video is already H.264, so it\'s left as it is', /0 converted, 1 already H\.264/.test(summary), summary);

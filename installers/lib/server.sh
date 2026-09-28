@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# installers/lib/server.sh — setting up a server Pi (server + display)
+# installers/lib/server.sh — setting up a Server (it also shows the slideshow on its own screen)
 #
 # Responsibilities
 #   System packages and Node.js, the install folder (a clone, or the chosen branch fetched and
@@ -25,7 +25,7 @@
 #
 # Change impact
 #   The units, .env, installer.json and update-status.json are read by systemd, update.sh and
-#   the server on every Pi: their names and formats must not change (SYSTEM_DESIGN §6).
+#   the server on every Server: their names and formats must not change (SYSTEM_DESIGN §6).
 #   Changing what's written here that updates can't change means raising INSTALLER_VERSION.
 
 install_server() {
@@ -38,7 +38,7 @@ install_server() {
   echo "▸ Installing system packages..."
   apt-get install -y -qq git ffmpeg "$(chromium_package)" curl
 
-  # ── Node.js 20 LTS via NodeSource, when the Pi's is missing or too old ──────
+  # ── Node.js 20 LTS via NodeSource, when the installed one is missing or too old ──────
   if ! node_new_enough; then
     echo "▸ Installing Node.js 20 LTS..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null

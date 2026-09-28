@@ -62,7 +62,7 @@ export function useSocket() {
     audio.value = { shows: data?.shows ?? {}, slideshows: data?.slideshows ?? {}, event: data?.event ?? null };
   });
 
-  // The server sends its display build on every connect. If it changes (the Pi was
+  // The server sends its display build on every connect. If it changes (the Server was
   // updated), reload so this screen runs the new version. reloadSoon only reloads once the
   // server answers, so the kiosk can't end up on the browser's error page.
   let buildId;

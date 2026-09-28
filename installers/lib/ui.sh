@@ -4,8 +4,8 @@
 # Responsibilities
 #   Asking, always from the keyboard (/dev/tty), never stdin: under `curl … | sudo bash`, stdin
 #   is the script itself. The yes/no and 1/2 questions ask again until answered; Enter takes
-#   the default where there is one. Also the questions every run asks: what the Pi is for, the
-#   branch a server Pi installs, and the reboot at the end.
+#   the default where there is one. Also the questions every run asks: whether this device is a Server or
+#   a Client, the branch a Server installs, and the reboot at the end.
 #
 # Provides
 #   has_tty                           there is a keyboard to ask on
@@ -16,7 +16,7 @@
 #   ask_yes_in_time <seconds> "<question>"   succeeds only on y within that time
 #   banner "<title>"                  the boxed heading
 #   choose_mode                       → MODE (server | display)
-#   choose_branch                     → INSTALL_BRANCH (a server Pi)
+#   choose_branch                     → INSTALL_BRANCH (a Server)
 #   offer_reboot                      the last step: reboots unless the answer is n
 #
 # Used by
@@ -89,7 +89,7 @@ choose_mode() {
   case "${NOTICEBOARD_MODE:-}" in
     server|display) MODE=$NOTICEBOARD_MODE; return ;;
   esac
-  # Default to whatever this Pi already runs, so a re-run only needs Enter
+  # Default to whatever this device already runs, so a re-run only needs Enter
   local default=""
   if [ -d "$INSTALL_DIR/.git" ]; then
     default=1
@@ -97,14 +97,14 @@ choose_mode() {
     default=2
   fi
 
-  echo "What is this Pi for?"
-  echo "  1) Server + display: stores the content, runs the admin panel, shows the slideshow here"
-  echo "  2) Remote display:   shows the slideshow from a server Pi on your network"
+  echo "Is this device the Server or a Client?"
+  echo "  1) Server: stores the content, runs the admin panel, shows the slideshow here"
+  echo "  2) Client: shows the slideshow from a Server on your network"
   ask_choice "$default"
   if [ "$CHOICE" = 1 ]; then MODE=server; else MODE=display; fi
 }
 
-# A server Pi follows main unless another branch was chosen in the admin panel
+# A Server follows main unless another branch was chosen in the admin panel
 # (Settings → Software updates). A re-run offers to keep that branch or go back to main.
 choose_branch() {
   # Already answered (use_branch_installer)

@@ -9,7 +9,7 @@
 //
 // Provides
 //   requireApprovedDevice(area)   middleware: allows approved devices (all of them while MAC
-//                                 filtering is off; always this Pi itself), else 404. Sets
+//                                 filtering is off; always the Server itself), else 404. Sets
 //                                 req.clientMac. area names the log lines ("Display", "Admin")
 //   requireAdmin                  middleware: requireApprovedDevice('Admin'), then a valid session
 //                                 cookie: 401 { error: 'Not authenticated' } without one,

@@ -6,7 +6,7 @@
 // H.264 (plays everywhere), each explained, with a warning while H.265 is chosen that some screens
 // and browsers can't play it (SYSTEM_DESIGN §16 #12). Save sends all three (PUT /settings { display }).
 // Below: "Convert existing videos" to the saved format (POST /settings/videos/convert), after a
-// warning that it takes time and slows the Pi, with its progress while it runs (polled every 3 s).
+// warning that it takes time and slows the Server, with its progress while it runs (polled every 3 s).
 //
 // Props: settings, from GET /settings (null until the page has loaded it; the defaults show meanwhile)
 // Used by: views/SettingsView
@@ -76,7 +76,7 @@ async function convertExisting() {
   const name = FORMAT_NAMES[savedFormat.value];
   if (!confirm(`Convert every video already uploaded to ${name}?\n\n`
     + 'This takes a long time: on a Raspberry Pi, several minutes for each minute of video, one video after another. '
-    + 'Meanwhile the Pi works hard: the screens, uploads and this admin panel may be slower. '
+    + 'Meanwhile the Server works hard: the screens, uploads and this admin panel may be slower. '
     + 'Screens keep showing each video as it is until its new version is ready.')) return;
   convertMsg.clear();
   try {
@@ -124,8 +124,8 @@ onUnmounted(() => clearTimeout(pollTimer));
         <ul>
           <li>
             <strong>H.265 (HEVC)</strong>: about half the file size of H.264 for the same picture, so more videos fit
-            on the Pi and the screens download them faster. Converting takes longer (a few times as long as H.264 on a
-            Pi), and only screens whose browser can decode H.265 can play it.
+            on the Server and the screens download them faster. Converting takes longer (a few times as long as H.264 on a
+            Raspberry Pi), and only screens whose browser can decode H.265 can play it.
           </li>
           <li>
             <strong>H.264</strong>: plays on every screen and in every browser, and converts faster; the files are
@@ -135,7 +135,7 @@ onUnmounted(() => clearTimeout(pollTimer));
       </div>
       <div v-if="videoFormat === 'h265'" class="format-warning" role="note">
         <strong>H.265 may not play everywhere.</strong> A screen can only show an H.265 video if its browser can
-        decode it: on a Raspberry Pi that depends on Chromium using the Pi's hardware video decoder, and on a PC on
+        decode it: on a Raspberry Pi 4 or 5 that depends on Chromium using its hardware video decoder (a Raspberry Pi 3 has none, so choose H.264 there), and on a PC on
         its graphics card. A screen that can't play a video shows nothing for the video's length, then the slideshow
         carries on as usual. Some browsers (e.g. Firefox) can't show H.265 in the preview here either. If a video
         doesn't show on a screen, choose H.264, save, and convert the existing videos below.
@@ -157,7 +157,7 @@ onUnmounted(() => clearTimeout(pollTimer));
         it's its turn, then <em>ready</em> again; the screens keep showing it as it is until the new version is ready.
       </p>
       <div class="format-warning" role="note">
-        <strong>This takes a long time and slows the Pi down.</strong> Videos are converted one after another, and on
+        <strong>This takes a long time and slows the Server down.</strong> Videos are converted one after another, and on
         a Raspberry Pi each minute of video takes several minutes. Meanwhile the screens, uploads and this admin panel
         may be slower. It carries on if you leave this page; an update waits for it to finish.
       </div>

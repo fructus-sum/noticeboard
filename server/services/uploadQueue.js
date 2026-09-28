@@ -84,7 +84,7 @@ function enqueueProcessing({ store: showStore = slideshowStore.store, folder, sl
 }
 
 // Thumbnails for videos that don't have one (uploaded before thumbnails existed, or the sample's).
-// Queued with the uploads, so they never compete with processing for the Pi's CPU.
+// Queued with the uploads, so they never compete with processing for the Server's CPU.
 function enqueueThumbnail({ folder, slideId, filename }) {
   queue.add(async () => {
     try {

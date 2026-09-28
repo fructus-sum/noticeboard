@@ -1,5 +1,5 @@
 // The shared foundations behave exactly like the copies they replaced (SYSTEM_DESIGN §14 D6, D7, D14,
-// D18): the address helpers, the "this Pi itself" rule for MAC filtering, the media type lists and
+// D18): the address helpers, the "the Server itself" rule for MAC filtering, the media type lists and
 // the socket event names. Also the media name rule and what the admin panel shows as a name (D38).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

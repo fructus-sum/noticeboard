@@ -2,7 +2,7 @@
 // client/display/src/components/AdminWarning.vue — the warning mark while the admin panel needs someone
 //
 // A small red triangle in the bottom-right corner, always visible while the admin panel shows a
-// warning the screens point to: "Run the installer again on this Pi", or (with manual updates) a new
+// warning the screens point to: "Run the installer again on the Server", or (with manual updates) a new
 // version waiting. It stays out of the way of the slides and the other controls. Clicking or tapping it shows only "Please check the Admin panel for details.":
 // the details stay in the admin panel. The message closes with ✕, Esc, or by itself after 60 s.
 //

@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# installers/lib/branch.sh — the branch a server Pi follows (data/update-branch.env)
+# installers/lib/branch.sh — the branch a Server follows (data/update-branch.env)
 #
 # Responsibilities
 #   The one bash rule for a valid branch name, and reading and writing the branch setting that
@@ -23,7 +23,7 @@
 #   valid_branch has a JavaScript twin, server/services/updates/branchName.js:
 #   tests/installers/branch-names.sh checks both give the same answers. The file format is a
 #   contract with the server (services/updates/updateFiles.js) and with the update.sh of older
-#   commits a Pi may switch back to: NOTICEBOARD_BRANCH=<branch>, then optionally
+#   commits a Server may switch back to: NOTICEBOARD_BRANCH=<branch>, then optionally
 #   NOTICEBOARD_MAIN_AT_SWITCH=<commit>.
 
 valid_branch() {

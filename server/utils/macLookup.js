@@ -1,8 +1,8 @@
-// server/utils/macLookup.js — a device's MAC address, and the MAC filter's "this Pi itself" rule
+// server/utils/macLookup.js — a device's MAC address, and the MAC filter's "the Server itself" rule
 //
 // Provides
 //   isLocalhost(address)   127.0.0.1, ::1, ::ffff:127.0.0.1, localhost or an empty address
-//   lookupMac(address)     the MAC from the ARP table (node-arp), lower-case; 'localhost' for this Pi;
+//   lookupMac(address)     the MAC from the ARP table (node-arp), lower-case; 'localhost' for the Server itself;
 //                          null if unknown
 //
 // Used by
@@ -16,7 +16,7 @@ const { plainAddress } = require('./network');
 
 const getMAC = promisify(arp.getMAC);
 
-// "This Pi itself" for MAC filtering: exactly these, including an empty address (unlike
+// "The Server itself" for MAC filtering: exactly these, including an empty address (unlike
 // network.isLoopback, which is used for kiosk exits). Kept as it is on purpose (SYSTEM_DESIGN §14 D6).
 const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost', '']);
 

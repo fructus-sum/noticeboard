@@ -22,7 +22,7 @@ const { sleep, check, makeApp, server, page, done } = require('../helpers/app.js
   await c.until(`${dialogTitle} === 'Turn on MAC filtering?'`, 3000);
   let text = await c.evaluate(`document.querySelector('.dialog').innerText`);
   check('ticking the box: a warning to add your own MAC address first', /add its MAC address to the\s+approved list first/.test(text) && /lock yourself out/.test(text), text.slice(0, 120).replace(/\n/g, ' '));
-  check('opened on the Pi itself (localhost): says this device stays allowed', /on the noticeboard Pi itself/.test(text));
+  check('opened on the Server itself (localhost): says this device stays allowed', /on the Server itself/.test(text));
   await c.screenshot(path.join(require('os').tmpdir(), 'noticeboard-test-mac-warning.png'));
 
   await c.click('How to find your MAC address');

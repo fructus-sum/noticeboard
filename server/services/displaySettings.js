@@ -3,7 +3,7 @@
 // Responsibilities
 //   The one place that puts the display:settings payload together: the location pin (config), the
 //   logo and the background colour (brandingService), and whether the installer needs running
-//   again on this Pi (services/updates/installerVersion) or, with manual updates, a new version is
+//   again on the Server (services/updates/installerVersion) or, with manual updates, a new version is
 //   waiting (services/updates): the viewer shows either as its warning mark. Both are read from
 //   files, so they're kept here and checked again with refresh(): the installer writes its record
 //   after it has restarted the server, an update can raise the version needed, and update.sh

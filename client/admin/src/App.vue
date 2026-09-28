@@ -2,7 +2,7 @@
 // client/admin/src/App.vue — the admin panel's frame: the sidebar, the warnings, the page
 //
 // On every page but the login page: the sidebar, the default-password warning and the updater's
-// notices ("back on main", "Run the installer again on this Pi"). The frame stays while moving
+// notices ("back on main", "Run the installer again on the Server"). The frame stays while moving
 // between pages, so a notice is the same on every page, and closing one closes it everywhere.
 // Used by: main.js
 // Uses: NavBar, DefaultPasswordWarning, updates/UpdateNotice, updates/InstallerNotice,

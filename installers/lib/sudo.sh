@@ -51,8 +51,8 @@ check_sudo_password() {
   fi
 
   SUDO_STATUS="⚠ sudo does not ask $DESKTOP_USER for a password"
-  echo "sudo on this Pi doesn't ask $DESKTOP_USER for a password, so anything running"
-  echo "as $DESKTOP_USER can take full control of the Pi. Making it ask is safer."
+  echo "sudo on this device doesn't ask $DESKTOP_USER for a password, so anything running"
+  echo "as $DESKTOP_USER can take full control of it. Making it ask is safer."
   echo "You'll then need $DESKTOP_USER's password for commands that start with sudo."
   if ! ask_yes_no "Make sudo ask for a password? (y/n): "; then
     echo "  sudo left as it is."

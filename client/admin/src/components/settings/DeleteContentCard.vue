@@ -73,7 +73,7 @@ async function startRestore() {
   try {
     updates.value = await api.get('/settings/updates');
     if (!updates.value.available || !(updates.value.autoUpdates || updates.value.instant)) {
-      msg.error(updates.value.reason || "Restore Defaults reinstalls the software through the updater, which isn't set up on this noticeboard. Run the installer on the Pi to set it up.");
+      msg.error(updates.value.reason || "Restore Defaults reinstalls the software through the updater, which isn't set up on this noticeboard. Run the installer on the Server to set it up.");
       return;
     }
     if (updates.value.busy) {
@@ -202,12 +202,12 @@ onUnmounted(() => clearInterval(pollTimer));
       <li><strong>The software is reinstalled</strong> from the latest version of {{ branch }}, into a clean folder. The noticeboard restarts; screens go blank for a few seconds, then reload by themselves.</li>
     </ul>
     <p>
-      Kept: the branch this noticeboard follows, and what the installer set up on the Pi (the kiosk, the services,
+      Kept: the branch this noticeboard follows, and what the installer set up on the Server (the kiosk, the services,
       sudo and the firewall).
     </p>
     <p class="tone-warn">
       <strong>Running the installer again afterwards is recommended.</strong> There will be no more reminders about it
-      once the restore is complete. In a terminal on this Pi, or over SSH:
+      once the restore is complete. In a terminal on the Server, or over SSH:
     </p>
     <p><code class="command">{{ installerCommand(branch) }}</code></p>
 

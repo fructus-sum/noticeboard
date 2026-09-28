@@ -1,6 +1,6 @@
 // The updater's warnings are on every admin page (SYSTEM_DESIGN §3.6), and the viewer shows a
 // warning mark while the installer needs running again (§3.5): "back on main" and "Run the
-// installer again on this Pi" on the Slideshows, slideshow and Settings pages but not the login
+// installer again on the Server" on the Slideshows, slideshow and Settings pages but not the login
 // page; closing "back on main" closes it on every page; the red triangle in the viewer's
 // bottom-right corner, about 20 px, with only "Please check the Admin panel for details.", gone
 // once the installer has run.

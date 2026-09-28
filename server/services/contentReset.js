@@ -5,7 +5,7 @@
 //   with its tracks and event. The sample slideshow (and whether it's published or hidden, but not
 //   its background audio, whose show is gone), every setting, the logo and the background colour
 //   are kept: it isn't a factory reset.
-//   Restore Defaults (SYSTEM_DESIGN §14 D42): as if newly installed on the branch the Pi follows.
+//   Restore Defaults (SYSTEM_DESIGN §14 D42): as if newly installed on the branch the Server follows.
 //   The request leaves a marker (data/restore-defaults) and asks update.sh to reinstall that
 //   branch into a clean folder and restart the server; the data is reset at the next start-up,
 //   before anything reads it, so nothing is half-written.
@@ -22,7 +22,7 @@
 //                            everything in data/ but KEPT_DATA, the files in tmp/ but the updater's
 //                            lock, and the logs (app.log emptied in place: the logger has it open)
 //   KEPT_DATA              the files in data/ a restore keeps: the branch followed, and how the
-//                            installer set this Pi up
+//                            installer set the Server up
 //
 // Used by
 //   routes/api/settings/maintenance.js; server/index.js (applyPendingRestore)
@@ -33,7 +33,7 @@
 //   utils/pathHelpers, utils/logger
 //
 // Change impact
-//   The sample must never be deleted by Delete All: installed Pis rely on it coming back only
+//   The sample must never be deleted by Delete All: installed Servers rely on it coming back only
 //   through the sample sync (SYSTEM_DESIGN §7). What Restore Defaults keeps is a promise to the
 //   owner: the branch, the installer's record, and what installers/update.sh keeps (its
 //   RESTORE_KEEP list).

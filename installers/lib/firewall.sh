@@ -2,9 +2,9 @@
 # installers/lib/firewall.sh — the optional firewall step
 #
 # Responsibilities
-#   The last step before the reboot. Many Pis already have a firewall set up the way their
+#   The last step before the reboot. Many devices already have a firewall set up the way their
 #   owner wants, so nothing is installed or changed without a yes. Setting one up uses ufw, the
-#   firewall Raspberry Pi's documentation recommends, and only opens the ports the user
+#   firewall Raspberry Pi OS's documentation recommends, and only opens the ports the user
 #   confirms, allowing SSH before anything could block it. Over SSH, the firewall turns itself
 #   off again unless the user confirms a new SSH login works.
 #
@@ -25,7 +25,7 @@
 FIREWALL_UNDO_UNIT="noticeboard-firewall-undo"   # turns ufw off again unless the user confirms SSH works
 
 check_firewall() {
-  local port=""   # the slideshow port; a remote display serves nothing, so it has none
+  local port=""   # the slideshow port; a Client serves nothing, so it has none
   if [ "$MODE" = server ]; then
     port=$(slideshow_port)
   fi
@@ -33,13 +33,13 @@ check_firewall() {
   echo ""
   echo "── Firewall (optional) ─────────────────────────"
   if [ -n "$port" ]; then
-    echo "The installer can check this Pi's firewall and make sure other devices can reach"
+    echo "The installer can check this device's firewall and make sure other devices can reach"
     echo "the slideshow and admin panel on port $port."
   else
-    echo "The installer can check this Pi's firewall and, if it has none, set one up."
+    echo "The installer can check this device's firewall and, if it has none, set one up."
   fi
   echo "Nothing is changed unless you say yes. Skip this if you look after the firewall yourself."
-  if ! ask_yes_no "Check this Pi's firewall? (y/n): "; then
+  if ! ask_yes_no "Check this device's firewall? (y/n): "; then
     echo "  Firewall not checked; nothing was changed."
     firewall_reminder "$port"
     return 0
@@ -48,7 +48,7 @@ check_firewall() {
   if ufw_active; then
     echo "  The ufw firewall is on; its rules are kept."
     if [ -z "$port" ]; then
-      echo "  A remote display needs no incoming port, so nothing was changed."
+      echo "  A Client needs no incoming port, so nothing was changed."
     elif ufw allow "$port/tcp" >/dev/null; then
       echo "  ✓ The slideshow port $port/tcp is allowed."
     else
@@ -60,7 +60,7 @@ check_firewall() {
   if command -v firewall-cmd >/dev/null && [ "$(firewall-cmd --state 2>/dev/null)" = running ]; then
     echo "  The firewalld firewall is on; its rules are kept."
     if [ -z "$port" ]; then
-      echo "  A remote display needs no incoming port, so nothing was changed."
+      echo "  A Client needs no incoming port, so nothing was changed."
     elif firewall-cmd --quiet --permanent --add-port="$port/tcp" && firewall-cmd --quiet --reload; then
       echo "  ✓ The slideshow port $port/tcp is allowed."
     else
@@ -70,7 +70,7 @@ check_firewall() {
   fi
 
   if other_firewall_rules; then
-    echo "  This Pi has firewall rules that weren't made with ufw or firewalld (nftables or"
+    echo "  This device has firewall rules that weren't made with ufw or firewalld (nftables or"
     echo "  iptables). They're someone's own setup, so they're left exactly as they are."
     firewall_reminder "$port"
     return 0
@@ -80,11 +80,11 @@ check_firewall() {
   if command -v ufw >/dev/null; then
     echo "The ufw firewall is installed but turned off."
   else
-    echo "This Pi has no firewall turned on."
+    echo "This device has no firewall turned on."
   fi
-  echo "The installer can set up ufw, the firewall Raspberry Pi recommends: it blocks incoming"
-  echo "connections except the ones you choose next. This is recommended only for a Pi that is"
-  echo "a dedicated slideshow machine running Raspberry Pi OS. If this Pi does other jobs too,"
+  echo "The installer can set up ufw, the firewall Raspberry Pi OS recommends: it blocks incoming"
+  echo "connections except the ones you choose next. This is recommended only for a device used"
+  echo "just for the noticeboard, running Raspberry Pi OS. If this device does other jobs too,"
   echo "say no and set up its firewall yourself."
   if ! ask_yes_no "Set up a firewall now? (y/n): "; then
     echo "  Nothing was changed."
@@ -102,12 +102,12 @@ ufw_active() {
 }
 
 # What to allow when the installer doesn't (or can't) change the firewall itself
-firewall_reminder() {   # firewall_reminder <slideshow port, or empty on a remote display>
+firewall_reminder() {   # firewall_reminder <slideshow port, or empty on a Client>
   if [ -n "$1" ]; then
-    echo "  If this Pi has a firewall, allow TCP port $1 through it so other devices can reach"
+    echo "  If this device has a firewall, allow TCP port $1 through it so other devices can reach"
     echo "  the slideshow and the admin panel. With ufw: sudo ufw allow $1/tcp"
   else
-    echo "  A remote display only connects out to its server, so it needs no incoming port."
+    echo "  A Client only connects out to its Server, so it needs no incoming port."
   fi
 }
 
@@ -178,7 +178,7 @@ vnc_running() {
 
 # Ask which ports to keep reachable, allow them, then turn ufw on. SSH is only opened if
 # the user needs it, and always before the firewall starts blocking.
-setup_ufw() {   # setup_ufw <slideshow port, or empty on a remote display>
+setup_ufw() {   # setup_ufw <slideshow port, or empty on a Client>
   local port=$1 detected over_ssh="" ssh_port="" vnc_port="" rule failed="" undo=""
   local rules=()
   detected=$(ssh_port_detected)
@@ -189,12 +189,12 @@ setup_ufw() {   # setup_ufw <slideshow port, or empty on a remote display>
   # SSH: only if it's needed. An SSH port nobody uses is better closed.
   echo ""
   if ssh_running; then
-    echo "SSH (logging in from another computer) is turned on for this Pi, on port $detected."
+    echo "SSH (logging in from another computer) is turned on for this device, on port $detected."
   else
-    echo "SSH (logging in from another computer) isn't turned on for this Pi."
+    echo "SSH (logging in from another computer) isn't turned on for this device."
   fi
   while true; do
-    if ask_yes_no "Do you need SSH access to this Pi? (y/n): "; then
+    if ask_yes_no "Do you need SSH access to this device? (y/n): "; then
       ask_port "SSH port" "$detected"
       ssh_port=$PORT_ANSWER
       break
@@ -224,7 +224,7 @@ setup_ufw() {   # setup_ufw <slideshow port, or empty on a remote display>
   # Over SSH, the firewall must turn itself off again if the user can't get back in
   if [ -n "$over_ssh" ] && [ -n "$ssh_port" ] && ! command -v systemd-run >/dev/null; then
     echo "  Can't set up the automatic undo that protects your SSH access, so the firewall"
-    echo "  wasn't set up. Run the installer from the Pi's own screen and keyboard instead."
+    echo "  wasn't set up. Run the installer from the device's own screen and keyboard instead."
     return 0
   fi
 
@@ -255,7 +255,7 @@ setup_ufw() {   # setup_ufw <slideshow port, or empty on a remote display>
     systemctl stop "$FIREWALL_UNDO_UNIT.timer" >/dev/null 2>&1 || true
     if ! systemd-run --quiet --unit="$FIREWALL_UNDO_UNIT" --on-active=3min "$(command -v ufw)" disable >/dev/null 2>&1; then
       echo "  Couldn't set up the automatic undo that protects your SSH access, so the firewall"
-      echo "  wasn't turned on. Its rules are ready: turn it on from the Pi itself with: sudo ufw enable"
+      echo "  wasn't turned on. Its rules are ready: turn it on from the device itself with: sudo ufw enable"
       return 0
     fi
     undo=1
@@ -270,7 +270,7 @@ setup_ufw() {   # setup_ufw <slideshow port, or empty on a remote display>
 
   if [ -n "$undo" ]; then
     echo ""
-    echo "The firewall is on. Check you can still log in: open a NEW SSH connection to this Pi"
+    echo "The firewall is on. Check you can still log in: open a NEW SSH connection to this device"
     echo "(port $ssh_port) and keep this one open. If there's no yes within 3 minutes, the"
     echo "firewall turns itself off again, so you can't be locked out."
     if ask_yes_in_time 170 "Could you log in over a new SSH connection? (y/n): "; then
@@ -285,7 +285,7 @@ setup_ufw() {   # setup_ufw <slideshow port, or empty on a remote display>
     fi
   fi
 
-  echo "  ✓ The firewall is on, and starts with the Pi. Incoming connections are blocked except:"
+  echo "  ✓ The firewall is on, and starts with the device. Incoming connections are blocked except:"
   ufw status 2>/dev/null | sed -n '/^--/,$p' | sed '1d; s/^/      /'
   echo "  To see it later: sudo ufw status. To turn it off: sudo ufw disable"
 }

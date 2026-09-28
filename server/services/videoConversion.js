@@ -3,7 +3,7 @@
 // Responsibilities
 //   "Convert existing videos" (Settings → Display): every ready video in every slideshow that isn't
 //   in the video format chosen now (settingsService.videoFormat) is converted, one at a time so the
-//   Pi stays usable (SYSTEM_DESIGN §14 D43). A video shows "processing" in the admin panel only while
+//   Server stays usable (SYSTEM_DESIGN §14 D43). A video shows "processing" in the admin panel only while
 //   it's its turn, and the screens keep playing its current file meanwhile (the slide is marked
 //   reprocessing, which the playlist still shows); once the new file is ready it replaces the old
 //   one, the slide is ready again and the displays get the new playlist. A video whose format isn't

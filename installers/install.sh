@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # the configuration is read by the modules in installers/lib
 # install.sh
-# Sets up a Raspberry Pi for Noticeboard. It asks what the Pi is for:
-#   1) Server + display: runs the server and shows the slideshow on this Pi's screen
-#   2) Remote display:   shows the slideshow from a server Pi elsewhere on the network
+# Sets up a Noticeboard Server or Client (a Raspberry Pi with Raspberry Pi OS). It asks which:
+#   1) Server: runs the Noticeboard server and shows the slideshow on its own screen
+#   2) Client: shows the slideshow from a Server elsewhere on the network
 #
 # Run with:  sudo bash installers/install.sh
 #   or:      curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash
@@ -22,7 +22,7 @@
 #   and raw.githubusercontent.com
 # Change impact
 #   What it installs that updates can't change (kiosk scripts, units, shortcuts, packages) only
-#   reaches a Pi when the installer runs again: raise INSTALLER_VERSION with such a change
+#   reaches a Server or Client when the installer runs again: raise INSTALLER_VERSION with such a change
 #   (SYSTEM_DESIGN §8, §15). tests/installers compares what it writes with golden files.
 set -euo pipefail
 
@@ -41,9 +41,9 @@ AUTOSTART_FILE="/etc/xdg/autostart/noticeboard-kiosk.desktop"
 SUDOERS_BACKUP_DIR="/root/noticeboard-sudoers-backup"
 # Raise this, and "installer" in system-requirements.json, whenever this script changes what
 # updates can't: kiosk scripts, system services, desktop shortcuts or system packages. A server
-# Pi whose last installer run (data/installer.json) is older is told to run it again.
+# Server whose last installer run (data/installer.json) is older is told to run it again.
 INSTALLER_VERSION=3
-# A server Pi follows main unless another branch was chosen in the admin panel (choose_branch)
+# A Server follows main unless another branch was chosen in the admin panel (choose_branch)
 INSTALL_BRANCH=main
 # The installer's parts, from the same commit as this script (see load_modules)
 INSTALLER_MODULES=(ui branch json system sudo server display kiosk desktop firewall)   # installers/lib/<name>.sh
@@ -75,7 +75,7 @@ main() {
 
   choose_mode
   if [ "$MODE" = server ] && ! id "$DESKTOP_USER" >/dev/null 2>&1; then
-    echo "ERROR: User '$DESKTOP_USER' not found. Run this with sudo from the Pi's desktop user."
+    echo "ERROR: User '$DESKTOP_USER' not found. Run this with sudo from the desktop user."
     exit 1
   fi
   if [ "$MODE" = server ]; then
@@ -102,9 +102,9 @@ main() {
 }
 
 # ── Latest installer ──────────────────────────────────────────────────────────
-# Whatever copy was started (an old one on the Pi, or a GitHub link, which can serve a
+# Whatever copy was started (an old one on this device, or a GitHub link, which can serve a
 # stale copy for a few minutes after a push), switch to the latest installer of the
-# branch this Pi follows (Settings → Software updates), else main's, so what it sets up
+# branch this Server follows (Settings → Software updates), else main's, so what it sets up
 # matches the version it installs. A branch whose installer is older than this falls back
 # to main's. A link pinned to a commit is never stale. If GitHub can't be reached, carry
 # on with this copy. To run a local copy as it is (e.g. to test changes):
@@ -157,7 +157,7 @@ run_installer_from() {   # run_installer_from <branch> <arguments...>
   exec bash "$file" "$@"
 }
 
-# The installer came from the branch this Pi followed. If the answer to the branch question
+# The installer came from the branch this Server followed. If the answer to the branch question
 # was another branch, hand over to that branch's installer, with the answers so far.
 use_branch_installer() {
   local from=${NOTICEBOARD_INSTALLER_BRANCH:-}
@@ -170,7 +170,7 @@ use_branch_installer() {
   unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH
 }
 
-# The branch this Pi follows (Settings → Software updates), or main
+# The branch this Server follows (Settings → Software updates), or main
 followed_branch() {
   local branch
   branch=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$BRANCH_FILE" 2>/dev/null | head -n 1 || true)
@@ -189,7 +189,7 @@ followed_branch() {
 #                                       installer, which only downloads install.sh
 #   not set (GitHub couldn't be asked for the latest installer): next to this script if it's in
 #                                       a copy of the repository, else downloaded at the branch
-#                                       this Pi follows
+#                                       this Server follows
 # They're read into memory and the download is deleted straight away. Anything missing or
 # broken stops the installer here, before it has changed anything.
 load_modules() {

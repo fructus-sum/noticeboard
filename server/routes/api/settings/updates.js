@@ -32,7 +32,7 @@ router.delete('/updates/notice', jsonRoute(async (req) => {
   return { ok: true };
 }));
 
-// Whether this version needs the installer run again on the Pi, for the admin home page
+// Whether this version needs the installer run again on the Server, for the admin home page
 router.get('/updates/installer', jsonRoute(() => updateService.installerStatus()));
 
 // The installed version, for "Last updated" in the sidebar ({ version: null } without git)

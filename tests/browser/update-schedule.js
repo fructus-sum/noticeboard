@@ -77,7 +77,7 @@ const { makeApp, server, page, check, done, sleep, shot } = require('../helpers/
   check('  … saved: "It will be installed at"', await c.until(`(document.querySelector('.waiting')?.innerText ?? '').includes('It will be installed at')`));
   check('  … in the file for update.sh', /NOTICEBOARD_UPDATE_AT=\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ/.test(fs.readFileSync(data('update-schedule.env'), 'utf8')));
   await c.go(env.base + '/admin/slideshows');
-  check('  … the notice stays until the Pi is up to date', await c.until(`!!document.querySelector('.page-notices .page-warning')`, 8000));
+  check('  … the notice stays until the Server is up to date', await c.until(`!!document.querySelector('.page-notices .page-warning')`, 8000));
   await v.go(env.base + '/?kiosk=off');
   check('  … and so does the mark', await v.until(`!!document.querySelector('.installer-warning')`, 8000));
   await c.screenshot(shot('update-available.png'));

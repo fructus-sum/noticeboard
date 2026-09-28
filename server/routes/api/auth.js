@@ -13,7 +13,7 @@
 //   utils/logger
 //
 // Change impact
-//   GET /api/auth/status is update.sh's health check on every installed Pi: it must keep answering
+//   GET /api/auth/status is update.sh's health check on every installed Server: it must keep answering
 //   2xx when the server is up (SYSTEM_DESIGN §15).
 const express = require('express');
 const rateLimit = require('express-rate-limit');

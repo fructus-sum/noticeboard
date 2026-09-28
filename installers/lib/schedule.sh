@@ -26,7 +26,7 @@
 #   installers/update.sh (loaded before its main(), so a checkout can't swap it mid-run)
 #
 # Uses
-#   SCHEDULE_FILE, set by the script that loads it; GNU date (in the Pi's local time zone)
+#   SCHEDULE_FILE, set by the script that loads it; GNU date (in the Server's local time zone)
 #
 # Change impact
 #   The file format is a contract with the server (services/updates/updateFiles.js):

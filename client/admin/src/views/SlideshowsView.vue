@@ -2,7 +2,7 @@
 // client/admin/src/views/SlideshowsView.vue — the home page: every slideshow (/admin/slideshows)
 //
 // Responsibilities
-//   The updater's notices, this Pi's IP and MAC addresses, the list with publish/disable and
+//   The updater's notices, the Server's IP and MAC addresses, the list with publish/disable and
 //   hide/unhide (hidden ones behind "Show hidden slideshows"), creating a slideshow, deleting one
 //   (never the sample), and opening one.
 //
@@ -50,7 +50,7 @@ async function setHidden(ss, hidden) {
   if (!hiddenCount.value) showHidden.value = false;
 }
 
-// This Pi's IP and MAC addresses, shown above the list
+// The Server's IP and MAC addresses, shown above the list
 const device = ref(null);
 
 async function loadDevice() {
@@ -114,7 +114,7 @@ onMounted(loadDevice);
       class="card"
       style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 20px;padding:10px 16px;font-size:13px"
     >
-      <span style="font-weight:600">This noticeboard</span>
+      <span style="font-weight:600">The Server</span>
       <span v-for="i in device.interfaces" :key="i.name + i.ip" style="color:var(--text-muted)">
         <template v-if="device.interfaces.length > 1">{{ i.name }}: </template>
         IP <code style="color:var(--text)">{{ i.ip }}</code>

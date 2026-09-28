@@ -1,4 +1,4 @@
-// "Run the installer again on this Pi": the home page box, from the installer's record (or the
+// "Run the installer again on the Server": the home page box, from the installer's record (or the
 // kiosk script an older installer left), and the warning when checking a branch that needs it.
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
@@ -94,9 +94,9 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
   check('not set up by the installer (no record, no kiosk script): no box', (await home()) === '');
   kiosk('#!/bin/bash\n# an old kiosk script\nchromium --kiosk http://localhost:3000\n');
   let text = await home();
-  check('kiosk script from before the exit button, no record: the box, with what it brings', /Run the installer again on this Pi/.test(text) && text.includes('The kiosk exit button'), text.slice(0, 80).replace(/\n/g, ' '));
+  check('kiosk script from before the exit button, no record: the box, with what it brings', /Run the installer again on the Server/.test(text) && text.includes('The kiosk exit button'), text.slice(0, 80).replace(/\n/g, ' '));
   check('the box gives main\'s installer command', text.includes('curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash'));
-  check('the kiosk change also needs the remote displays: says so', /each remote display Pi/.test(text));
+  check('the kiosk change also needs the Clients: says so', /each Client/.test(text));
   check('nothing to close on it', !(await c.evaluate(`!!document.querySelector('.installer button[aria-label*="Close"], .installer .notice__close')`)));
   check('its help link goes to the guide section', (await c.evaluate(`document.querySelector('.installer a').getAttribute('href')`)) === '/admin/help#installer-needed');
   const guide = await (await fetch(BASE + '/admin/help')).text();
@@ -117,15 +117,15 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
   await type('.row input', 'needs-installer'); await click('Check branch');
   await until(`(${card}).innerText.includes('exists on GitHub')`, 20000);
   text = await c.evaluate(`(${card}).innerText`);
-  check('checking a branch that needs a newer installer run: warns before switching', /After switching, run the installer again on this Pi/.test(text));
-  check('lists only what this Pi missed (versions 2 and 3)', text.includes('A new system service') && text.includes('A desktop shortcut') && !/After switching[\s\S]*The kiosk exit button/.test(text));
+  check('checking a branch that needs a newer installer run: warns before switching', /After switching, run the installer again on the Server/.test(text));
+  check('lists only what the Server missed (versions 2 and 3)', text.includes('A new system service') && text.includes('A desktop shortcut') && !/After switching[\s\S]*The kiosk exit button/.test(text));
   await c.screenshot(path.join(require('os').tmpdir(), 'noticeboard-test-installer-check.png'));
   await click('Switch to needs-installer');
   await until(`!!document.querySelector('#switch-password')`);
   await type('#switch-password', 'Admin@12345');
   await c.evaluate(`document.querySelector('.dialog form, form.dialog').requestSubmit()`);
   await until(`document.querySelector('#final-title') !== null`, 5000);
-  check('the final warning reminds you too', /Afterwards, run the installer again on this Pi/.test(await c.evaluate(`document.querySelector('.dialog').innerText`)));
+  check('the final warning reminds you too', /Afterwards, run the installer again on the Server/.test(await c.evaluate(`document.querySelector('.dialog').innerText`)));
   await click('Cancel, keep');
   await sleep(300);
   check('cancel: nothing changed', !fs.existsSync(path.join(APP, 'data/update-branch.env')) && !fs.existsSync(path.join(APP, 'tmp/update-request')));
@@ -136,12 +136,12 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
   const api = await c.evaluate(`fetch('/api/settings/updates/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ branch: 'needs-installer' }) }).then((r) => r.json())`);
   check('the check answers with the installer needs', api.installer?.needed === true && api.installer.required === 3 && api.installer.installed === 1 && api.installer.displays === false && api.requirements?.listed === true, JSON.stringify(api.installer));
 
-  // After the switch: the Pi runs the branch's version, following it
+  // After the switch: the Server runs the branch's version, following it
   git(APP, 'fetch', '-q', 'origin', 'needs-installer'); git(APP, 'checkout', '-q', '-B', 'needs-installer', 'origin/needs-installer');
   follow('needs-installer');
   text = await home();
   check('after switching: the box on the home page, with that branch\'s installer command', /Run the installer again/.test(text) && text.includes('/noticeboard/needs-installer/installers/install.sh') && text.includes('A desktop shortcut'), text.slice(0, 60));
-  check('only the server Pi this time (no display change missed)', !/each remote display Pi/.test(text));
+  check('only the Server this time (no Client change missed)', !/each Client/.test(text));
   record(3);
   check('once the installer has run (record 3): the box is gone', (await home()) === '');
 

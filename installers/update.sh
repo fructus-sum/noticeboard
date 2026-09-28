@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # update.sh
-# Keeps a server Pi on the latest commit of the GitHub branch it follows: main, unless another
+# Keeps a Server on the latest commit of the GitHub branch it follows: main, unless another
 # branch was chosen in the admin panel (Settings → Software updates). When there's a new commit
 # it installs it, rebuilds, restarts the server and checks the server answers. If anything
 # fails it puts the previous version back, and after a failed branch switch it also goes back
@@ -34,7 +34,7 @@
 #   files it shares with the server (SYSTEM_DESIGN §4.2); GET /api/auth/status after a
 #   restart
 # Change impact
-#   This file runs the next update on every Pi that installed it: a mistake here can stop updates
+#   This file runs the next update on every Server that installed it: a mistake here can stop updates
 #   everywhere. Its path is in every installed update unit, and after a rollback an older
 #   commit's update.sh must take over again (§9, §15). tests/upgrade proves both.
 set -euo pipefail
@@ -61,7 +61,7 @@ LOCK_FILE="$INSTALL_DIR/tmp/update.lock"             # install.sh holds this loc
 FAILED_FILE="$INSTALL_DIR/tmp/update-failed-commit"  # skipped until the branch moves past it
 UPLOAD_DIR="$INSTALL_DIR/tmp/noticeboard-uploads"    # pathHelpers.tmpDir()
 # Another branch is only installed if its update.sh also follows the branch chosen in the admin
-# panel, i.e. mentions this file. An older branch would ignore that setting, so the Pi couldn't
+# panel, i.e. mentions this file. An older branch would ignore that setting, so the Server couldn't
 # be switched back from the admin panel. (server/services/updates/index.js checks the same.)
 BRANCH_SUPPORT_MARKER="update-branch.env"
 
@@ -84,7 +84,7 @@ done
 # else main
 BRANCH="${NOTICEBOARD_BRANCH:-$(read_branch_setting)}"
 BRANCH="${BRANCH:-main}"
-# main's commit when this Pi switched to its branch (see branch_merged)
+# main's commit when this Server switched to its branch (see branch_merged)
 MAIN_AT_SWITCH=$(read_main_at_switch)
 RETURNED_FROM=""     # the branch this run went back to main from, because it was merged
 PREVIOUS_BRANCH=""   # the branch and commit running before this update
@@ -210,7 +210,7 @@ main() {
     if [ "$code" -eq 2 ]; then
       reason="The branch $BRANCH doesn't exist on GitHub"
     else
-      reason="Couldn't download $BRANCH from GitHub (is the Pi online?)"
+      reason="Couldn't download $BRANCH from GitHub (is the Server online?)"
     fi
     if [ -n "$switching" ]; then
       restore_branch_setting
@@ -307,13 +307,13 @@ main() {
     if install_commit "$PREVIOUS_BRANCH" "$CURRENT"; then
       write_status rolled-back "${TARGET:0:7} from $BRANCH failed to install or build, so ${CURRENT:0:7} from $PREVIOUS_BRANCH was put back. The noticeboard kept running the whole time."
     else
-      write_status failed "${TARGET:0:7} from $BRANCH failed to install or build, and putting ${CURRENT:0:7} from $PREVIOUS_BRANCH back failed too. The noticeboard is still running, but might not start after a restart. To recover, run the installer on this Pi: curl -fsSL $INSTALLER_URL | sudo bash"
+      write_status failed "${TARGET:0:7} from $BRANCH failed to install or build, and putting ${CURRENT:0:7} from $PREVIOUS_BRANCH back failed too. The noticeboard is still running, but might not start after a restart. To recover, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash"
       echo "ERROR: couldn't restore ${CURRENT:0:7}'s files. Fix this before the server next restarts." >&2
     fi
     if [ -n "$restore" ]; then
       # The reset still happens: the server applies it at start-up (and so clears the status above)
       restart_server || true
-      write_status failed "Restore Defaults: the settings and content were reset, but reinstalling ${TARGET:0:7} from $BRANCH failed, so ${CURRENT:0:7} was put back. To reinstall, run the installer on this Pi: curl -fsSL $INSTALLER_URL | sudo bash"
+      write_status failed "Restore Defaults: the settings and content were reset, but reinstalling ${TARGET:0:7} from $BRANCH failed, so ${CURRENT:0:7} was put back. To reinstall, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash"
     fi
     exit 1
   fi
@@ -327,7 +327,7 @@ main() {
       write_status rolled-back "${TARGET:0:7} from $BRANCH didn't start, so ${CURRENT:0:7} from $PREVIOUS_BRANCH was put back and restarted."
       echo "Rolled back to ${CURRENT:0:7}."
     else
-      write_status failed "${TARGET:0:7} from $BRANCH didn't start, and going back to ${CURRENT:0:7} from $PREVIOUS_BRANCH failed too. To recover, run the installer on this Pi: curl -fsSL $INSTALLER_URL | sudo bash (server logs: journalctl -u $SERVICE_NAME)"
+      write_status failed "${TARGET:0:7} from $BRANCH didn't start, and going back to ${CURRENT:0:7} from $PREVIOUS_BRANCH failed too. To recover, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash (server logs: journalctl -u $SERVICE_NAME)"
       echo "ERROR: rollback to ${CURRENT:0:7} failed. Check: journalctl -u $SERVICE_NAME" >&2
     fi
     exit 1
@@ -483,7 +483,7 @@ waiting_note() {
   if [ -n "$next" ]; then echo "It's installed at $(date -d "@$next" '+%-d %b %Y, %H:%M'), or when you choose Update now."; fi
 }
 
-# Restore Defaults: delete everything untracked in the install folder but RESTORE_KEEP (a Pi has no
+# Restore Defaults: delete everything untracked in the install folder but RESTORE_KEEP (a Server has no
 # .gitignore, so -x and the keep list are what protect those)
 clean_folder() {
   local args=() keep

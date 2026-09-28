@@ -7,7 +7,7 @@
 //     Update now (POST /settings/updates/install-now), Set a time (PUT /settings/updates/install-at,
 //     default the next 00:00), or waiting for the automatic install, whose time it shows;
 //   - the schedule: every 15 minutes, every 2 hours, daily or weekly at a time, or manual
-//     (PUT /settings/updates/schedule). Times are the Pi's own clock; a set time is an exact moment.
+//     (PUT /settings/updates/schedule). Times are the Server's own clock; a set time is an exact moment.
 //   update.sh works out the next install time; after a change the server asks it to check at once.
 //
 // Props: info (GET /settings/updates)

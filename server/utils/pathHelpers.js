@@ -10,7 +10,7 @@
 //   most server modules (never a hard-coded path elsewhere)
 //
 // Change impact
-//   Installed Pis, update.sh and the kiosk scripts rely on these names (SYSTEM_DESIGN §6,
+//   Installed Servers, update.sh and the kiosk scripts rely on these names (SYSTEM_DESIGN §6,
 //   §15). mediaUrl must match shared/index.js (a unit test checks).
 const path = require('path');
 
@@ -35,7 +35,7 @@ function updateNoticePath() { return path.join(dataDir(), 'update-notice.json');
 function updateRequestPath() { return path.join(ROOT, 'tmp', 'update-request'); }
 function updateSchedulePath() { return path.join(dataDir(), 'update-schedule.env'); }
 function restoreMarkerPath() { return path.join(dataDir(), 'restore-defaults'); }
-// What install.sh set up: the version of its last run, and the server Pi's kiosk script
+// What install.sh set up: the version of its last run, and the Server's kiosk script
 function installerRecordPath() { return path.join(dataDir(), 'installer.json'); }
 function serverKioskPath() { return path.join(ROOT, 'start-kiosk.sh'); }
 function requirementsPath() { return path.join(ROOT, 'system-requirements.json'); }

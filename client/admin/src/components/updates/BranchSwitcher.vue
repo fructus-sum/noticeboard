@@ -125,7 +125,7 @@ defineExpose({ reset });
         </div>
 
         <div v-if="checked.installer?.needed" class="software software--missing installer-needed">
-          <strong>⚠ After switching, run the installer again on this Pi.</strong>
+          <strong>⚠ After switching, run the installer again on the Server.</strong>
           {{ checked.branch }} needs something only the installer sets up, which a switch can’t do by itself.
           Until it’s run, these stay as they were:
           <ul>
