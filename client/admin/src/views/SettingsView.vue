@@ -1,9 +1,10 @@
 <script setup>
 // client/admin/src/views/SettingsView.vue — the Settings page (/admin/settings)
 //
-// One card per area, in this order: Display, MAC filtering, Branding, Change password (#password),
-// Software updates, Delete content. The settings the first two show are loaded once here (GET /settings); the
-// other cards load what they need themselves.
+// One card per area, in this order: Branding (first, the owner, 2026-09-28), Display, MAC filtering,
+// Port, Change password (#password), Software updates, Delete content. The settings Branding, Display,
+// MAC filtering and Port show are loaded once here (GET /settings); the other cards load what they
+// need themselves.
 //
 // Used by: router/index.js
 // Uses: useApi, the cards in components/settings and components/updates
@@ -27,10 +28,10 @@ onMounted(async () => {
 <template>
   <div>
     <h1>Settings</h1>
+    <BrandingSettings :settings="settings" />
     <DisplaySettingsCard :settings="settings" />
     <MacFilterCard :settings="settings" />
     <ServerPortCard :settings="settings" />
-    <BrandingSettings :settings="settings" />
     <PasswordCard />
     <SoftwareUpdates />
     <DeleteContentCard />

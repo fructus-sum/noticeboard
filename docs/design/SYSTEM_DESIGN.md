@@ -4,7 +4,7 @@
 
 **Keeping it up to date:** every planned change starts in §18, before any code. Then change this document in the same commit as the code it describes, so it is always a live view of the software and of the work in progress. Code comments refer to it as `SYSTEM_DESIGN §<n>`, and to the entries of §14 by their D-number: when a number changes, update those comments too (search the code for `SYSTEM_DESIGN`).
 
-**Version:** main is **0.5.0**; `feature/audio-support` carries **0.6.0** ("Audio") to **0.6.14** (the words Server and Client, the Known Issues, and fixes from the Pi test) and **0.7.0** (every screen in step), which merge into main together. 1.0.0 is the version with Display Groups. The rules and the history are in §19.
+**Version:** main is **0.5.0**; `feature/audio-support` carries **0.6.0** ("Audio") to **0.6.14** (the words Server and Client, the Known Issues, and fixes from the Pi test) and **0.7.0** (every screen in step) and **0.7.1** (Branding first on the Settings page), which merge into main together. 1.0.0 is the version with Display Groups. The rules and the history are in §19.
 
 **Module headers:** every module starts with a header in this form (`//` comments in JavaScript and inside a Vue file's `<script setup>`, `#` in bash). Comments inside a module explain intent, compatibility constraints and anything non-obvious, not what each line does.
 
@@ -1048,7 +1048,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/audio/ShowPreview.vue` | "Preview the show": plays the show (saved settings, ready tracks) in the browser with the screens' engine; ⏭ Next track, ■ Stop, the track playing, "Try again" if the browser refuses sound; follows changes while playing (a new volume at once; a change to the tracks, order, transition or fade starts its next track), stops when the page is left; its timeline starts when ▶ is pressed | `@shared/audioPlayer.mjs`, `@shared` audioUrl, mediaDisplayName | |
 | `components/audio/TrackList.vue` | upload, rows (▶/■ to listen at the show's volume, name with ✎, length, file, status), reorder, delete | useItemList, useRename, CollapsibleCard, `@shared` audioUrl, mediaDisplayName, LIMITS | |
 | `views/SlideshowDetailView.vue` | loads the default duration, the slideshow (404 → the list) and its slides; the header with its tags; the disabled banner | useApi, SlideshowSettingsCard, SlideList, TagPill | |
-| `views/SettingsView.vue` | loads `GET /settings` once for the Display and MAC cards; the cards in order (Display, MAC filtering, Branding, Change password, Software updates, Delete content) | useApi, the settings and updates cards | |
+| `views/SettingsView.vue` | loads `GET /settings` once for the Display and MAC cards; the cards in order (Branding first since 0.7.1, then Display, MAC filtering, Port, Change password, Software updates, Delete content) | useApi, the settings and updates cards | |
 | `components/slideshow/SlideshowSettingsCard.vue` | the settings facts, publish/disable, hide/unhide, the edit form (name, priority, duration, schedule, background audio: the published audio shows, and the current one marked if it has been unpublished) | useApi, useShowActions, useFlash, ScheduleEditor, StatusBadge, PublishToggle, FlashMessage, `@shared` LIMITS | |
 | `components/slideshow/ScheduleEditor.vue` | always/timed, times, days (v-model; two fields, no wrapper) | WeeklyTimesEditor | |
 | `components/ui/WeeklyTimesEditor.vue` | start and end time and the days of the week (v-model, edited in place; `daysLabel`) | none | used by ScheduleEditor and AudioEventCard |
@@ -1318,11 +1318,11 @@ Every planned change starts here, before any code: what changes and why, the par
 | # | Change | Status | Version (§19) |
 |---|---|---|---|
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again | a patch release when fixed |
-| 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); to check on a real Pi, then merge into main with the owner's OK | 0.6.0 |
+| 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); checked on the owner's Pis (2026-09-28: all works, including the lowered background and crossfades); to merge into main with the owner's OK | 0.6.0 |
 | 18.4 | The words Server and Client everywhere; the supported devices | Done (the kiosk scripts' text with §18.5 item 2, installer version 4); on `feature/audio-support`, to merge with it | 0.6.1 |
 | 18.5 | The Known Issues cleared for a stable base (§16) | Done on `feature/audio-support` (all 12 items), to merge with it | 0.6.2 to 0.6.13 (one per item) |
 | 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, after 18.5 | 0.8.0 |
-| 18.8 | Every screen in step: slides and music on the Server's clock | Built on `feature/audio-support` (phases 1–3 done, the docs updated); to check on real Pis with audio, then merge with it | 0.7.0 |
+| 18.8 | Every screen in step: slides and music on the Server's clock | Built on `feature/audio-support` (phases 1–3 done, the docs updated); checked on the owner's Pis (2026-09-28); to merge with audio | 0.7.0 |
 
 Design notes D44–D47 are reserved for 18.3.
 
@@ -1544,7 +1544,7 @@ cat /proc/device-tree/model; uname -r; chromium --version
 1. **Done:** the server clock and the time events.
 2. **Done:** the slide timeline.
 3. **Done:** the music timeline.
-4. Docs (done), the full run, the check on the owner's Pis.
+4. **Done:** the docs, the full run, the check on the owner's Pis (2026-09-28).
 
 ## 19. Versions
 
@@ -1557,7 +1557,7 @@ cat /proc/device-tree/model; uname -r; chromium --version
 - **Each bug fix counts as its own patch number,** even when several are done together (the owner, 2026-09-28): e.g. §18.5's twelve items are 0.6.2 to 0.6.13, and wording or documentation work such as §18.4 is a patch too.
 - `package.json` (the root, `client/admin` and `client/display`) still says 1.0.0, npm's default; nothing reads it. Setting it to the version here is for the owner to decide (by hand, with the matching top entries of `package-lock.json`, never with npm install on Windows).
 
-**Current:** main is **0.5.0**. On `feature/audio-support`, done and waiting for the check on a real Pi, then one merge into main: **0.6.0** "Audio" (§18.3), **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item), **0.6.14** (the fix from the Pi test) and **0.7.0** (§18.8 every screen in step). Planned: **0.8.0** (§18.6 Releases) and **0.9.0** (the installer and update redesign, planned).
+**Current:** main is **0.5.0**. On `feature/audio-support`, done and waiting for the check on a real Pi, then one merge into main: **0.6.0** "Audio" (§18.3), **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item), **0.6.14** (the fix from the Pi test), **0.7.0** (§18.8 every screen in step) and **0.7.1** (the Branding card first on the Settings page). Planned: **0.8.0** (§18.6 Releases) and **0.9.0** (the installer and update redesign, planned).
 
 **History** (numbered after the fact for everything before 0.6.0)
 
@@ -1584,3 +1584,4 @@ cat /proc/device-tree/model; uname -r; chromium --version
 | 0.6.13 | on the branch | `feature/audio-support` | the Display card warns about videos in the other format | |
 | 0.6.14 | on the branch | `feature/audio-support` | `?debug=audio` on the viewer | a video's sound silenced the background music on a Pi (every sound is now 48 kHz) |
 | 0.7.0 | on the branch | `feature/audio-support` | Every screen in step (§18.8): every screen keeps to the Server's clock, shows the same slide and plays the same music at the same moment; a playlist change reaches every screen together at the end of the slide on air; music like a radio (a show is joined where it is now); a video starts at the right point and is kept there | screens side by side changing slides at different times, and screens heard together echoing |
+| 0.7.1 | on the branch | `feature/audio-support` | The Branding card first on the Settings page (the owner, 2026-09-28) | |

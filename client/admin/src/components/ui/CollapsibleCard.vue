@@ -8,7 +8,8 @@
 // carries on.
 //
 // The ▾ is drawn by CSS, so the title's text is exactly the title (tests and the page text rely on it).
-// Props: title, name (the key it's remembered by), attention
+// Props: title, name (the key it's remembered by; also its data-card attribute, which the tests find
+//   it by), attention
 // Slots: default (the body), actions (buttons beside the title, e.g. Edit; hidden while folded)
 // Attributes (e.g. an id to link to) go to the card.
 // Used by: settings/DisplaySettingsCard, MacFilterCard, BrandingSettings, PasswordCard,
@@ -34,7 +35,7 @@ function toggle() {
 </script>
 
 <template>
-  <section class="card" :class="{ 'card--collapsed': collapsed }">
+  <section class="card" :class="{ 'card--collapsed': collapsed }" :data-card="name">
     <div class="card-head">
       <h2 class="card-title">
         <button
