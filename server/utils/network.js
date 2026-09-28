@@ -3,7 +3,7 @@
 // Responsibilities
 //   The one place that knows how addresses look: IPv4 addresses reported inside IPv6 (::ffff:),
 //   loopback addresses, and this machine's LAN interfaces. Deciding who is *allowed* is not here
-//   (see services/macService.js, which keeps its own rule for "this Pi itself").
+//   (see services/macService.js, which keeps its own rule for "the Server itself").
 //
 // Provides
 //   plainAddress(address) → string   the address without the ::ffff: prefix ('' for none)

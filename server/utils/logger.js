@@ -2,7 +2,7 @@
 //
 // Provides
 //   logger.error / warn / info / debug(message, details)
-//   Written as JSON lines to the console (on a Pi: the journal, journalctl -u noticeboard) and to
+//   Written as JSON lines to the console (on an installed Server: the journal, journalctl -u noticeboard) and to
 //   logs/app.log (5 MB, 3 files kept).
 //
 // Environment

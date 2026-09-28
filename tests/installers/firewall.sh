@@ -78,7 +78,7 @@ done_ok && [ -z "$(changes)" ] && grep -q "allow TCP port 3000" "$OUT" && grep -
 run no8080 server 'MOCK_PORT=8080' n
 grep -q "allow TCP port 8080" "$OUT" && grep -q "sudo ufw allow 8080/tcp" "$OUT" && ok "no: the reminder names the Pi's real port (8080)" || { bad "no8080"; show no8080; }
 run nodisplay display '' n
-done_ok && [ -z "$(changes)" ] && grep -q "needs no incoming port" "$OUT" && ok "no, remote display: nothing changed, no port needed" || { bad "nodisplay"; show nodisplay; }
+done_ok && [ -z "$(changes)" ] && grep -q "needs no incoming port" "$OUT" && ok "no, a Client: nothing changed, no port needed" || { bad "nodisplay"; show nodisplay; }
 run blank server '' "" maybe n
 [ "$(grep -c "Please type y or n" "$OUT")" = 2 ] && [ -z "$(changes)" ] && ok "Enter or anything else isn't a yes: asks again" || { bad "blank"; show blank; }
 
@@ -86,7 +86,7 @@ run blank server '' "" maybe n
 run ufwon server 'define_ufw; MOCK_UFW_STATE=active' y
 done_ok && [ "$(changes)" = "ufw allow 3000/tcp" ] && ok "ufw already on: only the slideshow port is added, rules kept" || { bad "ufwon"; show ufwon; }
 run ufwondisplay display 'define_ufw; MOCK_UFW_STATE=active' y
-done_ok && [ -z "$(changes)" ] && ok "ufw on, remote display: nothing to add" || { bad "ufwondisplay"; show ufwondisplay; }
+done_ok && [ -z "$(changes)" ] && ok "ufw on, a Client: nothing to add" || { bad "ufwondisplay"; show ufwondisplay; }
 run firewalld server 'firewall-cmd() { log "firewall-cmd $*"; if [ "$1" = --state ]; then echo running; fi; }' y
 done_ok && grep -q -- "--permanent --add-port=3000/tcp" "$CALLS" && grep -q -- "--reload" "$CALLS" && ! grep -q "^ufw\|^apt-get" "$CALLS" \
   && ok "firewalld running: the port is added there, nothing else" || { bad "firewalld"; show firewalld; }
@@ -100,7 +100,7 @@ done_ok && [ -z "$(changes)" ] && grep -q "left exactly as they are" "$OUT" && o
 
 # ── No firewall ──
 run setupno server '' y n
-done_ok && [ -z "$(changes)" ] && grep -q "dedicated slideshow machine running Raspberry Pi OS" "$OUT" && grep -q "allow TCP port 3000" "$OUT" \
+done_ok && [ -z "$(changes)" ] && grep -q "just for the noticeboard, running Raspberry Pi OS" "$OUT" && grep -q "allow TCP port 3000" "$OUT" \
   && ok "no firewall, setup declined: nothing changed, recommendation explained" || { bad "setupno"; show setupno; }
 run setup server 'MOCK_ACTIVE="ssh"' y y y "" ""
 expected=$'apt-get install -y -qq ufw\nufw allow 22/tcp\nufw allow 3000/tcp\nufw allow 5353/udp\nufw default deny incoming\nufw default allow outgoing\nufw --force enable'
@@ -124,7 +124,7 @@ grep -q "^ufw allow 5900/tcp" "$CALLS" && ok "VNC running: asked, and allowed wh
 run vncno server 'MOCK_VNC=1' y y n "" n
 ! grep -q "5900" "$CALLS" && ok "VNC not needed: stays closed" || { bad "vncno"; show vncno; }
 run display display 'MOCK_ACTIVE="ssh"' y y y ""
-done_ok && ! grep -q "Slideshow port" "$OUT" && ! grep -q "3000" "$CALLS" && grep -q "^ufw --force enable" "$CALLS" && ok "remote display: no slideshow port" || { bad "display"; show display; }
+done_ok && ! grep -q "Slideshow port" "$OUT" && ! grep -q "3000" "$CALLS" && grep -q "^ufw --force enable" "$CALLS" && ok "a Client: no slideshow port" || { bad "display"; show display; }
 run enablefails server 'MOCK_ENABLE_FAILS=1' y y n ""
 done_ok && grep -q "^ufw disable" "$CALLS" && grep -q "left off" "$OUT" && ok "if turning it on fails: turned off again, installer carries on" || { bad "enablefails"; show enablefails; }
 

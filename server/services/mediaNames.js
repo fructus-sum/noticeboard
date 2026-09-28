@@ -14,7 +14,7 @@
 //                                 (a file is never refused for its name), or null when it has none
 //
 // Used by
-//   routes/api/slides.js (uploads and renaming), services/sampleSlideshow.js (the sample's files)
+//   routes/api/mediaItems.js (uploads and renaming), services/sampleSlideshow.js (the sample's files)
 //
 // Uses
 //   shared/contract.json (limits.mediaNameMax)

@@ -3,7 +3,7 @@
 // Responsibilities
 //   "Convert existing videos" (Settings → Display): every ready video in every slideshow that isn't
 //   in the video format chosen now (settingsService.videoFormat) is converted, one at a time so the
-//   Pi stays usable (SYSTEM_DESIGN §14 D43). A video shows "processing" in the admin panel only while
+//   Server stays usable (SYSTEM_DESIGN §14 D43). A video shows "processing" in the admin panel only while
 //   it's its turn, and the screens keep playing its current file meanwhile (the slide is marked
 //   reprocessing, which the playlist still shows); once the new file is ready it replaces the old
 //   one, the slide is ready again and the displays get the new playlist. A video whose format isn't
@@ -13,6 +13,9 @@
 // Provides
 //   start()           → the status: starts a run (409 when one is running)
 //   status()          → { running, total, done, converted, skipped, failed, current, format, finishedAt }
+//   formats()         → { format, total, other }: the videos uploaded, and how many aren't in the
+//                     selected format (their recorded format, else ffprobe; nothing is written), for
+//                     the Display card's warning (SYSTEM_DESIGN §18.5 item 12)
 //   recover()         at start-up: a slide left marked by a run the server didn't finish is ready
 //                     again with its old file (still there), and the unfinished outputs are deleted
 //
@@ -20,7 +23,7 @@
 //   routes/api/settings/videos.js, server/index.js (recover)
 //
 // Uses
-//   services/slideshowStore, services/mediaService (processVideo, getVideoDuration, videoFormatOf),
+//   services/slideshowStore, services/mediaService (processVideo, getMediaDuration, videoFormatOf),
 //   services/settingsService (videoFormat), services/displayEvents, utils/pathHelpers, utils/logger
 //
 // Change impact
@@ -30,7 +33,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const store = require('./slideshowStore');
-const { processVideo, getVideoDuration, videoFormatOf } = require('./mediaService');
+const { processVideo, getMediaDuration, videoFormatOf } = require('./mediaService');
 const { videoFormat } = require('./settingsService');
 const displayEvents = require('./displayEvents');
 const { slidesDir, tmpDir } = require('../utils/pathHelpers');
@@ -76,7 +79,7 @@ async function convertOne({ folder, id }, format) {
   try {
     fs.mkdirSync(work, { recursive: true });
     const made = await processVideo(source, work, `${id}-${crypto.randomBytes(3).toString('hex')}`, format);
-    const duration = await getVideoDuration(path.join(work, made));
+    const duration = await getMediaDuration(path.join(work, made));
     // Deleted meanwhile: the new file isn't needed
     const kept = await patchSlide(folder, id, () => {});
     if (!kept) return 'skipped';
@@ -117,6 +120,20 @@ async function run(videos, format) {
   logger.info('Converting existing videos finished', { converted: state.converted, skipped: state.skipped, failed: state.failed });
 }
 
+// How many of the videos uploaded aren't in the selected format
+async function formats() {
+  const format = videoFormat();
+  const videos = readyVideos();
+  let other = 0;
+  for (const { folder, id } of videos) {
+    const slide = store.readSlides(folder).slides.find((s) => s.id === id);
+    if (!slide) continue;
+    const current = slide.format ?? await videoFormatOf(path.join(slidesDir(folder), slide.filename));
+    if (current !== format) other += 1;
+  }
+  return { format, total: videos.length, other };
+}
+
 function start() {
   if (state.running) throw Object.assign(new Error('Videos are already being converted.'), { status: 409, expose: true });
   const format = videoFormat();
@@ -150,4 +167,4 @@ async function recover() {
   }
 }
 
-module.exports = { start, status, recover };
+module.exports = { start, status, formats, recover };

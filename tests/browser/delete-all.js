@@ -1,5 +1,5 @@
 // Delete All in the admin panel (SYSTEM_DESIGN §14 D40): the Settings card "Delete content", the
-// warning listing each slideshow, the admin password, the last chance; cancelling at any step or a
+// warning listing each slideshow and audio show, the admin password, the last chance; cancelling at any step or a
 // wrong password changes nothing; confirming leaves only the sample; with nothing to delete it
 // says so instead of asking.
 const { makeApp, server, page, check, done, sleep, shot } = require('../helpers/app.js');
@@ -11,6 +11,7 @@ const { connect } = require('../helpers/cdp.js');
   await s.start();
   await s.login();
   for (const name of ['Front desk', 'Canteen']) await s.api('POST', '/api/slideshows', { name });
+  await s.api('POST', '/api/audioshows', { name: 'Lobby music' });
   const count = async () => (await s.api('GET', '/api/slideshows')).data.length;
 
   const c = await page(connect, { width: 1100, height: 900 });
@@ -27,6 +28,7 @@ const { connect } = require('../helpers/cdp.js');
   // Cancel at the password step
   await c.click('Delete All');
   check('the warning lists each slideshow and its slides', await c.until(`(document.querySelector('.danger-dialog')?.innerText ?? '').includes('Front desk (0 slides)') && document.querySelector('.danger-dialog').innerText.includes('Canteen (0 slides)')`));
+  check('  … and each audio show with its tracks', await c.evaluate(`document.querySelector('.danger-dialog').innerText.includes('Lobby music (audio show, 0 tracks)') && document.querySelector('.danger-dialog').innerText.includes('Delete all your slideshows and audio shows?')`));
   const text = await c.evaluate(`document.querySelector('.danger-dialog').innerText`);
   check('it says what is kept and that it can\'t be undone', text.includes("can't be undone") && text.includes('sample slideshow'));
   check('the password field has the focus', await c.until(`document.activeElement?.id === 'delete-all-password'`));
@@ -51,7 +53,8 @@ const { connect } = require('../helpers/cdp.js');
   await typePassword('Admin@12345');
   await c.until(`document.activeElement?.textContent.trim() === 'Cancel, keep them'`);
   await c.click('Confirm, delete them all');
-  check('confirmed: "Deleted 2 slideshows"', await c.until(`${flash}.includes('Deleted 2 slideshows')`));
+  check('confirmed: "Deleted 2 slideshows and 1 audio show"', await c.until(`${flash}.includes('Deleted 2 slideshows and 1 audio show')`));
+  check('  … no audio shows left', (await s.api('GET', '/api/audioshows')).data.length === 0);
   const left = (await s.api('GET', '/api/slideshows')).data;
   check('only the sample is left', left.length === 1 && left[0].sample);
 

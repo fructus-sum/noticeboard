@@ -1,7 +1,8 @@
 // server/services/macService.js — which device a request comes from, and whether it's approved
 //
 // Provides
-//   resolveRequest(req) → { mac, ip, approved }; this Pi itself counts as 'localhost', approved
+//   resolveRequest(req) → { mac, ip, approved }; the Server itself counts as 'localhost', approved
+//   resolveAddress(ip)  → the same for an address (a socket.io connection's, SYSTEM_DESIGN §18.5)
 //   isMacApproved(mac)  → approved when MAC filtering is off, for localhost, or when on the list
 //
 // Used by
@@ -20,7 +21,10 @@ function getClientIp(req) {
 }
 
 async function resolveRequest(req) {
-  const ip = getClientIp(req);
+  return resolveAddress(getClientIp(req));
+}
+
+async function resolveAddress(ip) {
   const normalized = plainAddress(ip);
 
   if (isLocalhost(normalized)) {
@@ -45,4 +49,4 @@ function isMacApproved(mac) {
   );
 }
 
-module.exports = { resolveRequest, isMacApproved };
+module.exports = { resolveRequest, resolveAddress, isMacApproved };

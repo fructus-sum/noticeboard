@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# installers/lib/system.sh — the Pi's system: packages, Node.js, the install folder's lock, the port
+# installers/lib/system.sh — the device's system: packages, Node.js, the install folder's lock, the port
 #
 # Provides
 #   update_system        apt update, then a full upgrade (non-interactive, waits for apt's lock)
@@ -19,7 +19,7 @@
 #   panel checks: server/test/node-version.test.js keeps them in step. update.sh reads the port
 #   the same way (its server_port), through server/utils/configIO.js.
 
-# Bring the Pi fully up to date before installing anything. dist-upgrade is apt-get's
+# Bring the device fully up to date before installing anything. dist-upgrade is apt-get's
 # name for Raspberry Pi's recommended `apt full-upgrade`, which a plain upgrade isn't:
 # that can hold back kernel and firmware updates. It keeps existing config files,
 # never stops to ask, and waits if another update (e.g. the desktop's) holds the lock.
@@ -27,7 +27,7 @@ update_system() {
   local apt_opts=(-o DPkg::Lock::Timeout=300)
   echo "▸ Updating the package list..."
   apt-get "${apt_opts[@]}" update
-  echo "▸ Upgrading installed packages (can take a while if the Pi hasn't been updated recently)..."
+  echo "▸ Upgrading installed packages (can take a while if it hasn't been updated recently)..."
   DEBIAN_FRONTEND=noninteractive apt-get "${apt_opts[@]}" -y \
     -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
     dist-upgrade

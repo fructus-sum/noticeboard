@@ -13,7 +13,7 @@
 //     accents or other scripts arrive intact (multer's default reads them as Latin-1)
 //
 // Used by
-//   routes/api/slides.js (slide uploads), routes/api/settings/logo.js (the logo)
+//   routes/api/mediaItems.js (every show's uploads: slides), routes/api/settings/logo.js (the logo)
 //
 // Uses
 //   multer, utils/pathHelpers (tmpDir)

@@ -2,12 +2,12 @@
 // client/admin/src/views/SlideshowsView.vue — the home page: every slideshow (/admin/slideshows)
 //
 // Responsibilities
-//   The updater's notices, this Pi's IP and MAC addresses, the list with publish/disable and
+//   The updater's notices, the Server's IP and MAC addresses, the list with publish/disable and
 //   hide/unhide (hidden ones behind "Show hidden slideshows"), creating a slideshow, deleting one
 //   (never the sample), and opening one.
 //
 // Used by: router/index.js
-// Uses: useApi (/slideshows, /settings/device), useSlideshowActions, ui/StatusBadge,
+// Uses: useApi (/slideshows, /settings/device), useShowActions, ui/StatusBadge,
 //   ui/PublishToggle, ui/TagPill
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
@@ -15,7 +15,7 @@ import { api } from '../composables/useApi.js';
 import StatusBadge from '../components/ui/StatusBadge.vue';
 import PublishToggle from '../components/ui/PublishToggle.vue';
 import TagPill from '../components/ui/TagPill.vue';
-import { useSlideshowActions } from '../composables/useSlideshowActions.js';
+import { useShowActions } from '../composables/useShowActions.js';
 
 const router = useRouter();
 const slideshows = ref([]);
@@ -31,7 +31,7 @@ const createError = ref('');
 const deletingFolder = ref(null);
 
 // Publish / disable and hide / unhide (the folder being changed disables its buttons)
-const { toggling, hiding, setEnabled, setHidden: saveHidden } = useSlideshowActions();
+const { toggling, hiding, setEnabled, setHidden: saveHidden } = useShowActions();
 
 function applyFlags(folder, flags) {
   const idx = slideshows.value.findIndex(s => s.folder === folder);
@@ -50,7 +50,7 @@ async function setHidden(ss, hidden) {
   if (!hiddenCount.value) showHidden.value = false;
 }
 
-// This Pi's IP and MAC addresses, shown above the list
+// The Server's IP and MAC addresses, shown above the list
 const device = ref(null);
 
 async function loadDevice() {
@@ -114,7 +114,7 @@ onMounted(loadDevice);
       class="card"
       style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 20px;padding:10px 16px;font-size:13px"
     >
-      <span style="font-weight:600">This noticeboard</span>
+      <span style="font-weight:600">The Server</span>
       <span v-for="i in device.interfaces" :key="i.name + i.ip" style="color:var(--text-muted)">
         <template v-if="device.interfaces.length > 1">{{ i.name }}: </template>
         IP <code style="color:var(--text)">{{ i.ip }}</code>

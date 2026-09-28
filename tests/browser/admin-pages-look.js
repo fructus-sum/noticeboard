@@ -104,15 +104,16 @@ async function capture(c, map, prefix) {
   await c.until(`!!document.querySelector('.facts')`, 8000);
   await sleep(700);
   Object.assign(look, await capture(c, {
-    'display card': '.card', 'pin checkbox label': 'label[for=show-pin]', 'updates commit code': '.facts code', 'mac add input': 'input[placeholder="aa:bb:cc:dd:ee:ff"]',
+    'display card': '[data-card=settings-display]', 'pin checkbox label': 'label[for=show-pin]', 'updates commit code': '.facts code', 'mac add input': 'input[placeholder="aa:bb:cc:dd:ee:ff"]',
     'mac add button': 'text:button:Add', 'logo preview': '.preview', 'logo upload': '.upload', 'password card': '#password',
     'password input': '#password input', 'updates facts': '.facts', 'updates term': '.facts dt', 'updates pill': '.pill',
     'branch form input': '.row input', 'check button': 'text:button:Check branch',
   }, 'settings:'));
-  await c.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save').click()`);
+  // The Display card's Save (found by name: Branding is above it since 0.7.2)
+  await c.evaluate(`[...document.querySelectorAll('[data-card=settings-display] button')].find((b) => b.textContent.trim() === 'Save').click()`);
   await sleep(400);
-  look['settings: saved message'] = await c.evaluate(styles('.success-msg'));
-  texts['settings: saved message'] = await c.evaluate(`document.querySelector('.success-msg')?.textContent ?? ''`);
+  look['settings: saved message'] = await c.evaluate(styles('[data-card=settings-display] .success-msg'));
+  texts['settings: saved message'] = await c.evaluate(`document.querySelector('[data-card=settings-display] .success-msg')?.textContent ?? ''`);
   texts['settings page'] = await c.evaluate(text('main'));
   await c.evaluate(`(() => { const el = document.querySelector('.row input'); el.value = 'main'; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   await c.click('Check branch');

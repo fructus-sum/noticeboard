@@ -1,24 +1,42 @@
 // server/realtime/displaySocket.js — the live connection to every display (socket.io)
 //
 // Responsibilities
-//   The only module that uses socket.io. It tells each display the build it should run, its own
-//   look (the location pin, the logo) and the playlist, when it connects and whenever they change.
+//   The only module that uses socket.io. Only approved devices may connect: MAC filtering applies
+//   here as it does to the pages (a device it blocks gets a connect error and nothing else), and
+//   when the approved list or the switch changes, connections no longer approved are closed.
+//   It tells each display the build it should run, its own
+//   look (the location pin, the logo), the playlist and the background audio, when it connects and
+//   whenever they change.
 //   The event names are shared with the viewer (shared/contract.json).
 //
 // Provides
 //   initDisplaySocket(httpServer) → the socket.io server. On connect: display:build and
-//     display:settings; on display:ready: that display's playlist. Afterwards:
-//       playlist:update to all   on the scheduler's 'update' and on displayEvents.playlistChanged
+//     display:settings; on display:ready: the playlist every screen is playing ({ slides,
+//     startedAt }: the running timeline, services/playlistTimeline), then the audio. Afterwards:
+//       playlist:update to all   when the running timeline changes: a changed playlist (on the
+//                                scheduler's 'update' or displayEvents.playlistChanged) takes effect,
+//                                and is sent, when the slide on air ends, so every screen switches
+//                                together (SYSTEM_DESIGN §18.8); the same playlist isn't sent again
 //       display:settings to all  on a config 'change', on displayEvents.displaySettingsChanged,
 //                                and when the installer state changes (checked when a display
 //                                connects and every 5 minutes), only when the settings differ
 //                                from the last ones sent
+//     time:ping → time:pong { sent, server }: the Server's clock, which every screen keeps its
+//       slides and music to (SYSTEM_DESIGN §18.8)
+//       audio:update to all      on a config 'change', on displayEvents.audioChanged, on the
+//                                event clock's 'update' and when a show's timeline changes
+//                                (services/audioTimeline: each show carries startedAt and after,
+//                                which every screen plays to), only when it differs from the last
+//                                one sent (SYSTEM_DESIGN §18.3, §18.8)
 //
 // Used by
 //   server/index.js
 //
 // Uses
-//   socket.io; services/playlistService (buildPlaylist), services/displaySettings (the payload),
+//   socket.io; services/macService (resolveAddress: who may connect), services/playlistService
+//   (buildPlaylist), services/playlistTimeline (when a change takes effect), services/audioPlaylist (buildAudio),
+//   services/audioTimeline (each show's timeline), services/audioEventClock (the event playing, 'update'),
+//   services/displaySettings (the payload),
 //   services/schedulerService (getActive, 'update'), services/configService ('change'),
 //   services/displayEvents, utils/displayBuildId, utils/logger
 //
@@ -31,7 +49,12 @@ const schedulerService = require('../services/schedulerService');
 const configService = require('../services/configService');
 const displayEvents = require('../services/displayEvents');
 const { buildPlaylist } = require('../services/playlistService');
+const { createPlaylistTimeline } = require('../services/playlistTimeline');
+const { createAudioTimeline } = require('../services/audioTimeline');
+const { buildAudio } = require('../services/audioPlaylist');
+const audioEventClock = require('../services/audioEventClock');
 const displaySettings = require('../services/displaySettings');
+const macService = require('../services/macService');
 const { displayBuildId } = require('../utils/displayBuildId');
 const logger = require('../utils/logger');
 const { socketEvents: EVENTS } = require('../../shared/contract.json');
@@ -39,6 +62,37 @@ const { socketEvents: EVENTS } = require('../../shared/contract.json');
 function initDisplaySocket(httpServer) {
   // The displays are always served from this server, so no cross-origin access is needed
   const io = new Server(httpServer);
+
+  // MAC filtering, as for the pages (middleware/access.js): an unapproved device, or one that
+  // can't be identified, isn't let in
+  const approved = async (address) => {
+    try {
+      return (await macService.resolveAddress(address)).approved;
+    } catch (err) {
+      logger.error('Socket: MAC check error', { err: err.message });
+      return false;
+    }
+  };
+  io.use((socket, next) => {
+    approved(socket.handshake.address).then((ok) => {
+      if (ok) return next();
+      logger.warn('Display: MAC denied (socket)', { ip: socket.handshake.address });
+      next(new Error('Not Found'));
+    });
+  });
+  // A change to MAC filtering: close the connections it no longer allows
+  let lastFiltering = JSON.stringify(configService.get('macFiltering'));
+  configService.on('change', async () => {
+    const now = JSON.stringify(configService.get('macFiltering'));
+    if (now === lastFiltering) return;
+    lastFiltering = now;
+    for (const socket of io.of('/').sockets.values()) {
+      if (!(await approved(socket.handshake.address))) {
+        logger.warn('Display: MAC no longer approved, disconnected', { ip: socket.handshake.address });
+        socket.disconnect(true);
+      }
+    }
+  });
 
   // Sent on every connect: a display that sees it change reloads to pick up the new build
   const buildId = displayBuildId();
@@ -54,10 +108,34 @@ function initDisplaySocket(httpServer) {
     logger.info('Socket: display:settings broadcast', settings);
   }
 
+  // The background audio, each show with the timeline every screen plays it to: sent again only
+  // when it has changed (a change to a show's timeline takes effect when its track on air ends)
+  const audioTimeline = createAudioTimeline({ onSwitch: () => broadcastAudio() });
+  function currentAudio() {
+    const audio = buildAudio({ event: audioEventClock.getActive() });
+    audioTimeline.offer(audio.shows, audio.event);
+    return { ...audio, shows: audioTimeline.current() };
+  }
+  let lastAudio = JSON.stringify(currentAudio());
+  function broadcastAudio() {
+    const audio = currentAudio();
+    const json = JSON.stringify(audio);
+    if (json === lastAudio) return;
+    lastAudio = json;
+    io.emit(EVENTS.AUDIO_UPDATE, audio);
+    logger.info('Socket: audio:update broadcast', { shows: Object.keys(audio.shows).length, slideshows: Object.keys(audio.slideshows).length });
+  }
+
+  // The playlist every screen plays, and the Server's time it started at: a change takes effect,
+  // and goes out to every screen, when the slide on air ends
+  const timeline = createPlaylistTimeline({
+    onSwitch: (playlist) => {
+      io.emit(EVENTS.PLAYLIST_UPDATE, playlist);
+      logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length, startedAt: playlist.startedAt });
+    },
+  });
   function broadcastPlaylist() {
-    const playlist = buildPlaylist(schedulerService.getActive());
-    io.emit(EVENTS.PLAYLIST_UPDATE, playlist);
-    logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length });
+    timeline.offer(buildPlaylist(schedulerService.getActive()).slides);
   }
 
   const INSTALLER_CHECK_MS = 5 * 60 * 1000;
@@ -72,9 +150,17 @@ function initDisplaySocket(httpServer) {
     displaySettings.refresh().then(broadcastDisplaySettings);
 
     socket.on(EVENTS.DISPLAY_READY, () => {
-      const playlist = buildPlaylist(schedulerService.getActive());
+      // Anything changed since (e.g. the default duration) is offered first; the screen gets what's running
+      broadcastPlaylist();
+      const playlist = timeline.current();
       socket.emit(EVENTS.PLAYLIST_UPDATE, playlist);
       logger.info('Socket: playlist sent to display', { id: socket.id, slideCount: playlist.slides.length });
+      socket.emit(EVENTS.AUDIO_UPDATE, currentAudio());
+    });
+
+    // A screen measuring its clock against the Server's
+    socket.on(EVENTS.TIME_PING, (ask) => {
+      socket.emit(EVENTS.TIME_PONG, { sent: ask?.sent ?? null, server: Date.now() });
     });
 
     socket.on('disconnect', () => {
@@ -86,6 +172,9 @@ function initDisplaySocket(httpServer) {
   displayEvents.onPlaylistChanged(broadcastPlaylist);
   configService.on('change', broadcastDisplaySettings);
   displayEvents.onDisplaySettingsChanged(broadcastDisplaySettings);
+  configService.on('change', broadcastAudio);
+  displayEvents.onAudioChanged(broadcastAudio);
+  audioEventClock.on('update', broadcastAudio);
 
   logger.info('Socket.io initialised');
   return io;

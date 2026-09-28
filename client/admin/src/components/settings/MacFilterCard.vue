@@ -2,7 +2,7 @@
 // client/admin/src/components/settings/MacFilterCard.vue — Settings → MAC filtering
 //
 // Responsibilities
-//   The on/off switch and the list of approved devices (add, remove; "localhost", this Pi itself,
+//   The on/off switch and the list of approved devices (add, remove; "localhost", the Server itself,
 //   can't be removed). Switching it on first shows MacFilterWarning, since a device that isn't on
 //   the list loses access; nothing changes on the server until Save (PUT /settings { macFiltering }).
 //

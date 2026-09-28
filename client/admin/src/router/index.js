@@ -1,7 +1,8 @@
 // client/admin/src/router/index.js — the admin panel's pages and its login check
 //
 // Provides
-//   the router, under /admin/: /login, /slideshows (/ goes there), /slideshows/:folder, /settings.
+//   the router, under /admin/: /login, /slideshows (/ goes there), /slideshows/:folder, /audio,
+//   /audio/:folder, /settings.
 //   Every page but /login needs a login (GET /auth/status, which never redirects by itself, so it
 //   can't loop). A link with #id (e.g. /settings#password) scrolls to that element.
 //
@@ -13,12 +14,16 @@ import LoginView from '../views/LoginView.vue';
 import SlideshowsView from '../views/SlideshowsView.vue';
 import SlideshowDetailView from '../views/SlideshowDetailView.vue';
 import SettingsView from '../views/SettingsView.vue';
+import AudioShowsView from '../views/AudioShowsView.vue';
+import AudioShowDetailView from '../views/AudioShowDetailView.vue';
 
 const routes = [
   { path: '/login', component: LoginView, meta: { public: true } },
   { path: '/', redirect: '/slideshows' },
   { path: '/slideshows', component: SlideshowsView },
   { path: '/slideshows/:folder', component: SlideshowDetailView },
+  { path: '/audio', component: AudioShowsView },
+  { path: '/audio/:folder', component: AudioShowDetailView },
   { path: '/settings', component: SettingsView },
 ];
 

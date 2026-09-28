@@ -97,7 +97,7 @@ grep -q "QA INSTALLER" "$T/out" && ok "main's installer (branch installer was to
 ( load_installer; ask() { echo ASKED; REPLY=1; }
   NOTICEBOARD_MODE=server NOTICEBOARD_INSTALL_BRANCH=main; BRANCH_FILE="$T/b.env"; echo NOTICEBOARD_BRANCH=QALife-updates > "$T/b.env"
   choose_mode; choose_branch; echo "MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
-grep -q "MODE=server BRANCH=main" "$T/out" && ! grep -q ASKED "$T/out" && ! grep -q "What is this Pi for" "$T/out" \
+grep -q "MODE=server BRANCH=main" "$T/out" && ! grep -q ASKED "$T/out" && ! grep -q "Is this device the Server or a Client" "$T/out" \
   && ok "handed-over answers: mode and branch not asked again" || bad "answers" "$T/out"
 ( load_installer; ask() { echo ASKED; REPLY=2; }
   unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH; INSTALL_DIR="$T/nothing"; KIOSK_SCRIPT="$T/nothing"; BRANCH_FILE="$T/b.env"

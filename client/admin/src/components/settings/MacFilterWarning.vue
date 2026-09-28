@@ -65,15 +65,15 @@ onMounted(async () => {
       <h2 id="mac-warn-title">Turn on MAC filtering?</h2>
       <p>
         Once this is saved, only the devices on the approved list can open the displays and this admin panel.
-        Every other device gets a "Not Found" page. The Pi running the noticeboard is always allowed.
+        Every other device gets a "Not Found" page. The Server itself is always allowed.
       </p>
       <p class="important">
         <strong>If you're using the admin panel from another computer, tablet or phone, add its MAC address to the
-        approved list first</strong>, or you'll lock yourself out. Add the MAC address of every display Pi as well.
+        approved list first</strong>, or you'll lock yourself out. Add the MAC address of every Client as well.
       </p>
 
       <div v-if="myDevice" class="mine">
-        <template v-if="myDevice.local">You're using the admin panel on the noticeboard Pi itself, so this device stays allowed.</template>
+        <template v-if="myDevice.local">You're using the admin panel on the Server itself, so this device stays allowed.</template>
         <template v-else-if="myDevice.mac && myMacApproved">This device (<code>{{ myDevice.mac }}</code>) is already on the approved list.</template>
         <template v-else-if="myDevice.mac">
           This device's MAC address appears to be <code>{{ myDevice.mac }}</code>, and it isn't on the list yet.

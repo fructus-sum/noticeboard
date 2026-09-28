@@ -68,6 +68,9 @@ async function logout() {
     <RouterLink to="/slideshows" class="nav__link" title="Slideshows" aria-label="Slideshows">
       <NavIcon name="slideshows" /><span class="nav__label">Slideshows</span>
     </RouterLink>
+    <RouterLink to="/audio" class="nav__link" title="Audio" aria-label="Audio">
+      <NavIcon name="audio" /><span class="nav__label">Audio</span>
+    </RouterLink>
     <RouterLink to="/settings" class="nav__link" title="Settings" aria-label="Settings">
       <NavIcon name="settings" /><span class="nav__label">Settings</span>
     </RouterLink>

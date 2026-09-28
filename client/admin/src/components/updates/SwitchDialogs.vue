@@ -118,7 +118,7 @@ function switched(info) {
         <li><strong>May be unstable.</strong> Slideshows, screens, the admin panel or updates may misbehave until you switch back.</li>
         <li>
           <strong>Your data.</strong> Slideshows, slides and settings are kept, and the settings are backed up first (in
-          data/backups on the Pi). But a branch may change how it stores them, and switching back doesn't undo that.
+          data/backups on the Server). But a branch may change how it stores them, and switching back doesn't undo that.
         </li>
         <li><strong>Future updates</strong> come from {{ target.branch }} until you switch back.</li>
       </ul>
@@ -133,7 +133,7 @@ function switched(info) {
         Remember: this noticeboard is still missing {{ missing.map((r) => r.name).join(', ') }}.
       </p>
       <p v-if="target.installer?.needed" class="tone-warn">
-        Afterwards, run the installer again on this Pi: the admin panel will show how.
+        Afterwards, run the installer again on the Server: the admin panel will show how.
       </p>
       <p>This is your last chance to back out:</p>
       <ul class="choices">

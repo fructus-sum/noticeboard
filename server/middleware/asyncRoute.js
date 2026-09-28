@@ -10,7 +10,8 @@
 //                        other error goes to next(err)
 //
 // Used by
-//   routes/api/auth.js, routes/api/slideshows.js, routes/api/slides.js, routes/api/settings/*
+//   routes/api/auth.js, routes/api/slideshows.js, routes/api/slides.js, routes/api/mediaItems.js,
+//   routes/api/settings/*
 function route(handler) {
   return (req, res, next) => {
     Promise.resolve()

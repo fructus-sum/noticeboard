@@ -1,19 +1,23 @@
-// server/routes/api/settings/maintenance.js — actions that can't be undone: Delete All, Restore Defaults
+// server/routes/api/settings/maintenance.js — actions that can't be undone: Delete All, Restore
+// Defaults; and restarting the Server (for a setting that needs it, SYSTEM_DESIGN §18.5 item 4)
 //
 // Each is: the admin password (which gives a one-time token for that action, the wrong tries
 // counted with every other password check), then a final confirmation with that token.
+// GET /maintenance/restart says whether the Server needs a restart ({ restartNeeded, port }).
 //
 // Used by
-//   routes/api/settings/index.js; the admin panel (components/settings/DeleteContentCard)
+//   routes/api/settings/index.js; the admin panel (components/settings/DeleteContentCard,
+//   components/settings/RestartNotice)
 //
 // Uses
-//   services/contentReset, services/actionTokens, services/adminPassword, middleware/asyncRoute,
+//   services/contentReset, services/restartState, services/actionTokens, services/adminPassword, middleware/asyncRoute,
 //   middleware/passwordLimiter, utils/logger
 //
 // Change impact
 //   The admin panel of the running version is the only caller.
 const express = require('express');
 const contentReset = require('../../../services/contentReset');
+const restartState = require('../../../services/restartState');
 const actionTokens = require('../../../services/actionTokens');
 const adminPassword = require('../../../services/adminPassword');
 const { route, jsonRoute } = require('../../../middleware/asyncRoute');
@@ -23,7 +27,7 @@ const logger = require('../../../utils/logger');
 const router = express.Router();
 
 // The actions, each confirmed with its own token (the subject is the same for all: this noticeboard)
-const ACTIONS = new Set(['delete-all', 'restore-defaults']);
+const ACTIONS = new Set(['delete-all', 'restore-defaults', 'restart']);
 const SUBJECT = 'noticeboard';
 
 const expired = () => Object.assign(
@@ -52,6 +56,17 @@ router.post('/maintenance/delete-all', jsonRoute(async (req) => {
 router.post('/maintenance/restore-defaults', jsonRoute(async (req) => {
   if (!actionTokens.take(req.body?.token, 'restore-defaults', SUBJECT)) throw expired();
   return contentReset.requestRestore(req.ip);
+}));
+
+router.get('/maintenance/restart', (req, res) => {
+  res.json(restartState.status());
+});
+
+// The Server stops and systemd starts it again, with the saved settings
+router.post('/maintenance/restart', jsonRoute(async (req) => {
+  if (!actionTokens.take(req.body?.token, 'restart', SUBJECT)) throw expired();
+  restartState.requestRestart(req.ip);
+  return { restarting: true, ...restartState.status().port };
 }));
 
 module.exports = router;

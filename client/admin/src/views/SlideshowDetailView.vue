@@ -91,7 +91,7 @@ onMounted(init);
       "
     >
       <span style="font-size:16px">⚠</span>
-      <span>This slideshow is <strong>disabled</strong> — it will not appear on the display regardless of schedule settings. Click <strong>Publish</strong> above to make it live.</span>
+      <span>This slideshow is <strong>disabled</strong> — it will not appear on the screens regardless of schedule settings. Click <strong>Publish</strong> above to make it live.</span>
     </div>
 
     <SlideList v-model:slides="slides" :folder="folder" />

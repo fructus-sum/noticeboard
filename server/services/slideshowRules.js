@@ -10,6 +10,11 @@
 //   applyHiddenRule(before, updated) → null | { status: 409, error }  only an unpublished slideshow
 //                             can be hidden (or stay hidden). Also tidies `updated.hidden`: stored
 //                             only when true
+//   parseAudioShow(value)     → { value } | { error }  a slideshow's background audio: an audio
+//                             show's folder, or null (none) for null or '' (SYSTEM_DESIGN §18.3)
+//   parseVideoSound(slide, body) → { patch } | { error }  a video's own sound: { sound: true,
+//                             withSound, lowerTo } (defaults from the contract), or { sound: false }
+//                             (the keys are then removed). Only for videos
 //   isSample(folder)          → boolean  the sample slideshow can be hidden but never deleted
 //   SAMPLE_DELETE_ERROR       the message for trying anyway
 //
@@ -18,9 +23,11 @@
 //   services/contentReset.js (isSample: Delete All keeps the sample)
 //
 // Uses
-//   configService (sampleSlideshow), shared/contract.json (limits)
+//   configService (sampleSlideshow), audioShowStore (which audio shows exist), shared/contract.json
+//   (limits, the audio choices)
 const configService = require('./configService');
-const { limits } = require('../../shared/contract.json');
+const audioShowStore = require('./audioShowStore');
+const { limits, audio: AUDIO } = require('../../shared/contract.json');
 
 const { min, max } = limits.slideSeconds;
 const DURATION_ERROR = `The slide duration must be a whole number of seconds from ${min} to ${max}`;
@@ -45,10 +52,28 @@ function applyHiddenRule(before, updated) {
   return null;
 }
 
+function parseAudioShow(value) {
+  if (value === null || value === '') return { value: null };
+  if (typeof value !== 'string' || !audioShowStore.find(value)) return { error: 'Choose an audio show that exists' };
+  return { value };
+}
+
+// A video's own sound, and what the background audio does while it plays
+function parseVideoSound(slide, body) {
+  if (slide.type !== 'video') return { error: 'Only a video has its own sound' };
+  const { sound, withSound = slide.withSound ?? AUDIO.withSound[0], lowerTo = slide.lowerTo ?? AUDIO.lowerTo.default } = body ?? {};
+  if (typeof sound !== 'boolean') return { error: 'sound must be true or false' };
+  if (!sound) return { patch: { sound: false } };
+  if (!AUDIO.withSound.includes(withSound)) return { error: `withSound must be one of: ${AUDIO.withSound.join(', ')}` };
+  const { min, max } = AUDIO.lowerTo;
+  if (!Number.isInteger(lowerTo) || lowerTo < min || lowerTo > max) return { error: `lowerTo must be a whole number from ${min} to ${max}` };
+  return { patch: { sound: true, withSound, lowerTo } };
+}
+
 function isSample(folder) {
   return configService.get('sampleSlideshow')?.folder === folder;
 }
 
 const SAMPLE_DELETE_ERROR = "The sample slideshow can't be deleted. You can hide it instead.";
 
-module.exports = { parseSlideSeconds, applyHiddenRule, isSample, SAMPLE_DELETE_ERROR };
+module.exports = { parseSlideSeconds, applyHiddenRule, parseAudioShow, parseVideoSound, isSample, SAMPLE_DELETE_ERROR };

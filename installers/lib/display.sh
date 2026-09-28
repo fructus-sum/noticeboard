@@ -1,10 +1,10 @@
 # shellcheck shell=bash
-# installers/lib/display.sh — setting up a remote display Pi
+# installers/lib/display.sh — setting up a Client
 #
 # Provides
-#   ask_server_url      → SERVER_URL (offers the one this Pi already uses)
-#   install_display     packages, the kiosk script with this Pi's MAC addresses, autostart, Help
-#   collect_macs_html   → MACS_HTML, this Pi's MAC addresses as table rows
+#   ask_server_url      → SERVER_URL (offers the one this Client already uses)
+#   install_display     packages, the kiosk script with this Client's MAC addresses, autostart, Help
+#   collect_macs_html   → MACS_HTML, this Client's MAC addresses as table rows
 #   summary_display
 #
 # Used by
@@ -42,7 +42,7 @@ install_display() {
   write_help_shortcut "$SERVER_URL/admin/help"
 }
 
-# This Pi's MAC addresses, as table rows for the kiosk's waiting page (for MAC approval)
+# This Client's MAC addresses, as table rows for the kiosk's waiting page (for MAC approval)
 collect_macs_html() {
   local iface_path iface mac
   MACS_HTML=""
@@ -56,7 +56,7 @@ collect_macs_html() {
 }
 
 ask_server_url() {
-  # Offer the URL this Pi already uses, if it was set up before
+  # Offer the URL this Client already uses, if it was set up before
   local current=""
   if [ -f "$KIOSK_SCRIPT" ]; then
     current=$(sed -n 's/^SERVER_URL="\(.*\)"$/\1/p' "$KIOSK_SCRIPT" | head -n 1)
@@ -78,7 +78,7 @@ summary_display() {
   echo ""
   banner "Installation complete"
   echo ""
-  echo "  This Pi will display: $SERVER_URL"
+  echo "  This Client will show: $SERVER_URL"
   if [ -n "$SUDO_STATUS" ]; then
     echo "  $SUDO_STATUS"
   fi

@@ -1,9 +1,9 @@
-// server/utils/macLookup.js — a device's MAC address, and the MAC filter's "this Pi itself" rule
+// server/utils/macLookup.js — a device's MAC address, and the MAC filter's "the Server itself" rule
 //
 // Provides
-//   isLocalhost(address)   127.0.0.1, ::1, ::ffff:127.0.0.1, localhost or an empty address
-//   lookupMac(address)     the MAC from the ARP table (node-arp), lower-case; 'localhost' for this Pi;
-//                          null if unknown
+//   isLocalhost(address)   127.0.0.1, ::1, ::ffff:127.0.0.1, or localhost (not an empty address)
+//   lookupMac(address)     the MAC from the ARP table (node-arp), lower-case; 'localhost' for the
+//                          Server itself; null if unknown or the address is empty
 //
 // Used by
 //   services/macService, server/test/foundations.test.js
@@ -16,9 +16,10 @@ const { plainAddress } = require('./network');
 
 const getMAC = promisify(arp.getMAC);
 
-// "This Pi itself" for MAC filtering: exactly these, including an empty address (unlike
-// network.isLoopback, which is used for kiosk exits). Kept as it is on purpose (SYSTEM_DESIGN §14 D6).
-const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost', '']);
+// "The Server itself" for MAC filtering: exactly these (unlike network.isLoopback, which is used
+// for kiosk exits: SYSTEM_DESIGN §14 D6). An empty address isn't the Server: a request whose address
+// can't be told is refused while MAC filtering is on (§18.5 item 3).
+const LOCALHOST_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
 
 function isLocalhost(ip) {
   return LOCALHOST_IPS.has(plainAddress(ip));

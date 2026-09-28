@@ -45,9 +45,9 @@ const CHECKS = {
 const statusView = computed(() => {
   const s = props.info.status;
   if (!s) return null;
-  // Requested or running for over an hour: it never finished (e.g. the Pi lost power)
+  // Requested or running for over an hour: it never finished (e.g. the Server lost power)
   if (!props.info.busy && (s.state === 'requested' || s.state === 'updating')) {
-    return { label: "Didn't finish", tone: 'bad', note: 'The update log on the Pi may say why: journalctl -u noticeboard-update' };
+    return { label: "Didn't finish", tone: 'bad', note: 'The update log on the Server may say why: journalctl -u noticeboard-update' };
   }
   return STATES[s.state] ?? { label: s.state, tone: 'info' };
 });
@@ -67,7 +67,7 @@ const statusView = computed(() => {
     <dd>
       <template v-if="info.autoUpdates">{{ scheduleText }}</template>
       <template v-else-if="info.instant">Only when you switch branch (the 15-minute check is turned off).</template>
-      <template v-else>Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.</template>
+      <template v-else>Automatic updates aren't set up on this noticeboard. Run the installer on the Server to set them up.</template>
       <div v-if="info.lastCheck" class="muted">
         Last check {{ when(info.lastCheck.time) }}:
         <span :class="`tone-${CHECKS[info.lastCheck.result] ?? 'info'}`">{{ info.lastCheck.message }}</span>

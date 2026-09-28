@@ -2,8 +2,9 @@
 // client/admin/src/components/settings/DeleteContentCard.vue — the Settings card "Delete content"
 //
 // Responsibilities
-//   Delete All: every slideshow except the sample, with its slides and files. The warning lists
-//   exactly what goes (each slideshow and its slides) and what stays, then the admin password and
+//   Delete All: every slideshow except the sample, with its slides and files, and every audio show
+//   with its tracks. The warning lists exactly what goes (each slideshow and its slides, each audio
+//   show and its tracks) and what stays, then the admin password and
 //   a last chance (ConfirmDangerDialogs); POST /settings/maintenance/delete-all does it.
 //   Restore Defaults (SYSTEM_DESIGN §14 D42): as if newly installed on the branch this noticeboard
 //   follows. The warning lists everything that's reset and kept, the port and password going back
@@ -13,7 +14,7 @@
 //   (GET /settings/updates): without it the button says why it can't.
 //
 // Used by: views/SettingsView
-// Uses: useApi (GET /slideshows, /settings/updates, /auth/status, /settings/maintenance/…),
+// Uses: useApi (GET /slideshows, /audioshows, /settings/updates, /auth/status, /settings/maintenance/…),
 //   useFlash, FlashMessage, CollapsibleCard, ConfirmDangerDialogs; installerCommand from @shared
 import { ref, computed, onUnmounted } from 'vue';
 import { installerCommand } from '@shared/index.js';
@@ -26,12 +27,14 @@ import ConfirmDangerDialogs from '../ui/ConfirmDangerDialogs.vue';
 const msg = useFlash();
 const loading = ref(false);
 const toDelete = ref([]);          // the slideshows Delete All would delete: { name, slideCount }
+const audioToDelete = ref([]);     // and the audio shows: { name, trackCount }
 const confirmDelete = ref(null);
 const confirmRestore = ref(null);
 const updates = ref(null);         // GET /settings/updates, for Restore Defaults
 const restoring = ref(false);
 
 const slideTotal = computed(() => toDelete.value.reduce((n, s) => n + (s.slideCount ?? 0), 0));
+const deleteTitle = computed(() => (audioToDelete.value.length ? 'Delete all your slideshows and audio shows?' : 'Delete all your slideshows?'));
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const branch = computed(() => updates.value?.configuredBranch || 'main');
 
@@ -39,9 +42,10 @@ async function startDeleteAll() {
   msg.clear();
   loading.value = true;
   try {
-    const all = await api.get('/slideshows');
+    const [all, audio] = await Promise.all([api.get('/slideshows'), api.get('/audioshows')]);
     toDelete.value = all.filter((s) => !s.sample);
-    if (!toDelete.value.length) {
+    audioToDelete.value = audio;
+    if (!toDelete.value.length && !audioToDelete.value.length) {
       msg.ok('There is nothing to delete: only the sample slideshow is left.', 4000);
       return;
     }
@@ -57,8 +61,9 @@ const verifyFor = (action) => async (password) =>
   (await api.post('/settings/maintenance/verify-password', { password, action })).token;
 const deleteAll = (token) => api.post('/settings/maintenance/delete-all', { token });
 
-function deleted({ deleted: names }) {
-  msg.ok(`Deleted ${plural(names.length, 'slideshow')}. The sample slideshow and your settings are unchanged.`, 6000);
+function deleted({ deleted: names, deletedAudio = [] }) {
+  const audio = deletedAudio.length ? ` and ${plural(deletedAudio.length, 'audio show')}` : '';
+  msg.ok(`Deleted ${plural(names.length, 'slideshow')}${audio}. The sample slideshow and your settings are unchanged.`, 6000);
 }
 
 // Restore Defaults
@@ -68,7 +73,7 @@ async function startRestore() {
   try {
     updates.value = await api.get('/settings/updates');
     if (!updates.value.available || !(updates.value.autoUpdates || updates.value.instant)) {
-      msg.error(updates.value.reason || "Restore Defaults reinstalls the software through the updater, which isn't set up on this noticeboard. Run the installer on the Pi to set it up.");
+      msg.error(updates.value.reason || "Restore Defaults reinstalls the software through the updater, which isn't set up on this noticeboard. Run the installer on the Server to set it up.");
       return;
     }
     if (updates.value.busy) {
@@ -119,12 +124,12 @@ onUnmounted(() => clearInterval(pollTimer));
     </div>
     <template v-else>
       <p class="muted">
-        <strong>Delete All</strong> deletes every slideshow except the sample, with all their slides and files.
+        <strong>Delete All</strong> deletes every slideshow except the sample, with all their slides and files, and every audio show with its tracks.
         The sample slideshow, your settings, logo and background colour are kept. It can't be undone.
       </p>
       <p class="muted">
-        <strong>Restore Defaults</strong> makes this noticeboard as if it had just been installed: every slideshow,
-        setting, the logo and the update history are deleted, and the software is reinstalled. It can't be undone.
+        <strong>Restore Defaults</strong> makes this noticeboard as if it had just been installed: every slideshow and
+        audio show, setting, the logo and the update history are deleted, and the software is reinstalled. It can't be undone.
       </p>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button class="btn-danger" :disabled="loading" @click="startDeleteAll">Delete All…</button>
@@ -137,7 +142,7 @@ onUnmounted(() => clearInterval(pollTimer));
   <ConfirmDangerDialogs
     ref="confirmDelete"
     id-prefix="delete-all"
-    title="Delete all your slideshows?"
+    :title="deleteTitle"
     :verify="verifyFor('delete-all')"
     :confirm="deleteAll"
     cancel-label="Cancel, keep them"
@@ -148,11 +153,13 @@ onUnmounted(() => clearInterval(pollTimer));
     @done="deleted"
   >
     <p>
-      These {{ plural(toDelete.length, 'slideshow') }}, with {{ plural(slideTotal, 'slide') }} and their files,
+      These {{ plural(toDelete.length, 'slideshow') }}, with {{ plural(slideTotal, 'slide') }} and their files,<template v-if="audioToDelete.length">
+      and {{ plural(audioToDelete.length, 'audio show') }} with their tracks,</template>
       will be deleted:
     </p>
     <ul class="warnings">
       <li v-for="s in toDelete" :key="s.folder"><strong>{{ s.name }}</strong> ({{ plural(s.slideCount ?? 0, 'slide') }})</li>
+      <li v-for="a in audioToDelete" :key="'audio-' + a.folder"><strong>{{ a.name }}</strong> (audio show, {{ plural(a.trackCount ?? 0, 'track') }})</li>
     </ul>
     <p>
       <strong>This can't be undone.</strong> Kept: the sample slideshow, your settings, the logo and the background
@@ -188,18 +195,19 @@ onUnmounted(() => clearInterval(pollTimer));
     <p>It will be as if this noticeboard had just been installed on <strong>{{ branch }}</strong>:</p>
     <ul class="warnings">
       <li><strong>Every slideshow is deleted</strong>, with its slides and files. The sample slideshow comes back as new.</li>
+      <li><strong>Every audio show is deleted</strong>, with its tracks and events.</li>
       <li><strong>Every setting goes back to its default:</strong> the admin password becomes <code>Admin@12345</code> and everyone is logged out, MAC filtering is turned off, the display settings and the background colour are reset.</li>
       <li><strong>The port goes back to 3000.</strong> You can set a custom port again in Settings afterwards.</li>
       <li><strong>The logo, the update schedule, the update history, the settings backups and the logs are deleted.</strong></li>
       <li><strong>The software is reinstalled</strong> from the latest version of {{ branch }}, into a clean folder. The noticeboard restarts; screens go blank for a few seconds, then reload by themselves.</li>
     </ul>
     <p>
-      Kept: the branch this noticeboard follows, and what the installer set up on the Pi (the kiosk, the services,
+      Kept: the branch this noticeboard follows, and what the installer set up on the Server (the kiosk, the services,
       sudo and the firewall).
     </p>
     <p class="tone-warn">
       <strong>Running the installer again afterwards is recommended.</strong> There will be no more reminders about it
-      once the restore is complete. In a terminal on this Pi, or over SSH:
+      once the restore is complete. In a terminal on the Server, or over SSH:
     </p>
     <p><code class="command">{{ installerCommand(branch) }}</code></p>
 

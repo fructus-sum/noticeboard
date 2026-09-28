@@ -89,7 +89,7 @@ mkdir -p "$T/pi/data"; echo "NOTICEBOARD_BRANCH=feature/x" > "$T/pi/data/update-
 sed -i "s#^INSTALL_DIR=.*#INSTALL_DIR=\"$T/pi\"#" "$T/lonely/install.sh"
 run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=
 grep -q "LOADED sha=none" "$T/out" && grep -q "noticeboard/feature/x/installers/lib/ui.sh" "$T/curl.log" \
-  && ok "no commit, not in a checkout: downloaded at the branch this Pi follows" || bad "followed branch" "$T/out"
+  && ok "no commit, not in a checkout: downloaded at the branch this Server follows" || bad "followed branch" "$T/out"
 
 # ── The baseline installer (one file) hands over to this one, which fetches its parts at that commit ──
 if git -C "$REPO" show "$BASELINE:installers/install.sh" > "$T/old-install.sh" 2>/dev/null; then

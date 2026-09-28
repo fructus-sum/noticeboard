@@ -25,7 +25,7 @@ const { git, check, makeApp, server, page, done } = require('../helpers/app.js')
     return c.evaluate(`({ text: document.querySelector('.nav__updated').innerText.replace(/\\s+/g, ' ').trim(), title: document.querySelector('.nav__updated').title })`);
   };
 
-  // Like the Pi: updated to this version by the updater, some minutes after it was made
+  // Like an installed Server: updated to this version by the updater, some minutes after it was made
   const installed = new Date(Date.parse(made) + 13 * 60 * 1000 + 26 * 1000).toISOString();
   status({ state: 'updated', branch: 'main', commit, message: `Updated to ${commit.slice(0, 7)} from main.`, time: installed });
   let side = await sidebar();

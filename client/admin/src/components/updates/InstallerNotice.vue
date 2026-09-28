@@ -1,8 +1,8 @@
 <script setup>
-// client/admin/src/components/updates/InstallerNotice.vue — "Run the installer again on this Pi"
+// client/admin/src/components/updates/InstallerNotice.vue — "Run the installer again on the Server"
 //
 // Updates can't change what only the installer sets up (kiosk scripts, system services, desktop
-// shortcuts), so when this version needs a newer installer run than the Pi had, the Slideshows
+// shortcuts), so when this version needs a newer installer run than the Server had, the Slideshows
 // page says so, with the command to copy. It stays until the installer has been run: there's
 // nothing to close.
 //
@@ -38,7 +38,7 @@ async function copy() {
 
 <template>
   <div v-if="status?.needed" class="installer page-warning" role="alert">
-    <strong>Run the installer again on this Pi</strong>
+    <strong>Run the installer again on the Server</strong>
     <p>
       This version of the noticeboard needs something that only the installer sets up, and updates can't do that
       by themselves. Until it's run, what's listed here stays as it was:
@@ -47,14 +47,14 @@ async function copy() {
       <li v-for="c in status.changes" :key="c">{{ c }}</li>
     </ul>
     <p>
-      In a terminal on the server Pi, or over SSH, run the command below. It keeps your answers, slideshows and
+      In a terminal on the Server, or over SSH, run the command below. It keeps your answers, slideshows and
       settings, and offers to restart at the end.
     </p>
     <div class="installer__command">
       <code>{{ command }}</code>
       <button type="button" class="btn-ghost" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
     </div>
-    <p v-if="status.displays">Run it on each remote display Pi as well (choose "Remote display" there).</p>
+    <p v-if="status.displays">Run it on each Client as well (choose "Client" there).</p>
     <p class="installer__more">
       This goes away once the installer has run.
       <a href="/admin/help#installer-needed" target="_blank" rel="noopener">More in Help ↗</a>

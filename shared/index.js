@@ -16,6 +16,10 @@
 //                               is in contract.json, which the server checks with too)
 //   VIDEO_FORMATS, DEFAULT_VIDEO_FORMAT  what uploaded videos can be converted to (h265, h264)
 //                               and the default (from contract.json, which the server checks with too)
+//   AUDIO                       what an audio show's settings may be (from contract.json, which the
+//                               server checks with too): orders, transitions, fadeSeconds, volume
+//   audioUrl(folder, file)      the URL of an audio show's track; the server's pathHelpers.audioUrl
+//                               makes the same (server/test/foundations.test.js)
 //   PROJECT_URL                 the project on GitHub
 //   installerCommand(branch)    the one-line command that runs <branch>'s installer on a Pi
 //   mediaUrl(folder, file)      the URL of a slide's file (or its thumbnail); the server's
@@ -41,6 +45,7 @@ export const LIMITS = contract.limits;
 export const DEFAULT_BACKGROUND = contract.display.defaultBackground;
 export const VIDEO_FORMATS = contract.display.videoFormats;
 export const DEFAULT_VIDEO_FORMAT = contract.display.defaultVideoFormat;
+export const AUDIO = contract.audio;
 
 const COLOUR = new RegExp(contract.display.colourPattern);
 export const isColour = (value) => typeof value === 'string' && COLOUR.test(value);
@@ -51,6 +56,11 @@ export const PROJECT_URL = 'https://github.com/fructus-sum/noticeboard';
 // The command that runs <branch>'s installer on a Pi (in a terminal on it, or over SSH)
 export function installerCommand(branch = 'main') {
   return `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/${branch}/installers/install.sh | sudo bash`;
+}
+
+// An audio show's track as the server serves it
+export function audioUrl(folder, file) {
+  return `/audio/${folder}/tracks/${file}`;
 }
 
 // A slide's file (or its video's thumbnail) as the server serves it

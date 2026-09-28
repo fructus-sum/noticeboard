@@ -24,7 +24,7 @@ const configService = require('./configService');
 
 const COOKIE_NAME = 'nb_admin_token';
 const LIFETIME = '7d';
-// SECURE_COOKIES=true only if serving over HTTPS; Pi installs run HTTP, so leave false
+// SECURE_COOKIES=true only if serving over HTTPS; installed Servers run HTTP, so leave false
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'strict',

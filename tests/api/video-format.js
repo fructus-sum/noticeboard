@@ -1,5 +1,5 @@
 // The video format for new uploads and converting the existing videos (Settings → Display,
-// SYSTEM_DESIGN §14 D43, §16 #12): H.265 unless H.264 is chosen; only the contract's formats are
+// SYSTEM_DESIGN §14 D43): H.265 unless H.264 is chosen; only the contract's formats are
 // accepted; each upload is converted to the format chosen when it's processed (checked with
 // ffprobe) and records it; the playlist gives each video its length. Converting the existing videos
 // shows each as processing in its turn while the screens keep its current file, then replaces it;
@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { MODULES, makeApp, server, check, done, sleep, ffmpegEnv, hasFfmpeg } = require('../helpers/app.js');
+const { MODULES, makeApp, server, check, done, sleep, ffmpegEnv, hasFfmpeg, untilSlideEnds } = require('../helpers/app.js');
 const { io } = require(path.join(MODULES, 'socket.io-client'));
 
 if (!hasFfmpeg()) {
@@ -71,6 +71,8 @@ const codecOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams
 
   // Convert the existing videos to H.265
   await s.api('PUT', '/api/settings', { display: { videoFormat: 'h265' } });
+  const mixed = (await s.api('GET', '/api/settings/videos/formats')).data;
+  check('the videos not in the selected format are counted (the Display card warns)', mixed.format === 'h265' && mixed.total >= 2 && mixed.other === mixed.total - 1, JSON.stringify(mixed));
   const secondFile = second.filename;
   const started = await s.api('POST', '/api/settings/videos/convert');
   // Every video on this noticeboard: these two and the sample slideshow's
@@ -99,11 +101,14 @@ const codecOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams
   for (let i = 0; i < 240 && (await s.api('GET', '/api/settings/videos/convert')).data.running; i++) await sleep(250);
   const second2 = (await s.api('GET', '/api/settings/videos/convert')).data;
   check('run again: every video is already H.265, nothing converted', rerun.status === 200 && second2.converted === 0 && second2.skipped === all, JSON.stringify(second2));
+  const allSame = (await s.api('GET', '/api/settings/videos/formats')).data;
+  check('  … and none is counted as another format any more', allSame.other === 0 && allSame.total === all, JSON.stringify(allSame));
   const converted = (await slides()).find((x) => x.id === second.id);
   check('the converted video is ready, H.265, in a new file', converted.status === 'ready' && !converted.reprocessing && converted.format === 'h265'
     && converted.filename !== secondFile && codecOf(file(converted)) === 'hevc,hvc1');
   check('  … its old file is deleted, its thumbnail kept', !fs.existsSync(path.join(slidesDir, secondFile)) && converted.thumbnail === second.thumbnail && fs.existsSync(path.join(slidesDir, converted.thumbnail)));
-  await sleep(1500);
+  await sleep(500);
+  await untilSlideEnds(playlist);   // the change reaches the screens when the slide on air ends
   check('  … and the screens get the new file', playlist.slides.some((x) => x.url.endsWith(converted.filename)));
   check('nothing is left in the uploads folder', fs.readdirSync(path.join(env.APP, 'tmp', 'noticeboard-uploads')).length === 0);
 

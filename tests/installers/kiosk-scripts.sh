@@ -2,7 +2,8 @@
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
 # The generated kiosk scripts, run with stand-ins for chromium, curl, logger and sleep:
 # wait for the server, restart a crashed browser, and leave kiosk mode when this screen's exit
-# button asks (the claim endpoint answers {"exit":true}).
+# button asks (the claim endpoint answers {"exit":true}). The Server's kiosk opens the port in its
+# settings (a stand-in node answers for readConfig), and 3000 when that can't be read.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO/tests/helpers/installer.sh"
 T=$(mktemp -d); export T
@@ -69,22 +70,37 @@ waitfor "$T/launch.log" "LAUNCH --no-first-run http://localhost:3000/?kiosk=off"
 [ "$(kiosk_launches)" = "$before" ] && grep -q "Leaving kiosk mode" "$T/logger.log" && ok "server kiosk: logged, and the kiosk browser isn't relaunched" || bad "server no relaunch"
 [ -z "$(ps -ef | grep '/usr/bin/sleep 1000' | grep -v grep)" ] && ok "server kiosk: the full-screen browser was closed" || { bad "server browser still running"; stray_kill; }
 
-# ── Remote display ──
+# ── The Server's port, from its settings ──
+# A stand-in node: prints what $T/port holds, as the readConfig one-liner prints the port
+printf '#!/usr/bin/env bash
+cat "$T/port"
+' > "$T/bin/node"; chmod +x "$T/bin/node"
+for case in "3456 3456" "not-a-port 3000"; do
+  set -- $case
+  reset; echo "$1" > "$T/port"; touch "$T/crashed"; printf '200\n' > "$T/answers"
+  HOME="$T/home" PATH="$T/bin:/usr/bin:/bin" bash "$T/start-kiosk.sh" & K=$!
+  waitfor "$T/launch.log" "LAUNCH .*--kiosk http://localhost:$2/" && grep -q "Waiting for the Server at http://localhost:$2/" "$T/logger.log" \
+    && ok "server kiosk: settings say $1 -> opens http://localhost:$2/" || { bad "server port $1"; cat "$T/launch.log"; }
+  kill "$K" 2>/dev/null; wait "$K" 2>/dev/null; stray_kill
+done
+rm -f "$T/bin/node" "$T/port"
+
+# ── Client ──
 reset; printf '000\n404\n200\n' > "$T/answers"
 HOME="$T/home" PATH="$T/bin:/usr/bin:/bin" bash "$T/noticeboard-kiosk.sh" & K=$!
 waitfor "$T/logger.log" "starting it again" && waitfor "$T/launch.log" "LAUNCH .*--kiosk http://192.168.1.10:3000$"
 /usr/bin/sleep 1
 grep -q "showing the waiting page (server)" "$T/logger.log" && grep -q "showing the waiting page (approval)" "$T/logger.log" \
-  && ok "remote: waiting pages while unreachable / not approved" || bad "remote waiting"
+  && ok "Client: waiting pages while unreachable / not approved" || bad "Client waiting"
 grep "LAUNCH .*--kiosk http://192.168.1.10:3000" "$T/launch.log" | grep -q -- "--user-data-dir=$T/home/.config/noticeboard-kiosk" \
   && grep "file://" "$T/launch.log" | grep -q -- "--user-data-dir=/tmp/noticeboard-waiting-profile" \
-  && ok "remote: kiosk and waiting page each in their own profile" || { bad "remote profiles"; cat "$T/launch.log"; }
-[ "$(grep -c -- "--kiosk http://192.168.1.10:3000" "$T/launch.log")" -ge 2 ] && ok "remote: crashed browser restarted" || bad "remote restart"
-grep -q "http://192.168.1.10:3000/api/device/kiosk-exit/claim" "$T/curl.log" && ok "remote: asks its server about exit requests" || bad "remote polling"
+  && ok "Client: kiosk and waiting page each in their own profile" || { bad "Client profiles"; cat "$T/launch.log"; }
+[ "$(grep -c -- "--kiosk http://192.168.1.10:3000" "$T/launch.log")" -ge 2 ] && ok "Client: crashed browser restarted" || bad "Client restart"
+grep -q "http://192.168.1.10:3000/api/device/kiosk-exit/claim" "$T/curl.log" && ok "Client: asks its server about exit requests" || bad "Client polling"
 touch "$T/exit-asked"
 if finished "$K"; then wait "$K"; rc=$?; else rc=running; fi
 [ "$rc" = 0 ] && waitfor "$T/launch.log" "LAUNCH --no-first-run http://192.168.1.10:3000/?kiosk=off" && grep -q "Leaving kiosk mode" "$T/logger.log" \
-  && ok "remote: exit asked -> normal window, script ends" || { bad "remote exit (rc=$rc)"; cat "$T/launch.log"; }
+  && ok "Client: exit asked -> normal window, script ends" || { bad "Client exit (rc=$rc)"; cat "$T/launch.log"; }
 stray_kill
 
 rm -rf "$T"; echo "passed=$pass failed=$fail"; [ $fail -eq 0 ]

@@ -29,7 +29,7 @@ stubs() {
   ask()       { REPLY="${ANSWERS[0]}"; ANSWERS=("${ANSWERS[@]:1}"); echo "  [answered: '${REPLY}']"; }
 }
 
-# ── Server + display, re-run on an existing install (Enter accepts the default) ──
+# ── Server, re-run on an existing install (Enter accepts the default) ──
 git clone -q "$REPO" "$T/opt-noticeboard" 2>/dev/null
 (
   load_installer
@@ -45,7 +45,7 @@ git clone -q "$REPO" "$T/opt-noticeboard" 2>/dev/null
 ) > "$T/server.out" 2>&1
 rc=$?
 [ $rc -eq 0 ] && ok "server mode runs to the end under set -euo pipefail" || { bad "server mode exited $rc"; tail -20 "$T/server.out"; }
-grep -q "MODE=server" "$T/server.out" && ok "re-run defaults to 'Server + display' (Enter)" || bad "default mode"
+grep -q "MODE=server" "$T/server.out" && ok "re-run defaults to 'Server' (Enter)" || bad "default mode"
 grep -E '^(apt-get|npm|systemctl)' "$T/calls.log" | cut -c1-72 | sed 's/^/      /'
 first_two_are_update_then_upgrade && ok "apt update, then full upgrade, before anything else" || bad "upgrade order"
 grep -q 'dist-upgrade \[DEBIAN_FRONTEND=noninteractive\]' "$T/calls.log" && ok "upgrade is non-interactive" || bad "noninteractive"
@@ -57,7 +57,7 @@ done
 [ $missing -eq 0 ] && ok "service, update timer, kiosk script, autostart and .env written"
 grep -q "Auto-update  : every 15 minutes" "$T/server.out" && ok "summary shows the auto-update line" || bad "summary"
 
-# ── Remote display, fresh Pi: Enter (no default) and '3' are refused, then 2; empty URL, then one with a slash ──
+# ── Client, fresh device: Enter (no default) and '3' are refused, then 2; empty URL, then one with a slash ──
 : > "$T/calls.log"
 (
   load_installer
@@ -76,7 +76,7 @@ grep -q "The server URL is required" "$T/display.out" && grep -q "SERVER_URL=htt
 grep -q 'SERVER_URL="http://10.0.0.5:3000"' "$T/noticeboard-kiosk.sh" && ok "kiosk script points at the server" || bad "kiosk url"
 first_two_are_update_then_upgrade && ok "display mode also updates, then upgrades, first" || bad "display upgrade order"
 
-# ── Re-run on that display Pi: Enter, Enter keeps mode and URL ──
+# ── Re-run on that Client: Enter, Enter keeps mode and URL ──
 (
   load_installer; stubs
   INSTALL_DIR="$T/nothing-here"; KIOSK_SCRIPT="$T/noticeboard-kiosk.sh"; ANSWERS=("" "")

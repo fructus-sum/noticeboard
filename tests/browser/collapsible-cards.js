@@ -23,10 +23,14 @@ const state = (title) => `(() => { const c = ${card(title)}; if (!c) return null
   const c = await page(connect, { width: 1100, height: 900 });
   await c.login(env.base);
   await c.go(`${env.base}/admin/settings`);
-  await c.until(`document.querySelectorAll('section.card .card-toggle').length === 6`);
+  // Nothing remembered from before (a browser that ran this test already)
+  await c.evaluate(`localStorage.removeItem('noticeboard:collapsedCards')`);
+  await c.send('Page.reload');
+  await c.until(`document.querySelectorAll('section.card .card-toggle').length === 7`);
   const titles = await c.evaluate(`[...document.querySelectorAll('.card-toggle')].map((t) => t.textContent.trim())`);
-  check('the six Settings cards can fold', titles.join('|') === 'Display|MAC filtering|Branding|Change password|Software updates|Delete content', titles.join('|'));
-  check('every card starts open', (await c.evaluate(`[...document.querySelectorAll('.card-toggle')].every((t) => t.getAttribute('aria-expanded') === 'true')`)));
+  check('the seven Settings cards can fold', titles.join('|') === 'Branding|Display|MAC filtering|Port|Change password|Software updates|Delete content', titles.join('|'));
+  const closed = await c.evaluate(`[...document.querySelectorAll('.card-toggle')].filter((t) => t.getAttribute('aria-expanded') !== 'true').map((t) => t.textContent.trim())`);
+  check('every card starts open', closed.length === 0, `closed: ${closed.join(', ')} · stored: ${await c.evaluate(`localStorage.getItem('noticeboard:collapsedCards')`)}`);
 
   // Fold Display and Branding
   await c.evaluate(`${card('Display')}.querySelector('.card-toggle').click()`);
@@ -35,7 +39,7 @@ const state = (title) => `(() => { const c = ${card(title)}; if (!c) return null
   check('folding hides the body, the title stays', d.expanded === 'false' && !d.bodyShown && d.titleShown, JSON.stringify(d));
   check('it is remembered in this browser', (await c.evaluate(`localStorage.getItem('noticeboard:collapsedCards')`)) === '["settings-display","settings-branding"]');
   await c.send('Page.reload');
-  await c.until(`document.querySelectorAll('section.card .card-toggle').length === 6`);
+  await c.until(`document.querySelectorAll('section.card .card-toggle').length === 7`);
   d = await c.evaluate(state('Display'));
   const b = await c.evaluate(state('Branding'));
   const m = await c.evaluate(state('MAC filtering'));
@@ -56,7 +60,7 @@ const state = (title) => `(() => { const c = ${card(title)}; if (!c) return null
   // The password changed: the card can fold now
   await s.api('PUT', '/api/settings/password', { current: 'Admin@12345', newPassword: 'Another@123' });
   await c.send('Page.reload');
-  await c.until(`document.querySelectorAll('section.card .card-toggle').length === 6`);
+  await c.until(`document.querySelectorAll('section.card .card-toggle').length === 7`);
   await sleep(500);
   await c.evaluate(`${card('Change password')}.querySelector('.card-toggle').click()`);
   const pw2 = await c.evaluate(state('Change password'));

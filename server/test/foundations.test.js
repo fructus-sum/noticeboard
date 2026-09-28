@@ -1,10 +1,10 @@
 // The shared foundations behave exactly like the copies they replaced (SYSTEM_DESIGN §14 D6, D7, D14,
-// D18): the address helpers, the "this Pi itself" rule for MAC filtering, the media type lists and
+// D18): the address helpers, the "the Server itself" rule for MAC filtering, the media type lists and
 // the socket event names. Also the media name rule and what the admin panel shows as a name (D38).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { plainAddress, isLoopback, lanInterfaces } = require('../utils/network');
-const { isLocalhost } = require('../utils/macLookup');
+const { isLocalhost, lookupMac } = require('../utils/macLookup');
 const mediaTypes = require('../services/mediaTypes');
 const contract = require('../../shared/contract.json');
 
@@ -23,9 +23,14 @@ test('isLoopback: the kiosk-exit rule (the whole 127.0.0.0/8 range and ::1)', ()
   for (const a of ['192.168.1.20', '::ffff:192.168.1.20', '', undefined, '::11', '10.127.0.1']) assert.equal(isLoopback(a), false, String(a));
 });
 
-test('isLocalhost: the MAC-filter rule is unchanged (exact addresses, and an empty one)', () => {
-  for (const a of ['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost', '', undefined]) assert.equal(isLocalhost(a), true, String(a));
-  for (const a of ['127.0.0.2', '192.168.1.20', '::ffff:192.168.1.20']) assert.equal(isLocalhost(a), false, a);
+test('isLocalhost: the MAC-filter rule (exact addresses; an empty one is not the Server, 0.6.4)', () => {
+  for (const a of ['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']) assert.equal(isLocalhost(a), true, String(a));
+  for (const a of ['127.0.0.2', '192.168.1.20', '::ffff:192.168.1.20', '', undefined]) assert.equal(isLocalhost(a), false, String(a));
+});
+
+test('an empty address has no MAC, so MAC filtering refuses it (0.6.4)', async () => {
+  assert.equal(await lookupMac(''), null);
+  assert.equal(await lookupMac(undefined), null);
 });
 
 test('lanInterfaces lists IPv4, non-internal interfaces with name, ip and mac', () => {
@@ -55,6 +60,9 @@ test('socket event names in the shared contract are the ones open screens use', 
     PLAYLIST_UPDATE: 'playlist:update',
     DISPLAY_BUILD: 'display:build',
     DISPLAY_SETTINGS: 'display:settings',
+    AUDIO_UPDATE: 'audio:update',   // added for background audio (§18.3); older screens ignore it
+    TIME_PING: 'time:ping',         // added for screens in step (§18.8): a screen asks the time
+    TIME_PONG: 'time:pong',         //   … and the Server answers with its own
   });
 });
 
@@ -75,7 +83,11 @@ test('the web apps make the same media URLs as the server, and use the same limi
     assert.equal(shared.mediaUrl(folder, file), mediaUrl(folder, file));
   }
   assert.equal(shared.mediaUrl('my-slideshow', 'a.png'), '/media/my-slideshow/slides/a.png');
-  assert.deepEqual(shared.LIMITS, { passwordMinLength: 8, slideSeconds: { min: 1, max: 3600 }, mediaNameMax: 200 });
+  const { audioUrl } = require('../utils/pathHelpers');
+  assert.equal(shared.audioUrl('cafe-music', 'x.m4a'), audioUrl('cafe-music', 'x.m4a'));
+  assert.equal(shared.audioUrl('cafe-music', 'x.m4a'), '/audio/cafe-music/tracks/x.m4a');
+  assert.deepEqual(shared.AUDIO, contract.audio);
+  assert.deepEqual(shared.LIMITS, { passwordMinLength: 8, slideSeconds: { min: 1, max: 3600 }, mediaNameMax: 200, port: { min: 1024, max: 65535, default: 3000 } });
   assert.deepEqual(shared.SOCKET_EVENTS, contract.socketEvents);
 });
 

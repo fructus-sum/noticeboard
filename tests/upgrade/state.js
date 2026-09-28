@@ -98,7 +98,8 @@ async function snapshot() {
   await waitQuiet(cookie);
   const data = filesUnder(path.join(dir, 'data'));
   for (const k of Object.keys(data)) {
-    if (/^update-.*\.json$|^installer\.json$|^backups\//.test(k)) delete data[k];   // the updater's own records
+    // The updater's own records, and the Server's own copy of its config (config.last-good.json, 0.6.9)
+    if (/^update-.*\.json$|^installer\.json$|^backups\/|^config\.last-good\.json$/.test(k)) delete data[k];
   }
   const slideshows = (await api('GET', '/api/slideshows', null, cookie)).json;
   const slides = {};
@@ -112,7 +113,8 @@ async function snapshot() {
     slides,
     settings,
     logo: (await api('GET', '/api/settings/logo', null, cookie)).json,
-    playlist: shown.playlist,
+    // Without startedAt (0.7.0): the Server's time the playlist started, which is new at every start
+    playlist: shown.playlist && Object.fromEntries(Object.entries(shown.playlist).filter(([k]) => k !== 'startedAt')),
     displaySettings: shown.settings,
     oldLoginStillWorks: (await api('GET', '/api/auth/status', null, cookie)).json,
     kioskClaimAnswer: claim.text,

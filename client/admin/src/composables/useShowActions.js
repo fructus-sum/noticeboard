@@ -1,28 +1,28 @@
-// client/admin/src/composables/useSlideshowActions.js — publishing and hiding a slideshow
+// client/admin/src/composables/useShowActions.js — publishing (and hiding) a slideshow or an audio show
 //
 // Provides
-//   useSlideshowActions() → {
+//   useShowActions(base = '/slideshows') → {   base: '/slideshows' or '/audioshows'
 //     toggling, hiding              the folder being published/disabled or hidden/unhidden (or null),
 //                                   for disabling its buttons meanwhile
-//     setEnabled(folder, enabled)   → the saved slideshow, or null (the error was shown)
-//     setHidden(folder, hidden)     → the saved slideshow, or null
+//     setEnabled(folder, enabled)   → the saved show, or null (the error was shown)
+//     setHidden(folder, hidden)     → the saved show, or null (slideshows only)
 //   }
 //   The server's rules apply (only an unpublished slideshow can be hidden); its message is shown
 //   in an alert, as it always has been.
 //
-// Used by: SlideshowsView, slideshow/SlideshowSettingsCard
-// Uses: useApi (PUT /slideshows/:folder)
+// Used by: SlideshowsView, slideshow/SlideshowSettingsCard, AudioShowsView, audio/AudioShowSettingsCard
+// Uses: useApi (PUT <base>/:folder)
 import { ref } from 'vue';
 import { api } from './useApi.js';
 
-export function useSlideshowActions() {
+export function useShowActions(base = '/slideshows') {
   const toggling = ref(null);
   const hiding = ref(null);
 
   async function change(state, folder, patch) {
     state.value = folder;
     try {
-      return await api.put(`/slideshows/${folder}`, patch);
+      return await api.put(`${base}/${folder}`, patch);
     } catch (e) {
       alert(e.message);
       return null;

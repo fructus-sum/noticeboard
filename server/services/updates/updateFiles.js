@@ -3,7 +3,7 @@
 // Responsibilities
 //   The one place in the server that knows the names and formats of the files through which
 //   the admin panel and the updater talk (SYSTEM_DESIGN §4.2). They must stay exactly as
-//   update.sh (including older copies of it on installed Pis) reads and writes them:
+//   update.sh (including older copies of it on installed Servers) reads and writes them:
 //     data/update-branch.env    NOTICEBOARD_BRANCH=<branch> (update.sh also adds
 //                               NOTICEBOARD_MAIN_AT_SWITCH=<commit>)
 //     data/update-status.json   the last update or switch (the server writes only "requested")

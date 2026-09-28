@@ -1,11 +1,13 @@
 {
-  "_comment": "The software this branch needs on the Noticeboard server Pi, besides the packages npm installs. Keep it up to date on every branch: when a change needs new software, or a newer version of something listed, update this file in the same commit. Before switching branch, the admin panel checks the Pi against the target branch's list (Settings → Software updates). versions: space-separated conditions must all hold; || separates alternatives; * means any version.",
+  "_comment": "The software this branch needs on the Noticeboard Server, besides the packages npm installs. Keep it up to date on every branch: when a change needs new software, or a newer version of something listed, update this file in the same commit. Before switching branch, the admin panel checks the Server against the target branch's list (Settings → Software updates). versions: space-separated conditions must all hold; || separates alternatives; * means any version.",
   "installer": {
-    "_comment": "Updates can't change what only the installer sets up: kiosk scripts, system services, desktop shortcuts and system packages. When install.sh changes any of those, raise version here and INSTALLER_VERSION in install.sh to the same number (in the same commit), and add a line to changes saying what running it again brings. displays: true when remote display Pis need it too. A server Pi whose last installer run is older warns on the admin home page, and before switching to this branch.",
-    "version": 2,
+    "_comment": "Updates can't change what only the installer sets up: kiosk scripts, system services, desktop shortcuts and system packages. When install.sh changes any of those, raise version here and INSTALLER_VERSION in install.sh to the same number (in the same commit), and add a line to changes saying what running it again brings. displays: true when Clients need it too. A Server whose last installer run is older warns on the admin home page, and before switching to this branch.",
+    "version": 4,
     "changes": [
       { "version": 1, "change": "The full-screen kiosk only for the slideshow, in a browser of its own, with an exit button", "displays": true },
-      { "version": 2, "change": "A Noticeboard Help shortcut on the desktop, and the viewer hiding the mouse cursor by itself (unclutter is no longer used)", "displays": true }
+      { "version": 2, "change": "A Noticeboard Help shortcut on the desktop, and the viewer hiding the mouse cursor by itself (unclutter is no longer used)", "displays": true },
+      { "version": 3, "change": "Background audio: the full-screen kiosk may play sound without anyone clicking first", "displays": true },
+      { "version": 4, "change": "The Server's own screen follows the port set in Settings, and a Client's waiting page says \"Server\" and \"Client\"", "displays": true }
     ]
   },
   "software": [
@@ -15,7 +17,7 @@
       "versionArgs": ["--version"],
       "versions": ">=20.19.0 <21.0.0 || >=22.12.0",
       "neededFor": "Running the Noticeboard server. Some of its modules only load on Node.js 20.19 or newer (or 22.12 or newer).",
-      "install": "Run the Noticeboard installer again: it installs Node.js 20 when the Pi's version is too old."
+      "install": "Run the Noticeboard installer again: it installs Node.js 20 when the installed version is too old."
     },
     {
       "name": "npm",
@@ -62,7 +64,7 @@
       "commands": ["chromium", "chromium-browser"],
       "versionArgs": ["--version"],
       "versions": "*",
-      "neededFor": "Showing the slideshow full screen on this Pi's own screen.",
+      "neededFor": "Showing the slideshow full screen on the Server's own screen.",
       "install": "sudo apt install chromium (on older Raspberry Pi OS: chromium-browser)"
     }
   ]

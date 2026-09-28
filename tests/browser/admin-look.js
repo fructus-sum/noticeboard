@@ -39,8 +39,9 @@ const LIST = {
   'password warning': '.warning',
 };
 const SETTINGS = {
-  'settings card': '.card', 'card title': 'h2', 'field label': 'label', 'text input': 'input[type=number]',
-  'checkbox row': '.field', 'primary button': '.btn-primary', 'ghost button': 'text:button:Add',
+  // The Display card and what's in it, found by name (Branding is above it since 0.7.2)
+  'settings card': '[data-card=settings-display]', 'card title': '[data-card=settings-display] h2', 'field label': '[data-card=settings-display] label', 'text input': '[data-card=settings-display] input[type=number]',
+  'checkbox row': '[data-card=settings-display] .field', 'primary button': '[data-card=settings-display] .btn-primary', 'ghost button': 'text:button:Add',
 };
 const MAC_WARNING = {
   'overlay': '.overlay', 'dialog': '.dialog', 'dialog title': '.dialog h2', 'important box': '.important',

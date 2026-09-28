@@ -192,6 +192,23 @@ function lanAddress() {
   const forRestore = await s.api('POST', '/api/settings/maintenance/verify-password', { password: 'Admin@12345', action: 'restore-defaults' });
   await a('maintenance: restore defaults, updater not set up', 'POST', '/api/settings/maintenance/restore-defaults', { body: { token: forRestore.data.token }, exact: true });
 
+  // Audio shows and their tracks
+  await a('audioshows: list, empty', 'GET', '/api/audioshows', { exact: true });
+  const audio = await a('audioshow: create', 'POST', '/api/audioshows', { body: { name: 'Contract audio' } });
+  const audioFolder = audio.json.folder;
+  await a('audioshow: create, no name', 'POST', '/api/audioshows', { body: {}, exact: true });
+  await a('audioshow: get', 'GET', `/api/audioshows/${audioFolder}`);
+  await a('audioshow: get, missing', 'GET', '/api/audioshows/no-such-show', { exact: true });
+  await a('audioshow: bad setting', 'PUT', `/api/audioshows/${audioFolder}`, { body: { volume: 101 }, exact: true });
+  await a('audioshow: update', 'PUT', `/api/audioshows/${audioFolder}`, { body: { order: 'shuffle', transition: 'crossfade', fadeSeconds: 4 } });
+  await a('tracks: list, empty', 'GET', `/api/audioshows/${audioFolder}/tracks`, { exact: true });
+  const notAudio = new FormData();
+  notAudio.append('files', new Blob(['hello'], { type: 'text/plain' }), 'a.txt');
+  await a('tracks: upload unsupported', 'POST', `/api/audioshows/${audioFolder}/tracks`, { body: notAudio, exact: true });
+  await a('track: rename, missing', 'PATCH', `/api/audioshows/${audioFolder}/tracks/nope`, { body: { name: 'x' }, exact: true });
+  await a('audio: not a track', 'GET', `/audio/${audioFolder}/audioshow.json`, { exact: true });
+  await a('audioshow: delete', 'DELETE', `/api/audioshows/${audioFolder}`, { exact: true });
+
   await a('logout', 'POST', '/api/auth/logout', { exact: true });
   await s.stop();
 

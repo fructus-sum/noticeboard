@@ -10,7 +10,7 @@
 //   most server modules (never a hard-coded path elsewhere)
 //
 // Change impact
-//   Installed Pis, update.sh and the kiosk scripts rely on these names (SYSTEM_DESIGN §6,
+//   Installed Servers, update.sh and the kiosk scripts rely on these names (SYSTEM_DESIGN §6,
 //   §15). mediaUrl must match shared/index.js (a unit test checks).
 const path = require('path');
 
@@ -18,10 +18,14 @@ const ROOT = path.resolve(__dirname, '../..');
 
 function dataDir() { return path.join(ROOT, 'data'); }
 function slideshowsDir() { return path.join(ROOT, 'data', 'slideshows'); }
+function audioShowsDir() { return path.join(ROOT, 'data', 'audioshows'); }
 function slideshowDir(folderName) { return path.join(slideshowsDir(), folderName); }
 function slidesDir(folderName) { return path.join(slideshowDir(folderName), 'slides'); }
 function slideshowJsonPath(folderName) { return path.join(slideshowDir(folderName), 'slideshow.json'); }
 function configPath() { return path.join(dataDir(), 'config.json'); }
+// The last config.json that loaded or was saved, and the note left when one couldn't be read (§18.5 item 8)
+function lastGoodConfigPath() { return path.join(dataDir(), 'config.last-good.json'); }
+function configRecoveryPath() { return path.join(dataDir(), 'config-recovery.json'); }
 function logsDir() { return path.join(ROOT, 'logs'); }
 function displayDistDir() { return path.join(ROOT, 'client', 'display', 'dist'); }
 function adminDistDir() { return path.join(ROOT, 'client', 'admin', 'dist'); }
@@ -34,7 +38,7 @@ function updateNoticePath() { return path.join(dataDir(), 'update-notice.json');
 function updateRequestPath() { return path.join(ROOT, 'tmp', 'update-request'); }
 function updateSchedulePath() { return path.join(dataDir(), 'update-schedule.env'); }
 function restoreMarkerPath() { return path.join(dataDir(), 'restore-defaults'); }
-// What install.sh set up: the version of its last run, and the server Pi's kiosk script
+// What install.sh set up: the version of its last run, and the Server's kiosk script
 function installerRecordPath() { return path.join(dataDir(), 'installer.json'); }
 function serverKioskPath() { return path.join(ROOT, 'start-kiosk.sh'); }
 function requirementsPath() { return path.join(ROOT, 'system-requirements.json'); }
@@ -50,15 +54,19 @@ function logoPath() { return path.join(brandingDir(), 'logo.png'); }
 function defaultLogoPath() { return path.join(sampleDataDir(), 'sample-logo.png'); }
 
 function mediaUrl(folderName, filename) { return `/media/${folderName}/slides/${filename}`; }
+function audioUrl(folderName, filename) { return `/audio/${folderName}/tracks/${filename}`; }
 
 module.exports = {
   ROOT,
   dataDir,
   slideshowsDir,
+  audioShowsDir,
   slideshowDir,
   slidesDir,
   slideshowJsonPath,
   configPath,
+  lastGoodConfigPath,
+  configRecoveryPath,
   logsDir,
   displayDistDir,
   adminDistDir,
@@ -81,4 +89,5 @@ module.exports = {
   logoPath,
   defaultLogoPath,
   mediaUrl,
+  audioUrl,
 };

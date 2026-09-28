@@ -5,27 +5,37 @@
 //   Uploading (several files at once), the rows with a thumbnail, name, type, stored file name and
 //   status, renaming a slide (✎: Enter or leaving the field saves, Esc cancels; an empty name goes
 //   back to the uploaded file's name), moving a slide up or down, deleting one, making missing
-//   video thumbnails, and the larger preview (hover shows it, a click or tap pins it; Esc or ✕
-//   closes it). While a slide is being processed or its thumbnail made, the list reloads every 2
+//   video thumbnails, a video's own sound (VideoSoundControl), and the larger preview (hover
+//   shows it, a click or tap pins it; Esc or ✕ closes it). While a slide is being processed or its thumbnail made, the list reloads every 2
 //   seconds until none is.
 //
 // Props: folder. v-model:slides, the list as the server returns it (the page loads it first).
 //
 // Used by: views/SlideshowDetailView
 // It stays open while a slide or an upload has failed (a warning).
-// Uses: useApi (the slides routes), SlidePreview, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+// Uses: useApi (the slides routes), useItemList (upload, reloading, delete, reorder), useRename,
+//   SlidePreview, VideoSoundControl, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { mediaUrl, mediaDisplayName, LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
+import { useRename } from '../../composables/useRename.js';
+import { useItemList } from '../../composables/useItemList.js';
 import SlidePreview from './SlidePreview.vue';
+import VideoSoundControl from './VideoSoundControl.vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 
 const props = defineProps({ folder: { type: String, required: true } });
 const slides = defineModel('slides', { type: Array, required: true });
 
-async function loadSlides() {
-  slides.value = await api.get(`/slideshows/${props.folder}/slides`);
-}
+// Upload, reloading while a slide is processed or its thumbnail made, delete, reorder
+const {
+  load: loadSlides, fileInput, uploading, uploadErr, uploadCount, upload: uploadFile,
+  remove: deleteSlide, move, moveErr, stop,
+} = useItemList({
+  items: slides,
+  path: () => `/slideshows/${props.folder}/slides`,
+  busy: (s) => s.thumbnailPending,
+});
 
 // Larger preview of a slide: hover shows it, click/tap pins it
 const preview = ref(null);   // { slide, position, pinned }
@@ -72,100 +82,18 @@ async function createThumbnails() {
   }
 }
 
-// Upload
-const fileInput    = ref(null);
-const uploading    = ref(false);
-const uploadErr    = ref('');
-const uploadCount  = ref(0);
-
-async function uploadFile(e) {
-  const files = Array.from(e.target.files || []);
-  if (!files.length) return;
-  uploadErr.value = '';
-  uploading.value = true;
-  uploadCount.value = files.length;
-  const fd = new FormData();
-  for (const file of files) fd.append('files', file);
-  try {
-    const newSlides = await api.upload(`/slideshows/${props.folder}/slides`, fd);
-    slides.value.push(...newSlides);
-  } catch (err) {
-    uploadErr.value = err.message;
-  } finally {
-    uploading.value = false;
-    uploadCount.value = 0;
-    if (fileInput.value) fileInput.value.value = '';
-  }
-}
-
 // Something the admin must see: a slide that failed to process, or an upload that failed
-const attention = computed(() => !!uploadErr.value || slides.value.some(s => s.status === 'error'));
-
-// Polling while any slide is processing
-let pollTimer = null;
-const hasProcessing = computed(() => slides.value.some(s => s.status === 'processing' || s.thumbnailPending));
-
-watch(hasProcessing, (v) => {
-  if (v && !pollTimer) {
-    pollTimer = setInterval(async () => {
-      await loadSlides().catch(() => {});
-      if (!hasProcessing.value) { clearInterval(pollTimer); pollTimer = null; }
-    }, 2000);
-  }
-}, { immediate: true });
+const attention = computed(() => !!uploadErr.value || !!moveErr.value || slides.value.some(s => s.status === 'error'));
 
 // Renaming: one slide at a time, in place of its name
-const renaming = ref(null);   // { id, value, saving, error }
-const renameInput = ref(null);
-
-async function startRename(slide) {
-  renaming.value = { id: slide.id, value: slide.name || slide.originalName || '', saving: false, error: '' };
-  await nextTick();
-  renameInput.value?.[0]?.select();
-}
-function cancelRename() {
-  renaming.value = null;
-}
-async function saveRename() {
-  const r = renaming.value;
-  if (!r || r.saving) return;
-  const slide = slides.value.find(s => s.id === r.id);
-  if (!slide) return cancelRename();
-  const name = r.value.trim();
-  if (name === (slide.name || slide.originalName || '') || (!name && !slide.name)) return cancelRename();
-  r.saving = true;
-  try {
-    const saved = await api.patch(`/slideshows/${props.folder}/slides/${r.id}`, { name });
-    slides.value = slides.value.map(s => (s.id === saved.id ? saved : s));
-    renaming.value = null;
-  } catch (e) {
-    r.saving = false;
-    r.error = e.message;
-  }
-}
-
-async function deleteSlide(slide) {
-  if (!confirm(`Delete “${mediaDisplayName(slide)}”?`)) return;
-  try {
-    await api.del(`/slideshows/${props.folder}/slides/${slide.id}`);
-    slides.value = slides.value.filter(s => s.id !== slide.id);
-  } catch (e) {
-    alert(e.message);
-  }
-}
-
-async function move(index, dir) {
-  const newSlides = [...slides.value];
-  const target = index + dir;
-  if (target < 0 || target >= newSlides.length) return;
-  [newSlides[index], newSlides[target]] = [newSlides[target], newSlides[index]];
-  slides.value = newSlides;
-  await api.put(`/slideshows/${props.folder}/slides/reorder`, { order: newSlides.map(s => s.id) }).catch(() => {});
-}
+const { renaming, renameInput, startRename, cancelRename, saveRename } = useRename({
+  items: slides,
+  path: (slide) => `/slideshows/${props.folder}/slides/${slide.id}`,
+});
 
 onMounted(() => window.addEventListener('keydown', onKey));
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer);
+  stop();
   clearTimeout(hoverTimer);
   window.removeEventListener('keydown', onKey);
 });
@@ -175,6 +103,7 @@ onUnmounted(() => {
   <CollapsibleCard :title="`Slides (${slides.length})`" name="slideshow-slides" :attention="attention">
     <template #actions>
         <span v-if="uploadErr" class="error-msg">{{ uploadErr }}</span>
+        <span v-if="moveErr" class="error-msg move-error">{{ moveErr }}</span>
         <label class="btn-primary" style="cursor:pointer;display:inline-block;font-size:13px;padding:7px 14px;border-radius:var(--radius);font-weight:500">
           {{ uploading ? `Uploading${uploadCount > 1 ? ` ${uploadCount} files` : ''}…` : '+ Upload' }}
           <input ref="fileInput" type="file" accept="image/*,video/*" multiple style="display:none" :disabled="uploading" @change="uploadFile" />
@@ -233,6 +162,7 @@ onUnmounted(() => {
         <div class="slide-detail">
           {{ slide.type }}<template v-if="slide.filename"> · {{ slide.filename }}</template><template v-if="slide.thumbnailPending"> · making a thumbnail…</template>
         </div>
+        <VideoSoundControl v-if="slide.type === 'video' && slide.status === 'ready'" :folder="folder" :slide="slide" @change="(saved) => { slides[i] = saved; }" />
       </div>
       <span class="badge" :class="`badge--${slide.status}`">{{ slide.status }}</span>
       <div style="display:flex;gap:4px">

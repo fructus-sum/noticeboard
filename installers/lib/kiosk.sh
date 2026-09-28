@@ -3,8 +3,8 @@
 #
 # Responsibilities
 #   The installed kiosk scripts are the templates in installers/kiosk/ as they are: server.sh
-#   (the server Pi's start-kiosk.sh), and display.sh (a remote display's noticeboard-kiosk.sh)
-#   with this Pi's server URL and MAC addresses filled into its SERVER_URL="" and MACS_HTML=""
+#   (the Server's start-kiosk.sh), and display.sh (a Client's noticeboard-kiosk.sh)
+#   with this Client's Server URL and MAC addresses filled into its SERVER_URL="" and MACS_HTML=""
 #   lines. install.sh reads the templates when it loads its parts (KIOSK_TEMPLATE_server,
 #   KIOSK_TEMPLATE_display).
 #
@@ -16,7 +16,7 @@
 #   server.sh, display.sh
 #
 # Change impact
-#   Installed Pis only get a changed kiosk script when the installer runs again: a change to a
+#   Installed Servers and Clients only get a changed kiosk script when the installer runs again: a change to a
 #   template needs INSTALLER_VERSION raised (and "installer" in system-requirements.json). The
 #   server tells an older install by its kiosk script (services/updates/installerVersion.js
 #   looks for "kiosk-exit"). Compared with tests/fixtures/installer-golden.

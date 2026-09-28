@@ -2,11 +2,15 @@
 // and what they carry (the playlist's slides, the display settings). Recorded in
 // tests/fixtures/socket-events.json from the code before the playlist and the socket had their
 // own modules; the sequence must stay exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
+// When a step differs, the server's log is printed, to show what sent the extra or missing events.
+// Since 0.7.0 a changed playlist is sent when the slide on screen ends (every screen in step,
+// SYSTEM_DESIGN §18.8), so each step also waits for that moment, and the slideshow's slides are 2 s.
 const fs = require('fs');
 const path = require('path');
 const { MODULES, makeApp, server, check, done, sleep } = require('../helpers/app.js');
 const sharp = require(path.join(MODULES, 'sharp'));
 const { io } = require(path.join(MODULES, 'socket.io-client'));
+const { boundaryAfter } = require('../../shared/slideTimeline.mjs');
 
 const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'socket-events.json');
 
@@ -24,17 +28,35 @@ function summary(name, payload) {
   const s = server(env);
   await s.start();
   await s.login();
+  // The start-up job that makes the sample video's thumbnail (and fills in its length) resends the
+  // playlist when it finishes; let it finish first, so it can't land in the steps below (it did, now
+  // and then: a second empty playlist on connect)
+  for (let i = 0; i < 100; i++) {
+    let pending = false;
+    for (const ss of (await s.api('GET', '/api/slideshows')).data) {
+      if ((await s.api('GET', `/api/slideshows/${ss.folder}/slides`)).data.some((x) => x.thumbnailPending)) pending = true;
+    }
+    if (!pending) break;
+    await sleep(100);
+  }
+  await sleep(300);
   const png = async (c) => new Blob([await sharp({ create: { width: 64, height: 36, channels: 3, background: c } }).png().toBuffer()], { type: 'image/png' });
 
   let received = [];
   const sock = io(env.base, { transports: ['websocket'] });
-  sock.onAny((name, payload) => received.push(summary(name, payload)));
+  let running = { slides: [], startedAt: 0 };
+  sock.onAny((name, payload) => {
+    received.push(summary(name, payload));
+    if (name === 'playlist:update') running = payload;
+  });
   sock.on('connect', () => sock.emit('display:ready'));
   const steps = {};
   const step = async (name, action, settleMs = 1500) => {
     received = [];
     await action();
     await sleep(settleMs);
+    // A change waits for the end of the slide on screen (this machine's clock is the Server's)
+    if (running.slides.length) await sleep(Math.max(0, boundaryAfter(running.slides, running.startedAt, Date.now()) - Date.now() + 400));
     steps[name] = received;
   };
   const waitReady = async (folder) => {
@@ -57,7 +79,7 @@ function summary(name, payload) {
   await step('02 create a slideshow', async () => { folder = (await s.api('POST', '/api/slideshows', { name: 'Events' })).data.folder; });
   await step('03 upload an image (unpublished)', () => upload(folder, '#c0392b'));
   await step('04 publish', () => s.api('PUT', `/api/slideshows/${folder}`, { enabled: true }));
-  await step('05 change its duration', () => s.api('PUT', `/api/slideshows/${folder}`, { slideDurationSeconds: 6 }));
+  await step('05 change its duration', () => s.api('PUT', `/api/slideshows/${folder}`, { slideDurationSeconds: 2 }));
   await step('06 upload another image (published)', () => upload(folder, '#2980b9'));
   let slides;
   await step('07 reorder', async () => {
@@ -85,9 +107,19 @@ function summary(name, payload) {
     for (const [name, events] of Object.entries(steps)) console.log(`      ${name}: ${events.join(' | ') || '(nothing)'}`);
   } else {
     const want = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
+    let differs = false;
     for (const name of Object.keys(want)) {
-      check(`${name}: the same events`, JSON.stringify(want[name]) === JSON.stringify(steps[name]),
+      const same = JSON.stringify(want[name]) === JSON.stringify(steps[name]);
+      differs ||= !same;
+      check(`${name}: the same events`, same,
         `was ${want[name].join(' | ') || '(nothing)'}; now ${(steps[name] || []).join(' | ') || '(nothing)'}`);
+    }
+    // What the server did, to find out why (e.g. a playlist sent twice on connect, SYSTEM_DESIGN §17)
+    if (differs) {
+      const log = path.join(env.APP, 'logs', 'app.log');
+      const lines = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : [];
+      console.log('      the server\'s log up to the first steps:');
+      for (const line of lines.slice(0, 40)) console.log(`        ${line.slice(0, 220)}`);
     }
   }
   done(env);

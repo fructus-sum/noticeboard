@@ -1,4 +1,4 @@
-// server/services/updates/installerVersion.js — does this Pi need the installer run again?
+// server/services/updates/installerVersion.js — does the Server need the installer run again?
 //
 // Responsibilities
 //   Updates can't change what only installers/install.sh sets up (kiosk scripts, system services,
@@ -7,14 +7,14 @@
 //   version of every completed run in data/installer.json.
 //
 // Provides
-//   installedVersion()          → Promise<number | null>  the last installer run's version. Pis
+//   installedVersion()          → Promise<number | null>  the last installer run's version. Servers
 //                                 set up before the record existed are told apart by the kiosk
 //                                 script they got (with the exit button: 1, else 0). null: not set
 //                                 up by the installer (e.g. a copy on a PC): nothing to say
 //   installerNeeds(list, installed) → { required, installed, needed, changes, displays }
 //                                 for a version whose system-requirements.json is <list>; changes
-//                                 are only the versions this Pi missed; displays: remote display
-//                                 Pis need it too
+//                                 are only the versions this Server missed; displays: Clients
+//                                 need it too
 //   status()                    → Promise<installerNeeds for the running version + { branch }>
 //                                 (the branch the installer command should come from)
 //

@@ -2,11 +2,14 @@
 //
 // Provides
 //   processImage(input, outDir, id) → a PNG
-//   processVideo(input, outDir, id, format) → an MP4 with AAC sound, its video 'h265' (HEVC, the
+//   processVideo(input, outDir, id, format) → an MP4 with AAC sound at 48 kHz, its video 'h265' (HEVC, the
 //                                     default: smaller) or 'h264' (plays everywhere), as chosen in
 //                                     Settings → Display. Videos already processed keep their format
-//                                     (SYSTEM_DESIGN §16 #12)
-//   getVideoDuration(file), createThumbnail(video, outDir, id) → a still for the admin panel
+//                                     (SYSTEM_DESIGN §14 D43)
+//   getMediaDuration(file) → a video's or audio file's length in whole seconds, or null (ffprobe)
+//   createThumbnail(video, outDir, id) → a still for the admin panel
+//   processAudio(input, outDir, id) → an AAC .m4a (192 kbit/s, 48 kHz), its loudness evened out (EBU R128,
+//                                     -16 LUFS) so one track isn't much louder than the next
 //   videoFormatOf(file) → 'h265' | 'h264' | another codec's name | null (ffprobe)
 //
 // Used by
@@ -34,6 +37,11 @@ const VIDEO_ENCODING = {
   h264: { codec: 'libx264', options: ['-crf 23', '-preset fast'] },
 };
 
+// Every sound we produce has one sample rate: a device (e.g. a Pi's HDMI output) may not mix two
+// streams at different rates, so a video's sound would silence the background music (SYSTEM_DESIGN
+// §18.3 phase 8)
+const AUDIO_RATE = 48000;
+
 function processVideo(inputPath, outDir, slideId, format = 'h265') {
   const encoding = VIDEO_ENCODING[format] ?? VIDEO_ENCODING.h265;
   const outFilename = `${slideId}.mp4`;
@@ -43,6 +51,7 @@ function processVideo(inputPath, outDir, slideId, format = 'h265') {
     ffmpeg(inputPath)
       .videoCodec(encoding.codec)
       .audioCodec('aac')
+      .audioFrequency(AUDIO_RATE)
       .outputOptions([
         ...encoding.options,
         '-pix_fmt yuv420p',
@@ -62,6 +71,28 @@ function processVideo(inputPath, outDir, slideId, format = 'h265') {
   });
 }
 
+function processAudio(inputPath, outDir, trackId) {
+  const outFilename = `${trackId}.m4a`;
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .noVideo()
+      .audioCodec('aac')
+      .audioBitrate('192k')
+      .audioFilters('loudnorm=I=-16:TP=-1.5:LRA=11')
+      .audioFrequency(AUDIO_RATE)   // loudnorm would otherwise raise it (to 96 kHz in AAC)
+      .outputOptions(['-movflags +faststart', '-map 0:a:0'])
+      .on('end', () => {
+        logger.info('Audio processed', { trackId, outFilename });
+        resolve(outFilename);
+      })
+      .on('error', (err) => {
+        logger.error('Audio processing failed', { trackId, err: err.message });
+        reject(err);
+      })
+      .save(path.join(outDir, outFilename));
+  });
+}
+
 // The format a video is in, as Settings → Display names them
 function videoFormatOf(filePath) {
   return new Promise((resolve) => {
@@ -73,7 +104,7 @@ function videoFormatOf(filePath) {
   });
 }
 
-function getVideoDuration(filePath) {
+function getMediaDuration(filePath) {
   return new Promise((resolve) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
       if (err || !metadata?.format?.duration) return resolve(null);
@@ -86,7 +117,7 @@ function getVideoDuration(filePath) {
 // frame of the second or so starting 10% of the way in (between 1 and 5 s, so not a black
 // opening frame), at most 640 × 640 px. The video itself is only read.
 async function createThumbnail(videoPath, outDir, slideId) {
-  const seconds = await getVideoDuration(videoPath);
+  const seconds = await getMediaDuration(videoPath);
   const at = seconds ? Math.min(5, Math.max(1, seconds * 0.1), Math.max(0, seconds - 0.5)) : 0;
   const outFilename = `${slideId}-thumb.jpg`;
   await new Promise((resolve, reject) => {
@@ -105,4 +136,4 @@ async function createThumbnail(videoPath, outDir, slideId) {
   return outFilename;
 }
 
-module.exports = { processImage, processVideo, getVideoDuration, createThumbnail, videoFormatOf };
+module.exports = { processImage, processVideo, processAudio, getMediaDuration, createThumbnail, videoFormatOf };

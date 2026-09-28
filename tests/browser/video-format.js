@@ -1,8 +1,10 @@
-// Settings → Display → Video format for new uploads and Existing videos (SYSTEM_DESIGN §14 D43,
-// §16 #12): H.265 by default with both formats explained and the warning that some screens and
-// browsers can't play it; choosing H.264 hides the warning and Save keeps it with the other display
+// Settings → Display → Video format for new uploads and Existing videos (SYSTEM_DESIGN §14 D43):
+// H.265 by default with both formats explained and the warning that some screens and browsers
+// can't play it; choosing H.264 hides the warning and Save keeps it with the other display
 // settings. "Convert existing videos" uses the saved format (it asks to save a changed choice
-// first), warns before it starts, shows its progress and how it went.
+// first), warns before it starts, shows its progress and how it went. While videos already uploaded
+// aren't in the saved format, the card says how many (§18.5 item 12): the sample's H.264 video with
+// H.265 selected, none once H.264 is saved.
 const { makeApp, server, page, check, done, shot } = require('../helpers/app.js');
 const { connect } = require('../helpers/cdp.js');
 
@@ -21,6 +23,8 @@ const { connect } = require('../helpers/cdp.js');
   const warning = await c.evaluate(`document.querySelector('.format-warning')?.innerText ?? ''`);
   check('with H.265, the warning about screens that can\'t play it', warning.includes('H.265 may not play everywhere') && warning.includes("shows nothing for the video's length"), warning.slice(0, 120));
   await c.screenshot(shot('video-format.png'));
+  const mismatch = `(document.querySelector('.mismatch-warning')?.innerText ?? '').replace(/\\s+/g, ' ')`;
+  check('the sample\'s H.264 video with H.265 selected: the card says so', await c.until(`${mismatch}.includes("1 of the 1 videos uploaded isn't H.265") && ${mismatch}.includes('Convert existing videos')`, 10000), await c.evaluate(mismatch));
 
   const convertButton = `[...document.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('Convert existing videos'))`;
   await c.evaluate(`(() => { const e = document.querySelector('#video-format'); e.value = 'h264'; e.dispatchEvent(new Event('change')); })()`);
@@ -31,13 +35,15 @@ const { connect } = require('../helpers/cdp.js');
   const saved = (await s.api('GET', '/api/settings')).data.display;
   check('Save keeps H.264 with the other display settings', saved.videoFormat === 'h264' && saved.defaultSlideDurationSeconds === 10 && saved.showDeviceInfo === true, JSON.stringify(saved));
   check('saved: convert offers H.264', await c.until(`!${convertButton}.disabled && ${convertButton}.textContent.includes('H.264')`));
+  check('  … and, the video being H.264 already, no mismatch warning', await c.until(`!document.querySelector('.mismatch-warning')`, 10000), await c.evaluate(mismatch));
 
   // Convert: the warning, then the progress, then how it went
   let question = '';
   c.on((msg) => { if (msg.method === 'Page.javascriptDialogOpening') { question = msg.params.message; c.send('Page.handleJavaScriptDialog', { accept: true }); } });
   await c.evaluate(`${convertButton}.click()`);
-  check('it warns about the time and the Pi being slower', question.includes('long time') && question.includes('slower'), question.slice(0, 120));
+  check('it warns about the time and the Server being slower', question.includes('long time') && question.includes('slower'), question.slice(0, 120));
   check('then it shows how it went', await c.until(`document.body.innerText.includes('Last conversion to H.264')`, 120000));
+  check('  … and the mismatch warning is gone', await c.until(`!document.querySelector('.mismatch-warning')`, 10000), await c.evaluate(mismatch));
   const summary = await c.evaluate(`document.querySelector('.convert__done')?.innerText ?? ''`);
   check('  … the sample\'s video is already H.264, so it\'s left as it is', /0 converted, 1 already H\.264/.test(summary), summary);
   await c.screenshot(shot('video-convert.png'));
