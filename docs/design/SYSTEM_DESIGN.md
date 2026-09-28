@@ -1292,7 +1292,8 @@ Every planned change starts here, before any code: what changes and why, the par
 | 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); to check on a real Pi, then merge into main with the owner's OK | 0.6.0 |
 | 18.4 | The words Server and Client everywhere; the supported devices | Done (the kiosk scripts' text with §18.5 item 2, installer version 4); on `feature/audio-support`, to merge with it | 0.6.1 |
 | 18.5 | The Known Issues cleared for a stable base (§16) | Done on `feature/audio-support` (all 12 items), to merge with it | 0.6.2 to 0.6.13 (one per item) |
-| 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, after 18.5 | 0.7.0 |
+| 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, after 18.5 | 0.8.0 |
+| 18.8 | Every screen in step: slides and music on the Server's clock | Designed, waiting for the owner's review; on `feature/audio-support`, before the merge | 0.7.0 |
 
 Design notes D44–D47 are reserved for 18.3.
 
@@ -1424,7 +1425,7 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 ### 18.6 Releases: main follows GitHub Releases
 
-**Version:** 0.7.0 (a feature).
+**Version:** 0.8.0 (a feature; 0.7.0 went to §18.8).
 
 **Why:** merging into main should not by itself update every installed Server; publishing a Release should.
 
@@ -1445,6 +1446,76 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 ---
 
+### 18.8 Every screen in step: slides and music on the Server's clock
+
+**Version:** 0.7.0 (a feature), on `feature/audio-support`, merged into main with audio (the owner, 2026-09-28).
+
+**Why:** today every screen keeps its own time. Its slideshow starts when it loads, and its music starts from wherever it joined. So screens side by side show different slides, and screens heard together play the music at different points (an echo). The owner wants them in step. The limit is accepted: about a tenth of a second between screens, plus whatever delay each TV adds to its sound.
+
+**One clock: the Server's.**
+- Each screen measures how far its clock is from the Server's, over the socket it already has:
+  - new events `time:ping` { sent } and `time:pong` { sent, server };
+  - offset = server + round trip / 2 − received;
+  - the sample with the shortest round trip wins out of 5 at connect, and one exchange every 5 minutes keeps it fresh.
+- A new `client/display/src/serverClock.js` (pure, unit-tested) gives `serverNow()`.
+- Screens' own clocks don't need to be right. Older viewers ignore the new events.
+
+**Slides on a shared timeline.**
+- The playlist gains `startedAt`, in the Server's time (a key only added).
+- Each slide takes its duration (images) or its length (videos; a video without a known length counts as 10 s).
+- Every screen works out from `serverNow()` which slide is on and how far into it. A screen that loads, reconnects or wakes goes straight to the right slide; the right point, for a video.
+- **A playlist change** keeps today's rule that nothing is cut short:
+  - the Server works out the end of the slide on the timeline when the change happens (E);
+  - the new playlist starts from its first slide at E, as a screen does today, but now every screen at the same moment;
+  - the payload carries `startedAt = E`, which is in the future when it's sent.
+- The Server keeps the timeline in memory. After a restart it starts again at the first slide (screens reconnect and follow).
+- **The slide clock** becomes "the timeline says which slide", with its reliability kept:
+  - an image that won't load, or a video that won't play, holds its place until its time is up, as a video with a length does today;
+  - a hidden, asleep or frozen page catches up when it wakes;
+  - the "every slide keeps failing" recovery reload stays;
+  - its 30-simulated-days tests move over, with new ones for two screens with different clocks.
+- **Videos** start at the right point (`currentTime`). If one drifts more than 0.5 s from where the timeline says, it's put back.
+- A screen that loses the Server keeps the timeline it has, so screens stay in step through an outage.
+
+**Music on the same clock.**
+- Each audio show in `audio:update` gains `startedAt` (the Server's time its timeline began: when it was published or changed, or at start-up).
+- **Which track, and where in it**, come from `serverNow()`:
+  - in order: round and round;
+  - shuffled: each round's order comes from a seed made from `startedAt` and the round number, so every screen draws the same order, still never the same track twice in a row;
+  - a crossfade starts the next track `fadeSeconds` before the end, on every screen together.
+- **Drift:** a track more than 0.25 s out is put back; smaller drift is eased away by playing 2 % faster or slower for a moment.
+- The engine (`shared/audioPlayer.mjs`) takes `serverNow`, and a show with `startedAt`. The admin panel's preview keeps using the browser's clock, with the same code. Its tests move over, with two-screen ones added.
+- Ducking and pausing for a video's sound follow the slides, so they happen together too.
+- **Event audio:** starts and ends at its times on every screen. At its end the Server restarts the slideshow's show at a new track (its `startedAt` moves to that moment, one track on), which keeps the owner's rule "afterwards, the next track".
+
+**A decision for the owner:**
+- When the screens come back to a slideshow whose music was playing before, today each screen plays **the next track**. In step, the simplest and steadiest rule is **"like a radio"**: each show plays all the time on its timeline, and a slideshow joins its show wherever it is now, often mid-track.
+- The alternative is for the Server to restart the show at a new track every time its slideshow comes back on. It's possible, but each such return is one more moment when all the screens must switch music together, and it's more to go wrong.
+- **Recommended:** like a radio.
+
+**Affects:**
+- server: `playlistService` (`startedAt`, boundaries), `audioPlaylist` (each show's `startedAt`, re-anchoring after an event), `displaySocket` (the time events), `schedulerService` / the event clock (the boundary of a change);
+- viewer: `serverClock.js` (new), `slideshowClock.js`, `SlideShow.vue`, `VideoSlide.vue` (start at a point, drift), `BackgroundAudio.vue`;
+- shared: `audioPlayer.mjs`;
+- contract: the two time events (added).
+
+**Risks:**
+- The slide clock is the heart of "runs for months", so its rewrite keeps every current test and scenario (outages, freezes, crashes, updates) and adds two-screen ones.
+- Open screens with an older viewer ignore `startedAt` and the time events, and carry on as today until they reload.
+- The payloads only gain keys, so the socket and contract recordings are re-recorded on purpose.
+
+**Tests:**
+- unit, over simulated time: offsets and round trips; two screens with clocks minutes apart on the same slide and track, through playlist changes, outages and sleeping pages; seeded shuffle giving the same order everywhere; drift correction;
+- browser: two viewers in the same browser with different clock offsets (CDP `Emulation.setVirtualTimePolicy` is too coarse, so a test-only clock offset through `?debug=clock-offset`, which only a test sets) showing the same slide and the same track at the same time;
+- the viewer-reliability scenarios unchanged;
+- on the owner's Pis: two screens side by side, and a Server and a Client in one room.
+
+**Phases** (each tested, committed):
+1. The server clock and the time events.
+2. The slide timeline.
+3. The music timeline.
+4. Docs, the full run, the Pi check.
+
 ## 19. Versions
 
 **Rules** (the owner, 2026-09-28)
@@ -1456,7 +1527,7 @@ cat /proc/device-tree/model; uname -r; chromium --version
 - **Each bug fix counts as its own patch number,** even when several are done together (the owner, 2026-09-28): e.g. §18.5's twelve items are 0.6.2 to 0.6.13, and wording or documentation work such as §18.4 is a patch too.
 - `package.json` (the root, `client/admin` and `client/display`) still says 1.0.0, npm's default; nothing reads it. Setting it to the version here is for the owner to decide (by hand, with the matching top entries of `package-lock.json`, never with npm install on Windows).
 
-**Current:** main is **0.5.0**. On `feature/audio-support`, done and waiting for the check on a real Pi, then one merge into main: **0.6.0** "Audio" (§18.3), **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item). Planned next: **0.7.0** (§18.6 Releases).
+**Current:** main is **0.5.0**. On `feature/audio-support`, done and waiting for the check on a real Pi, then one merge into main: **0.6.0** "Audio" (§18.3), **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item). Planned: **0.7.0** (§18.8 every screen in step, on the audio branch before the merge), then **0.8.0** (§18.6 Releases) and **0.9.0** (the installer and update redesign, planned).
 
 **History** (numbered after the fact for everything before 0.6.0)
 
