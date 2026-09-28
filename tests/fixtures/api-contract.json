@@ -827,6 +827,20 @@
       "deleted": []
     }
   },
+  "maintenance: restore defaults, no token": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/restore-defaults",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"The password check has expired. Nothing was changed; start again.\"}"
+  },
+  "maintenance: restore defaults, updater not set up": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/restore-defaults",
+    "status": 409,
+    "type": "application/json",
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
+  },
   "logout": {
     "method": "POST",
     "path": "/api/auth/logout",

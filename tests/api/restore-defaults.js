@@ -2,8 +2,9 @@
 // action; the request leaves the marker, the status and a "restore-defaults" request for update.sh;
 // at the next start-up (update.sh restarts the server) everything in data/ but the branch setting
 // and the installer's record is gone, the logs are emptied, the waiting files deleted, and the
-// server starts as a new install: default settings and password, a new session secret (the old
-// login no longer works), the sample slideshow as new.
+// server starts as a new install: default settings and password (and port: it comes back on 3000,
+// which must be free), a new session secret (the old login no longer works), the sample slideshow
+// as new.
 const fs = require('fs');
 const path = require('path');
 const { MODULES, makeApp, server, check, done } = require('../helpers/app.js');
@@ -63,6 +64,9 @@ const sharp = require(path.join(MODULES, 'sharp'));
   // update.sh reinstalls and restarts the server, which resets its data at start-up
   fs.rmSync(at('tmp', 'update-request'));
   await s.stop();
+  // The restored config.json has the default port, so the server comes back on 3000
+  env.port = 3000;
+  env.base = 'http://localhost:3000';
   await s.start({ NOTICEBOARD_SYSTEMD_DIR: units });
   const dataLeft = fs.readdirSync(at('data')).sort().join(' ');
   check('data/ holds only the kept files and a new install\'s', dataLeft === 'config.json installer.json slideshows update-branch.env', dataLeft);
