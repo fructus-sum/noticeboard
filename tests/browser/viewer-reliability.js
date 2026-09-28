@@ -114,7 +114,9 @@ async function openDisplay() {
     while (!reached && Date.now() - t0 < 60_000) { reached = d.since(t0).find((x) => x.file === stuckFile); await sleep(200); }
     const moved = reached && await d.waitForChange(reached.t, 45_000);
     const stayed = moved ? moved.t - reached.t : Infinity;
-    check('A: an image whose download never finishes is skipped after its 30 s deadline', paused > 0 && stayed >= 30_000 && stayed <= 36_000, `download held back ${paused}x; moved on after ${secs(stayed)}`);
+    // Since 0.7.0 (every screen in step, SYSTEM_DESIGN §18.8) it keeps its place for its 3 s, as the
+    // other screens show it, rather than holding the slideshow up to a 30 s deadline
+    check('A: an image whose download never finishes keeps its place for its time, then the slideshow moves on', paused > 0 && stayed >= 2_000 && stayed <= 4_500, `download held back ${paused}x; moved on after ${secs(stayed)}`);
     d.close();
   }
 

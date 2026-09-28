@@ -30,7 +30,7 @@ import BackgroundAudio from './components/BackgroundAudio.vue';
 import AudioDebug from './components/AudioDebug.vue';
 import { startDailyReload } from './recovery.js';
 
-const { playlist, connected, received, settings, audio } = useSocket();
+const { playlist, connected, received, settings, audio, serverNow } = useSocket();
 const { active } = useActivity();
 const hasSlides = computed(() => playlist.value.slides.length > 0);
 // The slide on screen, for the background audio: its slideshow's show, and a video's own sound
@@ -51,7 +51,7 @@ if (kiosk) startDailyReload(() => connected.value);
 
 <template>
   <div class="app" :class="{ 'app--idle': !active }" :style="{ '--nb-background': settings.background }">
-    <SlideShow v-if="hasSlides" :slides="playlist.slides" :connected="connected" @on-air="(slide) => { onAir = slide; }" />
+    <SlideShow v-if="hasSlides" :slides="playlist.slides" :started-at="playlist.startedAt ?? null" :server-now="serverNow" :connected="connected" @on-air="(slide) => { onAir = slide; }" />
     <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
     <DeviceInfo v-if="settings.showDeviceInfo" />
     <ExitKiosk v-if="kiosk" :visible="active" />

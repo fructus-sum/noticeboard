@@ -8,6 +8,7 @@ const { connect } = require('../helpers/cdp.js');
 const { MODULES, sleep, check, makeApp, server, page, done } = require('../helpers/app.js');
 const sharp = require(path.join(MODULES, 'sharp'));
 const { io } = require(path.join(MODULES, 'socket.io-client'));
+const { boundaryAfter } = require('../../shared/slideTimeline.mjs');
 
 const { ffmpegEnv, hasFfmpeg } = require('../helpers/app.js');
 const FF = ffmpegEnv();
@@ -21,9 +22,13 @@ function makeVideo(file, seconds = 4) {
   execFileSync(FF.FFMPEG_PATH || 'ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', `testsrc=size=640x360:rate=25:duration=${seconds}`, '-pix_fmt', 'yuv420p', file]);
   return new Blob([fs.readFileSync(file)], { type: 'video/mp4' });
 }
+// The playlist once any change has taken effect: since 0.7.0 a change waits for the end of the slide
+// on screen (every screen in step, SYSTEM_DESIGN §18.8), so this waits for that moment too
 async function playlistOf(env) {
   const sock = io(env.base, { transports: ['websocket'] });
-  const list = await new Promise((resolve) => { sock.on('connect', () => sock.emit('display:ready')); sock.on('playlist:update', resolve); });
+  let list = await new Promise((resolve) => { sock.on('connect', () => sock.emit('display:ready')); sock.once('playlist:update', resolve); });
+  sock.on('playlist:update', (next) => { list = next; });
+  if (list.slides.length) await sleep(Math.max(0, boundaryAfter(list.slides, list.startedAt, Date.now()) - Date.now() + 400));
   sock.close();
   return list;
 }
@@ -94,10 +99,10 @@ const waitFor = async (fn, ms = 60000) => { const end = Date.now() + ms; while (
   await v.go(env.base + '/');
   const topSrc = `[...document.querySelectorAll('.slide-img, .slide-video')].pop()?.getAttribute('src') ?? ''`;
   await v.until(`${topSrc}.includes('${a.folder}')`, 15000);
-  // Wait for a fresh slide (the clock's own counter), then switch slideshows 2 s into it
+  // Wait for a fresh slide (the clock's own counter: a new one for every slide), then switch slideshows 2 s into it
   const gen = () => v.evaluate('window.noticeboard.slideshow().generation');
   const g0 = await gen();
-  await v.until(`window.noticeboard.slideshow().generation > ${g0} && window.noticeboard.slideshow().phase === 'showing'`, 15000);
+  await v.until(`window.noticeboard.slideshow().generation > ${g0}`, 15000);
   const shownAt = Date.now();
   const g1 = await gen();
   await sleep(2000);

@@ -3,11 +3,14 @@
 // tests/fixtures/socket-events.json from the code before the playlist and the socket had their
 // own modules; the sequence must stay exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
 // When a step differs, the server's log is printed, to show what sent the extra or missing events.
+// Since 0.7.0 a changed playlist is sent when the slide on screen ends (every screen in step,
+// SYSTEM_DESIGN §18.8), so each step also waits for that moment, and the slideshow's slides are 2 s.
 const fs = require('fs');
 const path = require('path');
 const { MODULES, makeApp, server, check, done, sleep } = require('../helpers/app.js');
 const sharp = require(path.join(MODULES, 'sharp'));
 const { io } = require(path.join(MODULES, 'socket.io-client'));
+const { boundaryAfter } = require('../../shared/slideTimeline.mjs');
 
 const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'socket-events.json');
 
@@ -41,13 +44,19 @@ function summary(name, payload) {
 
   let received = [];
   const sock = io(env.base, { transports: ['websocket'] });
-  sock.onAny((name, payload) => received.push(summary(name, payload)));
+  let running = { slides: [], startedAt: 0 };
+  sock.onAny((name, payload) => {
+    received.push(summary(name, payload));
+    if (name === 'playlist:update') running = payload;
+  });
   sock.on('connect', () => sock.emit('display:ready'));
   const steps = {};
   const step = async (name, action, settleMs = 1500) => {
     received = [];
     await action();
     await sleep(settleMs);
+    // A change waits for the end of the slide on screen (this machine's clock is the Server's)
+    if (running.slides.length) await sleep(Math.max(0, boundaryAfter(running.slides, running.startedAt, Date.now()) - Date.now() + 400));
     steps[name] = received;
   };
   const waitReady = async (folder) => {
@@ -70,7 +79,7 @@ function summary(name, payload) {
   await step('02 create a slideshow', async () => { folder = (await s.api('POST', '/api/slideshows', { name: 'Events' })).data.folder; });
   await step('03 upload an image (unpublished)', () => upload(folder, '#c0392b'));
   await step('04 publish', () => s.api('PUT', `/api/slideshows/${folder}`, { enabled: true }));
-  await step('05 change its duration', () => s.api('PUT', `/api/slideshows/${folder}`, { slideDurationSeconds: 6 }));
+  await step('05 change its duration', () => s.api('PUT', `/api/slideshows/${folder}`, { slideDurationSeconds: 2 }));
   await step('06 upload another image (published)', () => upload(folder, '#2980b9'));
   let slides;
   await step('07 reorder', async () => {

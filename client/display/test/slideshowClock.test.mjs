@@ -1,23 +1,17 @@
-// Tests for the display's slide clock, written for months of unattended running. Time is
-// simulated: a fake scheduler jumps straight to the next due timer, so weeks of slides, sleeps,
-// hidden pages, reconnects and outages run in seconds. Run with: npm test
+// Tests for the display's slide clock, written for months of unattended running and, since 0.7.0,
+// for screens in step with each other (SYSTEM_DESIGN §18.8). Time is simulated: a fake scheduler
+// jumps straight to the next due timer, so weeks of slides, sleeps, hidden pages, reconnects and
+// outages run in seconds. The scheduler's time is the Server's; a screen's estimate of it can be a
+// little off (err), as a real one is. Run with: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  createSlideshowClock,
-  LOAD_TIMEOUT_MS,
-  STALL_TIMEOUT_MS,
-  GRACE_MS,
-  RETRY_MS,
-  OUTAGE_RETRY_MS,
-  WATCHDOG_MS,
-} from '../src/slideshowClock.js';
+import { createSlideshowClock, WATCHDOG_MS } from '../src/slideshowClock.js';
+import { positionAt, boundaryAfter } from '../../../shared/slideTimeline.mjs';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const LOAD_MS = 100;       // how long the fake browser takes to show a slide
-const VIDEO_MS = 20_000;   // length of the fake videos
 
 // Timers that only move when the test says so. sleep() is a suspended machine: nothing runs,
 // then overdue timers fire once. throttle() is a hidden tab: timers run at most once a minute,
@@ -77,324 +71,270 @@ function createScheduler() {
   };
 }
 
-// Plays the part of the browser. trouble(slide) decides how a slide misbehaves:
-// null, 'never-loads', 'error', 'stall' (a video that freezes half way).
-function setup(slides, { trouble = () => null } = {}) {
-  const sched = createScheduler();
+// A screen: its clock, and the browser's side. trouble(slide) says how a slide misbehaves: null,
+// 'never-loads' or 'error'. err is how far off its estimate of the Server's time is (ms).
+function screen(sched, { err = 0, trouble = () => null } = {}) {
   const log = [];
   const stuck = [];
-  let current = slides;
+  let current = [];
   let clock = null;
   const onChange = (state) => {
     assert.ok(state.index >= 0 && state.index < current.length, `index ${state.index} out of range`);
     if (log.length) assert.equal(state.generation, log[log.length - 1].generation + 1, 'generation skipped');
     log.push({ t: sched.now(), ...state });
-    const slide = current[state.index];
     const gen = state.generation;
-    const problem = trouble(slide, state);
+    const problem = trouble(current[state.index]);
     if (problem === 'never-loads') return;
-    sched.timers.setTimeout(() => {
-      if (problem === 'error') { clock.failed(gen); return; }
-      clock.ready(gen);
-      if (slide.type !== 'video') return;
-      const stopAt = problem === 'stall' ? VIDEO_MS / 2 : VIDEO_MS;
-      for (let t = 1_000; t <= stopAt; t += 1_000) sched.timers.setTimeout(() => clock.progress(gen), t);
-      if (problem !== 'stall') sched.timers.setTimeout(() => clock.ended(gen), VIDEO_MS);
-    }, LOAD_MS);
+    sched.timers.setTimeout(() => (problem === 'error' ? clock.failed(gen) : clock.ready(gen)), LOAD_MS);
   };
-  clock = createSlideshowClock({ onChange, onStuck: (n) => stuck.push(n), now: sched.now, timers: sched.timers });
+  clock = createSlideshowClock({ onChange, onStuck: (n) => stuck.push(n), serverNow: () => sched.now() + err, timers: sched.timers });
   clock.start();
-  const setSlides = (list) => { current = list; return clock.setSlides(list); };
-  setSlides(slides);
-  return { sched, clock, log, stuck, setSlides };
+  const setSlides = (list, startedAt) => { current = list; return clock.setSlides(list, startedAt); };
+  const onNow = () => clock.state().index;
+  return { clock, log, stuck, setSlides, onNow };
 }
 
 const images = (n, seconds = 3, tag = 'a') =>
   Array.from({ length: n }, (_, i) => ({ type: 'image', url: `/media/${tag}/${i}.png`, duration: seconds }));
-const video = (tag = 'v') => ({ type: 'video', url: `/media/${tag}/clip.mp4`, duration: null });
+const video = (length = 20, tag = 'v') => ({ type: 'video', url: `/media/${tag}/clip.mp4`, duration: null, length });
 const copy = (list) => JSON.parse(JSON.stringify(list));
-// Time between each slide change after `from` and the change before it
-const gapsAfter = (log, from) => {
-  const gaps = [];
-  for (let i = 1; i < log.length; i++) if (log[i].t > from) gaps.push(log[i].t - log[i - 1].t);
-  return gaps;
-};
 
-test('cycles through the slides in order, each for its own duration', () => {
-  const { sched, log } = setup(images(3, 3));
-  sched.run(MINUTE);
-  assert.deepEqual(log.slice(0, 7).map((e) => e.index), [0, 1, 2, 0, 1, 2, 0]);
-  for (let i = 1; i < log.length; i++) assert.equal(log[i].t - log[i - 1].t, 3_000 + LOAD_MS);
+test('cycles through the slides in order, each for its own time, from the playlist\'s start', () => {
+  const sched = createScheduler();
+  const s = screen(sched);
+  s.setSlides(images(3, 3), 0);
+  sched.run(20_000);
+  // Each change at its boundary, or a few ms after (whichever of the slide's timer and the watchdog comes first)
+  assert.deepEqual(s.log.map((e) => e.index), [0, 1, 2, 0, 1, 2, 0]);
+  s.log.forEach((e, i) => assert.ok(e.t >= i * 3_000 && e.t <= i * 3_000 + 5, `change ${i} at ${e.t}`));
 });
 
-test('the same playlist sent again never stops the slideshow, at any moment of a slide', () => {
-  // The bug that froze screens: a re-sent playlist while the first slide was showing
-  for (const offset of [0, 1, 50, 99, 100, 101, 1_500, 3_000, 3_099, 3_100, 3_101]) {
-    const { sched, log, setSlides } = setup(images(3, 3));
-    sched.run(offset);
-    assert.equal(setSlides(copy(images(3, 3))), false, 'unchanged playlist should be ignored');
-    const before = log.length;
-    sched.run(MINUTE);
-    assert.ok(log.length - before >= 18, `offset ${offset}: only ${log.length - before} changes in a minute`);
-    assert.ok(Math.max(...gapsAfter(log, offset)) <= 3_000 + LOAD_MS, `offset ${offset}: a gap was too long`);
+test('the same playlist sent again never restarts the slide on screen, at any moment', () => {
+  const sched = createScheduler();
+  const s = screen(sched);
+  const list = images(3, 3);
+  s.setSlides(list, 0);
+  for (const at of [0, 50, 1_000, 2_999, 3_010, 7_777]) {
+    sched.run(at - sched.now());
+    const before = s.log.length;
+    assert.equal(s.setSlides(copy(list), 0), false);
+    assert.equal(s.log.length, before, `re-sent at ${at}`);
   }
 });
 
-test('a changed playlist starts from its first slide once the slide on screen has had its full time', () => {
-  const { sched, log, setSlides } = setup(images(3, 3));
-  sched.run(1_000);   // first slide on screen since LOAD_MS, due to change at LOAD_MS + 3 s
-  const { generation, t } = log[log.length - 1];
-  assert.equal(setSlides(images(4, 5, 'b')), true);
-  assert.equal(log.length, 1, 'the slide on screen must not be cut short');
-  sched.run(LOAD_MS + 3_000 - 1_000 - 1);
-  assert.equal(log.length, 1, 'still the old slide until its time is up');
-  sched.run(1);
-  const next = log[log.length - 1];
-  assert.equal(next.t - t, LOAD_MS + 3_000, 'the old slide kept its whole 3 s');
-  assert.equal(next.index, 0);
-  assert.equal(next.generation, generation + 1, 'must remount even though the index is still 0');
-  sched.run(MINUTE);
-  assert.ok(log.length >= 10);
-  // The new playlist's own durations apply from its first slide on
-  for (let i = 2; i < log.length; i++) assert.equal(log[i].t - log[i - 1].t, 5_000 + LOAD_MS);
+test('a changed playlist (the Server sends it at a boundary) is followed at once, from its first slide', () => {
+  const sched = createScheduler();
+  const s = screen(sched);
+  s.setSlides(images(3, 3), 0);
+  sched.run(6_000);                         // the boundary the Server picked
+  s.setSlides(images(2, 5, 'b'), 6_000);
+  const last = s.log[s.log.length - 1];
+  assert.equal(last.t, 6_000);
+  assert.equal(last.index, 0);
+  assert.equal(last.slotStart, 6_000);
+  sched.run(5_010);
+  assert.equal(s.onNow(), 1, 'then its own timeline');
 });
 
-test('a video on screen plays to its end before a new playlist starts', () => {
-  const { sched, log, setSlides } = setup([video(), ...images(2, 3)]);
-  sched.run(5_000);   // the video is playing
-  setSlides(images(2, 4, 'b'));
-  sched.run(VIDEO_MS - 5_000 + LOAD_MS - 1);
-  assert.equal(log.length, 1, 'the video is still playing');
-  sched.run(2);
-  assert.equal(log[log.length - 1].t, VIDEO_MS + LOAD_MS, 'switched exactly when the video ended');
+test('a screen that joins late goes straight to the slide on air, and a video to the right point', () => {
+  const sched = createScheduler();
+  sched.run(47_300);                        // the playlist started 47.3 s ago
+  const s = screen(sched);
+  s.setSlides([...images(2, 10), video(30)], 0);   // 50 s a round: at 47.3 s, 27.3 s into the video
+  const first = s.log[0];
+  assert.equal(first.index, 2);
+  assert.equal(first.slotStart, 20_000);
+  assert.ok(Math.abs(first.offset - 27.3) < 0.001, `offset ${first.offset}`);
 });
 
-test('a changed playlist replaces a slide that is still loading, or stops when there is nothing left', () => {
-  const loading = setup(images(3, 3));
-  loading.sched.run(LOAD_MS / 2);   // first slide not on screen yet
-  loading.setSlides(images(2, 3, 'b'));
-  assert.equal(loading.log.length, 2, 'a slide that is not on screen yet is replaced at once');
-  const emptied = setup(images(3, 3));
-  emptied.sched.run(1_000);
-  emptied.setSlides([]);
-  assert.equal(emptied.clock.state().phase, 'idle', 'nothing left to show: stop at once');
-  emptied.sched.run(MINUTE);
-  assert.equal(emptied.log.length, 1);
+test('two screens whose estimates of the Server\'s time differ slightly show the same slide, round after round', () => {
+  const sched = createScheduler();
+  const a = screen(sched, { err: -30 });
+  const b = screen(sched, { err: 45 });
+  const list = [...images(3, 4), video(12)];
+  a.setSlides(list, 0);
+  b.setSlides(list, 0);
+  let disagreements = 0;
+  for (let t = 0; t < 10 * MINUTE; t += 250) {
+    sched.run(250);
+    const truth = positionAt(list, 0, sched.now()).index;
+    // Within 50 ms of a boundary the two may legitimately differ
+    const nearEdge = [0, 4_000, 8_000, 12_000].some((edge) => Math.abs(((sched.now() % 24_000) - edge + 24_000) % 24_000) < 80
+      || Math.abs(((sched.now() % 24_000) - edge)) < 80);
+    if (!nearEdge && (a.onNow() !== truth || b.onNow() !== truth)) disagreements += 1;
+  }
+  assert.equal(disagreements, 0);
 });
 
-test('going back to the running playlist before the switch cancels it', () => {
-  const { sched, log, setSlides } = setup(images(3, 3));
-  sched.run(1_000);
-  setSlides(images(2, 3, 'b'));
-  assert.equal(setSlides(images(3, 3)), true);
-  sched.run(MINUTE);
-  assert.deepEqual(log.slice(0, 4).map((e) => e.index), [0, 1, 2, 0], 'carried on with the first playlist');
-  assert.ok(log.every((e) => e.generation > 0));
+test('a slide that can\'t be shown keeps its place until its time is up', () => {
+  const sched = createScheduler();
+  const s = screen(sched, { trouble: (slide) => (slide.url.endsWith('/1.png') ? 'error' : slide.url.endsWith('/2.png') ? 'never-loads' : null) });
+  s.setSlides(images(4, 3), 0);
+  sched.run(12_100);
+  assert.deepEqual(s.log.map((e) => e.index), [0, 1, 2, 3, 0], 'no slide skipped early');
+  s.log.forEach((e, i) => assert.ok(e.t >= i * 3_000 && e.t <= i * 3_000 + 5, `change ${i} at ${e.t}`));
 });
 
-test('a slide that never loads is skipped once its load deadline passes', () => {
-  const { sched, log } = setup(images(3, 3), { trouble: (s) => (s.url.endsWith('/1.png') ? 'never-loads' : null) });
-  sched.run(2 * MINUTE);
-  const stuckAt = log.findIndex((e) => e.index === 1);
-  const gap = log[stuckAt + 1].t - log[stuckAt].t;
-  assert.ok(gap >= LOAD_TIMEOUT_MS && gap <= LOAD_TIMEOUT_MS + WATCHDOG_MS + RETRY_MS, `gap ${gap}`);
-  assert.equal(log[stuckAt + 1].index, 2);
+test('when every slide keeps failing (the server gone), the recovery is asked for after three rounds', () => {
+  const sched = createScheduler();
+  let broken = true;
+  const s = screen(sched, { trouble: () => (broken ? 'error' : null) });
+  s.setSlides(images(2, 3), 0);
+  sched.run(6 * 3_000 + 10);
+  assert.deepEqual(s.stuck, [6]);
+  broken = false;
+  sched.run(30_000);
+  assert.deepEqual(s.stuck, [6], 'working again: no more');
 });
 
-test('a broken slide is skipped after a short pause', () => {
-  const { sched, log } = setup(images(3, 3), { trouble: (s) => (s.url.endsWith('/1.png') ? 'error' : null) });
-  sched.run(MINUTE);
-  const at = log.findIndex((e) => e.index === 1);
-  assert.equal(log[at + 1].t - log[at].t, LOAD_MS + RETRY_MS);
-});
-
-test('server unreachable: no busy loop, then an immediate restart when it is back', () => {
-  let down = true;
-  const { sched, clock, log, stuck } = setup(images(3, 3), { trouble: () => (down ? 'error' : null) });
-  sched.run(10 * MINUTE);
-  // One quick round, then one attempt every 30 s rather than hundreds
-  assert.ok(log.length <= 3 + 10 * MINUTE / OUTAGE_RETRY_MS + 1, `${log.length} attempts in 10 minutes`);
-  assert.ok(stuck.length >= 1, 'should report being stuck after three failed rounds');
-  down = false;
-  const before = log.length;
-  clock.resume();   // the socket reconnected
-  assert.equal(log.length, before + 1, 'should try the next slide straight away');
-  sched.run(MINUTE);
-  assert.ok(log.length - before >= 18, 'normal cycling should resume');
-});
-
-test('videos play to the end; stalled, unplayable or never-starting videos are skipped', () => {
-  const run = (problem) => {
-    const { sched, log } = setup([images(1, 3)[0], video(), images(1, 3, 'c')[0]], {
-      trouble: (s) => (s.type === 'video' ? problem : null),
-    });
-    sched.run(3 * MINUTE);
-    const at = log.findIndex((e) => e.index === 1);
-    return log[at + 1].t - log[at].t;
-  };
-  assert.equal(run(null), LOAD_MS + VIDEO_MS);
-  const stalled = run('stall');
-  assert.ok(stalled >= LOAD_MS + VIDEO_MS / 2 + STALL_TIMEOUT_MS && stalled <= LOAD_MS + VIDEO_MS / 2 + STALL_TIMEOUT_MS + WATCHDOG_MS + RETRY_MS, `stall gap ${stalled}`);
-  assert.equal(run('error'), LOAD_MS + RETRY_MS);
-  const never = run('never-loads');
-  assert.ok(never >= LOAD_TIMEOUT_MS && never <= LOAD_TIMEOUT_MS + WATCHDOG_MS + RETRY_MS, `never-starts gap ${never}`);
-});
-
-test('a video with a length moves on at its expected end, even if it never plays or stops', () => {
-  const withLength = { ...video('l'), length: VIDEO_MS / 1000 };
-  const run = (problem) => {
-    const { sched, log } = setup([images(1, 3)[0], withLength, images(1, 3, 'c')[0]], {
-      trouble: (s) => (s.type === 'video' ? problem : null),
-    });
-    sched.run(3 * MINUTE);
-    const at = log.findIndex((e) => e.index === 1);
-    return log[at + 1].t - log[at].t;
-  };
-  assert.equal(run(null), LOAD_MS + VIDEO_MS, 'played: moves on when it ends');
-  assert.equal(run('error'), VIDEO_MS, "can't be played: holds its place for its length");
-  assert.equal(run('never-loads'), VIDEO_MS, 'never starts: moves on at its expected end');
-  const stalled = run('stall');
-  assert.ok(stalled >= VIDEO_MS && stalled <= VIDEO_MS + GRACE_MS + WATCHDOG_MS, `stops half way: moves on around its expected end (${stalled})`);
-});
-
-test('a video with a length that buffers keeps playing past its expected end while it moves', () => {
-  const withLength = { ...video('b'), length: 10 };   // the fake video really plays for 20 s
-  const { sched, log } = setup([images(1, 3)[0], withLength, images(1, 3, 'c')[0]]);
-  sched.run(3 * MINUTE);
-  const at = log.findIndex((e) => e.index === 1);
-  assert.equal(log[at + 1].t - log[at].t, LOAD_MS + VIDEO_MS, 'it was still moving: played to its end');
-});
-
-test('an unplayable video with a length on every screen still reaches the recovery after three rounds', () => {
-  const withLength = { ...video('u'), length: 5 };
-  const { sched, stuck } = setup([withLength, { ...video('w'), length: 5 }], { trouble: () => 'error' });
-  sched.run(10 * MINUTE);
-  assert.ok(stuck.length >= 1, 'onStuck was called');
-});
-
-test('a lost timer cannot stop the slideshow: the watchdog moves on', () => {
-  const { sched, log } = setup(images(3, 3));
+test('a lost timer cannot stop the slideshow: the watchdog catches up', () => {
+  const sched = createScheduler();
+  const s = screen(sched);
   const realSetTimeout = sched.timers.setTimeout;
   let dropped = false;
   sched.timers.setTimeout = (fn, ms) => {
-    if (!dropped && ms === 3_000) { dropped = true; return -1; }   // this slide's timer never fires
+    if (!dropped && ms > 2_000) { dropped = true; return -1; }   // this slide's end timer never fires
     return realSetTimeout(fn, ms);
   };
+  s.setSlides(images(3, 3), 0);
   sched.run(MINUTE);
-  const gaps = log.slice(1).map((e, i) => e.t - log[i].t);
-  const longest = Math.max(...gaps);
-  assert.ok(longest > 3_000 + LOAD_MS && longest <= LOAD_MS + 3_000 + GRACE_MS + WATCHDOG_MS, `longest gap ${longest}`);
-  assert.ok(log.length >= 15);
+  const gaps = s.log.slice(1).map((e, i) => e.t - s.log[i].t);
+  assert.ok(Math.max(...gaps) <= 3_000 + WATCHDOG_MS + 10, `longest gap ${Math.max(...gaps)}`);
+  assert.equal(s.onNow(), positionAt(images(3, 3), 0, sched.now()).index, 'and on the right slide');
 });
 
-test('after the machine sleeps for 8 hours it moves on once on waking, with no burst', () => {
-  const { sched, log } = setup(images(3, 3));
+test('after the machine sleeps for 8 hours it goes straight to the right slide, once, with no burst', () => {
+  const sched = createScheduler();
+  const s = screen(sched);
+  const list = images(3, 3);
+  s.setSlides(list, 0);
   sched.run(10_000);
-  const before = log.length;
-  sched.sleep(8 * HOUR);
-  const wokeAt = sched.now();
-  sched.run(50);
-  assert.equal(log.length, before + 1, 'exactly one slide change right after waking');
-  sched.run(MINUTE);
-  const gaps = gapsAfter(log, wokeAt + 50);
-  assert.ok(gaps.every((g) => g === 3_000 + LOAD_MS), 'normal pace after waking');
-});
-
-test('a hidden page with throttled timers catches up the moment it is visible again', () => {
-  const { sched, clock, log } = setup(images(3, 3));
-  sched.run(10_000);
-  sched.throttle(true);            // tab hidden: timers at most once a minute
-  sched.run(10 * MINUTE);
-  const hiddenChanges = log.length;
-  sched.throttle(false);           // visible again
-  clock.resume();
+  const before = s.log.length;
+  sched.sleep(8 * HOUR + 1_234);
   sched.run(0);
+  assert.equal(s.log.length, before + 1, 'exactly one change on waking');
+  assert.equal(s.onNow(), positionAt(list, 0, sched.now()).index);
+  const woke = sched.now();
   sched.run(MINUTE);
-  assert.ok(log.length - hiddenChanges >= 18, 'normal pace once visible');
+  const gaps = s.log.filter((e) => e.t > woke + 3_000).map((e, i, all) => (i ? e.t - all[i - 1].t : 3_000));
+  assert.ok(gaps.every((g) => g === 3_000), 'normal pace after waking');
+});
+
+test('a hidden page with throttled timers is on the right slide the moment it is visible again', () => {
+  const sched = createScheduler();
+  const s = screen(sched);
+  const list = images(3, 3);
+  s.setSlides(list, 0);
+  sched.run(10_000);
+  sched.throttle(true);
+  sched.run(10 * MINUTE + 1_700);
+  sched.throttle(false);
+  s.clock.resume();
+  assert.equal(s.onNow(), positionAt(list, 0, sched.now()).index);
 });
 
 test('events from a slide that has already been replaced are ignored', () => {
-  const { sched, clock, log } = setup(images(3, 3));
+  const sched = createScheduler();
+  const s = screen(sched);
+  s.setSlides(images(3, 3), 0);
   sched.run(1_000);
-  const oldGen = log[log.length - 1].generation;
-  sched.run(3_000 + LOAD_MS - 1_000);   // the exact moment the next slide starts loading
-  assert.equal(clock.state().phase, 'loading');
-  const state = clock.state();
-  clock.ready(oldGen);
-  clock.failed(oldGen);
-  clock.ended(oldGen);
-  clock.progress(oldGen);
-  assert.deepEqual(clock.state(), state);
+  const oldGen = s.log[s.log.length - 1].generation;
+  sched.run(2_100);
+  const state = s.clock.state();
+  s.clock.ready(oldGen);
+  s.clock.failed(oldGen);
+  s.clock.ended(oldGen);
+  s.clock.progress(oldGen);
+  assert.deepEqual(s.clock.state(), state);
 });
 
-test('30 days unattended with reconnects, broken media, stalls, sleeps, hidden periods and outages', (t) => {
+test('a playlist without a start time (an older server) starts when it arrives', () => {
+  const sched = createScheduler();
+  sched.run(5_000);
+  const s = screen(sched);
+  s.setSlides(images(2, 3));
+  assert.equal(s.clock.state().startedAt, 5_000);
+  assert.equal(s.log[0].index, 0);
+});
+
+test('30 days unattended, two screens, with reconnects, playlist changes, failures, sleeps, hidden periods and outages', (t) => {
   // Small seeded random generator so a failure can be reproduced exactly
-  let seed = 20260926;
+  let seed = 20260928;
   const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const sched = createScheduler();
   let outage = false;
-  let playlist = [...images(4, 3), video()];
-  const { sched, clock, log, setSlides } = setup(playlist, {
-    trouble: (s) => {
-      if (outage) return 'error';
-      const r = random();
-      if (r < 0.01) return 'never-loads';
-      if (r < 0.02) return 'error';
-      if (s.type === 'video' && r < 0.07) return 'stall';
-      return null;
-    },
-  });
-  const quiet = [];   // [from, to]: asleep, hidden or server down, where long gaps are allowed
+  const trouble = (slide) => {
+    if (outage) return 'error';
+    const r = random();
+    if (r < 0.01) return 'never-loads';
+    if (r < 0.02) return 'error';
+    return null;
+  };
+  const a = screen(sched, { err: -25, trouble });
+  const b = screen(sched, { err: 40, trouble });
+  let playlist = [...images(4, 3), video(20)];
+  let startedAt = 0;
+  a.setSlides(playlist, startedAt);
+  b.setSlides(playlist, startedAt);
+  const quiet = [];   // [from, to]: asleep or hidden, where a screen may lag
   const counts = { resends: 0, changes: 0, sleeps: 0, hidden: 0, outages: 0 };
+  let checked = 0;
+  let wrong = 0;
   let maxPending = 0;
   for (let minute = 0; minute < 30 * DAY / MINUTE; minute++) {
     const r = random();
-    if (r < 0.5 / 60) {                                          // reconnect: same playlist again
+    const who = random() < 0.5 ? a : b;
+    if (r < 0.5 / 60) {                                          // a reconnect: the same playlist again
       counts.resends += 1;
-      setSlides(copy(playlist));
-    } else if (r < 0.5 / 60 + 1 / 1440) {                        // about daily: the playlist changes
+      who.setSlides(copy(playlist), startedAt);
+    } else if (r < 0.5 / 60 + 1 / 1440) {                        // about daily: the playlist changes at a boundary
       counts.changes += 1;
+      const at = boundaryAfter(playlist, startedAt, sched.now());
+      sched.run(at - sched.now());
       playlist = random() < 0.5 && playlist.length > 2 ? playlist.slice(1) : [...playlist, images(1, 3, `m${minute}`)[0]];
-      setSlides(playlist);
-    } else if (r < 0.5 / 60 + 1 / 1440 + 0.02 / 60) {            // ~2% per hour: machine sleeps 1-8 h
+      startedAt = at;
+      a.setSlides(playlist, startedAt);
+      b.setSlides(playlist, startedAt);
+    } else if (r < 0.5 / 60 + 1 / 1440 + 0.02 / 60) {            // ~2% per hour: a machine sleeps 1-8 h
       const ms = HOUR + Math.floor(random() * 7 * HOUR);
       counts.sleeps += 1;
-      quiet.push([sched.now(), sched.now() + ms + 90_000]);
+      quiet.push([sched.now(), sched.now() + ms + WATCHDOG_MS]);
       sched.sleep(ms);
     } else if (r < 0.5 / 60 + 1 / 1440 + 0.07 / 60) {            // ~5% per hour: hidden 5-30 min
       const ms = 5 * MINUTE + Math.floor(random() * 25 * MINUTE);
       counts.hidden += 1;
-      quiet.push([sched.now(), sched.now() + ms + 90_000]);
+      quiet.push([sched.now(), sched.now() + ms]);
       sched.throttle(true);
       sched.run(ms);
       sched.throttle(false);
-      clock.resume();
+      a.clock.resume();
+      b.clock.resume();
     } else if (r < 0.5 / 60 + 1 / 1440 + 0.08 / 60) {            // ~1% per hour: server down 1-10 min
       const ms = MINUTE + Math.floor(random() * 9 * MINUTE);
       counts.outages += 1;
-      quiet.push([sched.now(), sched.now() + ms + 90_000]);
       outage = true;
       sched.run(ms);
       outage = false;
-      clock.resume();
     }
-    sched.run(MINUTE);
+    // Check both screens against the timeline at a random moment in the next minute
+    const step = 1_000 + Math.floor(random() * 58_000);
+    sched.run(step);
+    const truth = positionAt(playlist, startedAt, sched.now());
+    const nearEdge = sched.now() - truth.start < 100 || truth.end - sched.now() < 100;
+    if (!nearEdge && !quiet.some(([from, to]) => sched.now() >= from && sched.now() <= to)) {
+      checked += 1;
+      if (a.onNow() !== truth.index || b.onNow() !== truth.index) wrong += 1;
+    }
+    sched.run(MINUTE - step);
     maxPending = Math.max(maxPending, sched.pending());
   }
-  const inQuiet = (t) => quiet.some(([from, to]) => t >= from && t <= to);
-  let worst = 0;
-  for (let i = 1; i < log.length; i++) {
-    if (!inQuiet(log[i].t) && !inQuiet(log[i - 1].t)) worst = Math.max(worst, log[i].t - log[i - 1].t);
-  }
-  // Worst normal case: a video stalls near its end, then a whole-round failure pause
-  const bound = VIDEO_MS + STALL_TIMEOUT_MS + WATCHDOG_MS + OUTAGE_RETRY_MS + GRACE_MS;
-  t.diagnostic(`${log.length} slide changes; ${counts.resends} re-sent playlists, ${counts.changes} playlist changes, `
-    + `${counts.sleeps} sleeps, ${counts.hidden} hidden periods, ${counts.outages} outages; `
-    + `longest normal gap ${(worst / 1000).toFixed(1)} s (limit ${bound / 1000} s); at most ${maxPending} timers pending`);
-  assert.ok(worst <= bound, `longest normal gap ${worst} ms > ${bound} ms`);
-  assert.ok(log.length > 30 * DAY / (7_000) * 0.8, `only ${log.length} slide changes in 30 days`);
-  assert.ok(maxPending <= 30, `timers piling up: ${maxPending} pending`);
-  // And it is still cycling at the end
-  const before = log.length;
+  t.diagnostic(`${a.log.length} + ${b.log.length} slide changes; ${counts.resends} re-sent playlists, ${counts.changes} playlist changes, `
+    + `${counts.sleeps} sleeps, ${counts.hidden} hidden periods, ${counts.outages} outages; ${checked} checks, ${wrong} off the timeline; `
+    + `at most ${maxPending} timers pending`);
+  assert.equal(wrong, 0, 'both screens on the slide the timeline says');
+  assert.ok(checked > 40_000, `only ${checked} checks`);
+  assert.ok(maxPending <= 20, `timers piling up: ${maxPending} pending`);
+  const before = a.log.length;
   sched.run(5 * MINUTE);
-  assert.ok(log.length - before >= 5, 'still cycling after 30 days');
+  assert.ok(a.log.length - before >= 5, 'still cycling after 30 days');
 });

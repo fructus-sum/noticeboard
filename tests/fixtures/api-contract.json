@@ -727,7 +727,8 @@
           "type": "string",
           "url": "string"
         }
-      ]
+      ],
+      "startedAt": "number"
     }
   },
   "playlist slide values": {

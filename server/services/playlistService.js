@@ -13,7 +13,7 @@
 //     other slides don't have these keys.
 //
 // Used by
-//   realtime/displaySocket.js
+//   realtime/displaySocket.js (which adds startedAt: services/playlistTimeline)
 //
 // Uses
 //   slideshowStore, configService (the default duration), pathHelpers (mediaUrl)

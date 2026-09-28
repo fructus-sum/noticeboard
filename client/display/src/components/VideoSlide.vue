@@ -5,7 +5,9 @@
 // background colour around it.
 //
 // Props: src, sound (play its own sound: SYSTEM_DESIGN §18.3; if the browser refuses sound, it
-// plays muted instead, so the slide still plays and keeps to time).
+// plays muted instead, so the slide still plays and keeps to time), offset (seconds into the video
+// to start at: a screen joining mid-slide), slotStart and serverNow (in step with the other screens:
+// a video more than DRIFT_S from where the Server's time says is put back, SYSTEM_DESIGN §18.8).
 // Emits: ready (playback started), progress (it moved forward), ended, error (it can't play:
 // refused by the autoplay policy even muted, or unplayable).
 // Used by: SlideFrame
@@ -17,7 +19,33 @@ import { usePageWake } from '../composables/usePageWake.js';
 const props = defineProps({
   src: { type: String, required: true },
   sound: { type: Boolean, default: false },
+  offset: { type: Number, default: 0 },
+  slotStart: { type: Number, default: null },
+  serverNow: { type: Function, default: () => Date.now() },
 });
+const DRIFT_S = 0.5;
+let lastDriftCheck = 0;
+
+// Where the video should be now, on the Server's time (null without a slot)
+const expected = () => (props.slotStart === null ? null : (props.serverNow() - props.slotStart) / 1000);
+function keepInStep() {
+  const el = video.value;
+  const want = expected();
+  if (!el || want === null || !Number.isFinite(el.duration) || want >= el.duration) return;
+  if (Math.abs(el.currentTime - want) > DRIFT_S) el.currentTime = want;
+}
+// Joining mid-slide: start where the other screens are
+function onMetadata() {
+  if (props.offset > 0.2) keepInStep();
+}
+// Moving: tell the clock, and check the drift every couple of seconds
+function onTime() {
+  emit('progress');
+  if (Date.now() - lastDriftCheck > 2000) {
+    lastDriftCheck = Date.now();
+    keepInStep();
+  }
+}
 
 // ready: playback started; progress: it moved forward; error: it can't play
 const emit = defineEmits(['ready', 'progress', 'ended', 'error']);
@@ -57,8 +85,9 @@ onMounted(play);
     autoplay
     muted
     playsinline
+    @loadedmetadata="onMetadata"
     @playing="emit('ready')"
-    @timeupdate="emit('progress')"
+    @timeupdate="onTime"
     @ended="emit('ended')"
     @error="emit('error')"
   />

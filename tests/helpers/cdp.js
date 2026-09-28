@@ -1,18 +1,36 @@
 // tests/helpers/cdp.js — a minimal Chrome DevTools Protocol client, for the browser tests
 //
 // Provides
-//   connect(port = 9222, { fresh }) → { send, evaluate, screenshot, sleep, on, close }
+//   connect(port = 9222, { fresh, newWindow }) → { send, evaluate, screenshot, sleep, on, close }
 //     fresh (default): a brand-new tab, so nothing (a frozen or hidden state) carries over
+//     newWindow: a page in a window of its own, visible like a real screen (screens-in-step.js)
 //
 // Uses
 //   Node's built-in fetch and WebSocket (Node 22 or newer) and a Chrome started with
 //   --remote-debugging-port (tests/run.js starts one for the browser tests)
 const fs = require('fs');
 
-async function connect(port = 9222, { fresh = true } = {}) {
+// A new page in a window of its own: visible like a real screen, however many are open (a tab
+// behind another is hidden, and Chrome slows its timers)
+async function newWindowPage(port) {
+  const { webSocketDebuggerUrl } = await (await fetch(`http://localhost:${port}/json/version`)).json();
+  const browser = new WebSocket(webSocketDebuggerUrl);
+  await new Promise((res, rej) => { browser.onopen = res; browser.onerror = rej; });
+  const targetId = await new Promise((res, rej) => {
+    browser.onmessage = (ev) => { const msg = JSON.parse(ev.data); if (msg.id === 1) (msg.error ? rej(new Error(msg.error.message)) : res(msg.result.targetId)); };
+    browser.send(JSON.stringify({ id: 1, method: 'Target.createTarget', params: { url: 'about:blank', newWindow: true } }));
+  });
+  browser.close();
+  const list = await (await fetch(`http://localhost:${port}/json/list`)).json();
+  return list.find((t) => t.id === targetId);
+}
+
+async function connect(port = 9222, { fresh = true, newWindow = false } = {}) {
   // A brand-new tab by default, so nothing (e.g. a frozen or hidden state) carries over between runs
   let page;
-  if (fresh) {
+  if (newWindow) {
+    page = await newWindowPage(port);
+  } else if (fresh) {
     page = await (await fetch(`http://localhost:${port}/json/new?about:blank`, { method: 'PUT' })).json();
   } else {
     const list = await (await fetch(`http://localhost:${port}/json/list`)).json();
@@ -50,7 +68,7 @@ async function connect(port = 9222, { fresh = true } = {}) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const close = () => {
     ws.close();
-    if (fresh) fetch(`http://localhost:${port}/json/close/${page.id}`).catch(() => {});
+    if (fresh || newWindow) fetch(`http://localhost:${port}/json/close/${page.id}`).catch(() => {});
   };
   return { send, evaluate, screenshot, sleep, on: (fn) => listeners.push(fn), close };
 }

@@ -8,7 +8,8 @@
 //   and reloads the page as a last resort when it seems broken.
 //
 // Props
-//   slides (the playlist), connected
+//   slides (the playlist), startedAt (the Server's time the playlist started, SYSTEM_DESIGN §18.8),
+//   serverNow (the Server's time as this screen tells it: useSocket), connected
 // Emits
 //   on-air(slide): the slide now on screen (its slideshow and a video's sound, for the background audio)
 //
@@ -25,6 +26,8 @@ import { usePageWake } from '../composables/usePageWake.js';
 
 const props = defineProps({
   slides: { type: Array, required: true },
+  startedAt: { type: Number, default: null },
+  serverNow: { type: Function, default: () => Date.now() },
   connected: { type: Boolean, default: true },
 });
 const emit = defineEmits(['on-air']);
@@ -34,24 +37,25 @@ const emit = defineEmits(['on-air']);
 // animation frames, which a hidden page or a switched-off screen doesn't produce, and that
 // could hold back every following slide.
 const FADE_MS = 400;
-const layers = ref([]);   // [{ slide, generation }]
+const layers = ref([]);   // [{ slide, generation, offset, slotStart }]
 let removeOld = null;
 
-function showSlide({ index, generation }) {
-  layers.value = [...layers.value.slice(-1), { slide: props.slides[index], generation }];
+function showSlide({ index, generation, offset, slotStart }) {
+  layers.value = [...layers.value.slice(-1), { slide: props.slides[index], generation, offset, slotStart }];
   emit('on-air', props.slides[index] ?? null);
   clearTimeout(removeOld);
   removeOld = setTimeout(() => { layers.value = layers.value.slice(-1); }, FADE_MS + 100);
 }
 
-// All timing lives in the clock; this component only shows what it asks for
+// All timing lives in the clock, on the Server's time; this component only shows what it asks for
 const clock = createSlideshowClock({
   onChange: showSlide,
   onStuck: () => recoverByReloading('every slide keeps failing'),
+  serverNow: () => props.serverNow(),
 });
 
 // The same playlist is sent again after every reconnect; the clock ignores unchanged ones
-watch(() => props.slides, (slides) => clock.setSlides(slides), { immediate: true });
+watch(() => [props.slides, props.startedAt], ([slides, startedAt]) => clock.setSlides(slides, startedAt), { immediate: true });
 // Server reachable again: retry at once instead of waiting out a failure pause
 watch(() => props.connected, (up) => { if (up) clock.resume(); });
 
@@ -78,6 +82,9 @@ onUnmounted(() => {
       :key="layer.generation"
       :slide="layer.slide"
       :generation="layer.generation"
+      :offset="layer.offset"
+      :slot-start="layer.slotStart"
+      :server-now="serverNow"
       :class="{ 'slide--fresh': i === layers.length - 1 }"
       @ready="clock.ready"
       @progress="clock.progress"

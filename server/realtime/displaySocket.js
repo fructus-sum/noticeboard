@@ -11,8 +11,12 @@
 //
 // Provides
 //   initDisplaySocket(httpServer) → the socket.io server. On connect: display:build and
-//     display:settings; on display:ready: that display's playlist, then the audio. Afterwards:
-//       playlist:update to all   on the scheduler's 'update' and on displayEvents.playlistChanged
+//     display:settings; on display:ready: the playlist every screen is playing ({ slides,
+//     startedAt }: the running timeline, services/playlistTimeline), then the audio. Afterwards:
+//       playlist:update to all   when the running timeline changes: a changed playlist (on the
+//                                scheduler's 'update' or displayEvents.playlistChanged) takes effect,
+//                                and is sent, when the slide on air ends, so every screen switches
+//                                together (SYSTEM_DESIGN §18.8); the same playlist isn't sent again
 //       display:settings to all  on a config 'change', on displayEvents.displaySettingsChanged,
 //                                and when the installer state changes (checked when a display
 //                                connects and every 5 minutes), only when the settings differ
@@ -28,7 +32,7 @@
 //
 // Uses
 //   socket.io; services/macService (resolveAddress: who may connect), services/playlistService
-//   (buildPlaylist), services/audioPlaylist (buildAudio),
+//   (buildPlaylist), services/playlistTimeline (when a change takes effect), services/audioPlaylist (buildAudio),
 //   services/audioEventClock (the event playing, 'update'),
 //   services/displaySettings (the payload),
 //   services/schedulerService (getActive, 'update'), services/configService ('change'),
@@ -43,6 +47,7 @@ const schedulerService = require('../services/schedulerService');
 const configService = require('../services/configService');
 const displayEvents = require('../services/displayEvents');
 const { buildPlaylist } = require('../services/playlistService');
+const { createPlaylistTimeline } = require('../services/playlistTimeline');
 const { buildAudio } = require('../services/audioPlaylist');
 const audioEventClock = require('../services/audioEventClock');
 const displaySettings = require('../services/displaySettings');
@@ -112,10 +117,16 @@ function initDisplaySocket(httpServer) {
     logger.info('Socket: audio:update broadcast', { shows: Object.keys(audio.shows).length, slideshows: Object.keys(audio.slideshows).length });
   }
 
+  // The playlist every screen plays, and the Server's time it started at: a change takes effect,
+  // and goes out to every screen, when the slide on air ends
+  const timeline = createPlaylistTimeline({
+    onSwitch: (playlist) => {
+      io.emit(EVENTS.PLAYLIST_UPDATE, playlist);
+      logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length, startedAt: playlist.startedAt });
+    },
+  });
   function broadcastPlaylist() {
-    const playlist = buildPlaylist(schedulerService.getActive());
-    io.emit(EVENTS.PLAYLIST_UPDATE, playlist);
-    logger.info('Socket: playlist:update broadcast', { slideCount: playlist.slides.length });
+    timeline.offer(buildPlaylist(schedulerService.getActive()).slides);
   }
 
   const INSTALLER_CHECK_MS = 5 * 60 * 1000;
@@ -130,7 +141,9 @@ function initDisplaySocket(httpServer) {
     displaySettings.refresh().then(broadcastDisplaySettings);
 
     socket.on(EVENTS.DISPLAY_READY, () => {
-      const playlist = buildPlaylist(schedulerService.getActive());
+      // Anything changed since (e.g. the default duration) is offered first; the screen gets what's running
+      broadcastPlaylist();
+      const playlist = timeline.current();
       socket.emit(EVENTS.PLAYLIST_UPDATE, playlist);
       logger.info('Socket: playlist sent to display', { id: socket.id, slideCount: playlist.slides.length });
       socket.emit(EVENTS.AUDIO_UPDATE, currentAudio());
