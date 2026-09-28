@@ -46,7 +46,7 @@ const overflow = `(() => {
   await sleep(500);
   let nav = await c.evaluate(`({ w: document.querySelector('.nav').getBoundingClientRect().width, collapsed: document.querySelector('.nav').classList.contains('nav--collapsed'), labels: [...document.querySelectorAll('.nav__label')].filter((l) => l.offsetParent).length, links: [...document.querySelectorAll('.nav a.nav__link')].map((a) => a.getAttribute('aria-label')) })`);
   check('phone: the menu starts collapsed to icons (56 px, no labels)', nav.collapsed && Math.round(nav.w) === 56 && nav.labels === 0, JSON.stringify(nav));
-  check('each icon is named for screen readers and tooltips', nav.links.join('|') === 'Slideshows|Settings|Help, opens in a new tab|Open viewer, in a new tab');
+  check('each icon is named for screen readers and tooltips', nav.links.join('|') === 'Slideshows|Audio|Settings|Help, opens in a new tab|Open viewer, in a new tab');
   let problems = await c.evaluate(overflow);
   check('phone, Slideshows: nothing off-screen or outside its box', problems.length === 0, problems.join('; '));
   const rows = await c.evaluate(`[...document.querySelectorAll('.ss-row')].map((r) => Math.round(r.getBoundingClientRect().height))`);
@@ -57,7 +57,7 @@ const overflow = `(() => {
   await sleep(300);
   nav = await c.evaluate(`({ w: document.querySelector('.nav').getBoundingClientRect().width, labels: [...document.querySelectorAll('.nav__label')].filter((l) => l.offsetParent).length })`);
   problems = await c.evaluate(overflow);
-  check('toggle: the menu expands with its words (200 px)', Math.round(nav.w) === 200 && nav.labels === 5, JSON.stringify(nav));
+  check('toggle: the menu expands with its words (200 px)', Math.round(nav.w) === 200 && nav.labels === 6, JSON.stringify(nav));
   check('expanded on a phone: still nothing off-screen or outside its box', problems.length === 0, problems.join('; '));
   await c.screenshot(path.join(require('os').tmpdir(), 'noticeboard-test-mobile-list-expanded.png'));
   await c.send('Page.reload');

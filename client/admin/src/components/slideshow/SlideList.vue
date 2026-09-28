@@ -13,20 +13,28 @@
 //
 // Used by: views/SlideshowDetailView
 // It stays open while a slide or an upload has failed (a warning).
-// Uses: useApi (the slides routes), useRename, SlidePreview, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+// Uses: useApi (the slides routes), useItemList (upload, reloading, delete, reorder), useRename,
+//   SlidePreview, CollapsibleCard; mediaUrl, mediaDisplayName and LIMITS from @shared
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { mediaUrl, mediaDisplayName, LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import { useRename } from '../../composables/useRename.js';
+import { useItemList } from '../../composables/useItemList.js';
 import SlidePreview from './SlidePreview.vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 
 const props = defineProps({ folder: { type: String, required: true } });
 const slides = defineModel('slides', { type: Array, required: true });
 
-async function loadSlides() {
-  slides.value = await api.get(`/slideshows/${props.folder}/slides`);
-}
+// Upload, reloading while a slide is processed or its thumbnail made, delete, reorder
+const {
+  load: loadSlides, fileInput, uploading, uploadErr, uploadCount, upload: uploadFile,
+  remove: deleteSlide, move, stop,
+} = useItemList({
+  items: slides,
+  path: () => `/slideshows/${props.folder}/slides`,
+  busy: (s) => s.thumbnailPending,
+});
 
 // Larger preview of a slide: hover shows it, click/tap pins it
 const preview = ref(null);   // { slide, position, pinned }
@@ -73,47 +81,8 @@ async function createThumbnails() {
   }
 }
 
-// Upload
-const fileInput    = ref(null);
-const uploading    = ref(false);
-const uploadErr    = ref('');
-const uploadCount  = ref(0);
-
-async function uploadFile(e) {
-  const files = Array.from(e.target.files || []);
-  if (!files.length) return;
-  uploadErr.value = '';
-  uploading.value = true;
-  uploadCount.value = files.length;
-  const fd = new FormData();
-  for (const file of files) fd.append('files', file);
-  try {
-    const newSlides = await api.upload(`/slideshows/${props.folder}/slides`, fd);
-    slides.value.push(...newSlides);
-  } catch (err) {
-    uploadErr.value = err.message;
-  } finally {
-    uploading.value = false;
-    uploadCount.value = 0;
-    if (fileInput.value) fileInput.value.value = '';
-  }
-}
-
 // Something the admin must see: a slide that failed to process, or an upload that failed
 const attention = computed(() => !!uploadErr.value || slides.value.some(s => s.status === 'error'));
-
-// Polling while any slide is processing
-let pollTimer = null;
-const hasProcessing = computed(() => slides.value.some(s => s.status === 'processing' || s.thumbnailPending));
-
-watch(hasProcessing, (v) => {
-  if (v && !pollTimer) {
-    pollTimer = setInterval(async () => {
-      await loadSlides().catch(() => {});
-      if (!hasProcessing.value) { clearInterval(pollTimer); pollTimer = null; }
-    }, 2000);
-  }
-}, { immediate: true });
 
 // Renaming: one slide at a time, in place of its name
 const { renaming, renameInput, startRename, cancelRename, saveRename } = useRename({
@@ -121,28 +90,9 @@ const { renaming, renameInput, startRename, cancelRename, saveRename } = useRena
   path: (slide) => `/slideshows/${props.folder}/slides/${slide.id}`,
 });
 
-async function deleteSlide(slide) {
-  if (!confirm(`Delete “${mediaDisplayName(slide)}”?`)) return;
-  try {
-    await api.del(`/slideshows/${props.folder}/slides/${slide.id}`);
-    slides.value = slides.value.filter(s => s.id !== slide.id);
-  } catch (e) {
-    alert(e.message);
-  }
-}
-
-async function move(index, dir) {
-  const newSlides = [...slides.value];
-  const target = index + dir;
-  if (target < 0 || target >= newSlides.length) return;
-  [newSlides[index], newSlides[target]] = [newSlides[target], newSlides[index]];
-  slides.value = newSlides;
-  await api.put(`/slideshows/${props.folder}/slides/reorder`, { order: newSlides.map(s => s.id) }).catch(() => {});
-}
-
 onMounted(() => window.addEventListener('keydown', onKey));
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer);
+  stop();
   clearTimeout(hoverTimer);
   window.removeEventListener('keydown', onKey);
 });

@@ -11,14 +11,14 @@
 // Emits: change(patch), the saved fields, which the page merges into its copy
 //
 // Used by: views/SlideshowDetailView
-// Uses: useApi (PUT /slideshows/:folder), useSlideshowActions, useFlash, ScheduleEditor, StatusBadge,
+// Uses: useApi (PUT /slideshows/:folder), useShowActions, useFlash, ScheduleEditor, StatusBadge,
 //   PublishToggle, FlashMessage, CollapsibleCard; LIMITS from @shared (the duration's range, which the server checks)
 import { ref, computed } from 'vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { LIMITS } from '@shared/index.js';
 import { api } from '../../composables/useApi.js';
 import { useFlash } from '../../composables/useFlash.js';
-import { useSlideshowActions } from '../../composables/useSlideshowActions.js';
+import { useShowActions } from '../../composables/useShowActions.js';
 import ScheduleEditor from './ScheduleEditor.vue';
 import StatusBadge from '../ui/StatusBadge.vue';
 import PublishToggle from '../ui/PublishToggle.vue';
@@ -34,7 +34,7 @@ const emit = defineEmits(['change']);
 const published = computed(() => props.slideshow.enabled !== false);
 
 // Publish / disable, and hide / unhide (only while unpublished; the slideshow is kept exactly as it is)
-const { toggling, hiding, setEnabled, setHidden } = useSlideshowActions();
+const { toggling, hiding, setEnabled, setHidden } = useShowActions();
 
 async function togglePublished() {
   const updated = await setEnabled(props.folder, !published.value);

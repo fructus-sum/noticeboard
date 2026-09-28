@@ -16,5 +16,11 @@
     "colourPattern": "^#[0-9a-fA-F]{6}$",
     "videoFormats": ["h265", "h264"],
     "defaultVideoFormat": "h265"
+  },
+  "audio": {
+    "orders": ["in-order", "shuffle"],
+    "transitions": ["none", "crossfade"],
+    "fadeSeconds": { "min": 1, "max": 10, "default": 3 },
+    "volume": { "min": 0, "max": 100, "default": 100 }
   }
 }

@@ -75,6 +75,10 @@ test('the web apps make the same media URLs as the server, and use the same limi
     assert.equal(shared.mediaUrl(folder, file), mediaUrl(folder, file));
   }
   assert.equal(shared.mediaUrl('my-slideshow', 'a.png'), '/media/my-slideshow/slides/a.png');
+  const { audioUrl } = require('../utils/pathHelpers');
+  assert.equal(shared.audioUrl('cafe-music', 'x.m4a'), audioUrl('cafe-music', 'x.m4a'));
+  assert.equal(shared.audioUrl('cafe-music', 'x.m4a'), '/audio/cafe-music/tracks/x.m4a');
+  assert.deepEqual(shared.AUDIO, contract.audio);
   assert.deepEqual(shared.LIMITS, { passwordMinLength: 8, slideSeconds: { min: 1, max: 3600 }, mediaNameMax: 200 });
   assert.deepEqual(shared.SOCKET_EVENTS, contract.socketEvents);
 });

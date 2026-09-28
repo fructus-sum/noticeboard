@@ -7,7 +7,7 @@
 //   (never the sample), and opening one.
 //
 // Used by: router/index.js
-// Uses: useApi (/slideshows, /settings/device), useSlideshowActions, ui/StatusBadge,
+// Uses: useApi (/slideshows, /settings/device), useShowActions, ui/StatusBadge,
 //   ui/PublishToggle, ui/TagPill
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
@@ -15,7 +15,7 @@ import { api } from '../composables/useApi.js';
 import StatusBadge from '../components/ui/StatusBadge.vue';
 import PublishToggle from '../components/ui/PublishToggle.vue';
 import TagPill from '../components/ui/TagPill.vue';
-import { useSlideshowActions } from '../composables/useSlideshowActions.js';
+import { useShowActions } from '../composables/useShowActions.js';
 
 const router = useRouter();
 const slideshows = ref([]);
@@ -31,7 +31,7 @@ const createError = ref('');
 const deletingFolder = ref(null);
 
 // Publish / disable and hide / unhide (the folder being changed disables its buttons)
-const { toggling, hiding, setEnabled, setHidden: saveHidden } = useSlideshowActions();
+const { toggling, hiding, setEnabled, setHidden: saveHidden } = useShowActions();
 
 function applyFlags(folder, flags) {
   const idx = slideshows.value.findIndex(s => s.folder === folder);

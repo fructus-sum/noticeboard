@@ -1,8 +1,9 @@
 // server/utils/slugify.js — folder names for new shows (slideshows, audio shows)
 //
 // Provides
-//   slugify(name, fallback) → lower-case letters, digits and hyphens (fallback when nothing is left;
-//                             'slideshow' unless given)
+//   slugify(name, fallback) → lower-case letters, digits and hyphens; accented letters lose only
+//                             their accent (é → e); fallback when nothing is left ('slideshow'
+//                             unless given). Only new folders are named by it: existing ones stay
 //   uniqueSlug(name, { dir, fallback }) → a slug no existing folder in dir uses (adds -2, -3…);
 //                             dir is data/slideshows unless given
 //
@@ -18,6 +19,7 @@ const { slideshowsDir } = require('./pathHelpers');
 function slugify(name, fallback = 'slideshow') {
   return (
     name
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')   // é → e: accented letters keep their letter
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9\s-]/g, '')

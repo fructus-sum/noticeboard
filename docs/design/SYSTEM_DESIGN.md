@@ -116,9 +116,10 @@ noticeboard/
 │   │                          asyncRoute.js, uploads.js, passwordLimiter.js, errorHandler.js
 │   ├── realtime/              displaySocket.js (socket.io: the live connection to the displays)
 │   ├── routes/                index.js (mounting), spa.js (the apps' catch-all and "not built" page)
-│   │   └── api/               index.js, auth.js, device.js, slideshows.js, slides.js, mediaItems.js (the items' routes)
+│   │   └── api/               index.js, auth.js, device.js, slideshows.js, slides.js, audioshows.js, tracks.js, mediaItems.js (the items' routes)
 │   │       └── settings/      index.js, general.js, security.js, logo.js, updates.js, maintenance.js (the Settings page)
-│   ├── services/              configService, showStore, slideshowStore, slideshowRules, playlistService, displayEvents,
+│   ├── services/              configService, showStore, slideshowStore, audioShowStore, slideshowRules, audioShowRules,
+│   │                          playlistService, displayEvents,
 │   │                          schedulerService, settingsService, adminPassword, adminSession, macService,
 │   │                          mediaService, mediaTypes, mediaNames, uploadQueue, brandingService, sampleSlideshow,
 │   │                          contentReset, actionTokens
@@ -184,6 +185,7 @@ Routes are mounted in this order; the order is significant:
 | # | Path | Guards | Handler |
 |---|---|---|---|
 | 1 | `/media/*` | `macFilter`, then an extension allowlist (`.png .jpg .jpeg .gif .webp .mp4 .webm .mp3 .wav .ogg`, else 404) and an `Accept-Ranges` header | `express.static(data/slideshows)` |
+| 1a | `/audio/*` | `macFilter`, then only `.m4a` (else 404) and an `Accept-Ranges` header | `express.static(data/audioshows)`: the audio shows' tracks, `/audio/<folder>/tracks/<file>` |
 | 2 | `GET /admin/help` | `macFilter` | `sendFile(noticeboard-guide.html)`, 404 text if missing |
 | 3 | `GET /branding/logo` | `macFilter` | uploaded `data/branding/logo.png`, or the placeholder resized in memory. `?v=` makes it cacheable for a year |
 | 4 | `/admin` | `macFilter` | `express.static(client/admin/dist)`, then `routes/spa.js` (`index.html` for every path, or an inline "not built" page) |
@@ -299,6 +301,9 @@ A Vue Router SPA under `/admin/`:
 | `POST /api/settings/maintenance/delete-all` | adminAuth + token | every slideshow but the sample deleted → `{ deleted: [names] }`; the playlist sent | DeleteContentCard |
 | `POST /api/settings/maintenance/restore-defaults` | adminAuth + token (action `restore-defaults`) | the marker, status `requested`, request `restore-defaults` (409 without the updater or while an update runs) | DeleteContentCard |
 | `GET/POST /api/slideshows` | adminAuth | list (with `sample`, `slideCount`) / create | SlideshowsView |
+| `GET/POST /api/audioshows` | adminAuth | list (with `trackCount`) / create (unpublished, default settings) | AudioShowsView |
+| `GET/PUT/DELETE /api/audioshows/:folder` | adminAuth | read / change (name, enabled, order, transition, fadeSeconds, volume: 400 outside the limits) / delete | AudioShowsView, AudioShowDetailView |
+| `GET/POST /api/audioshows/:folder/tracks`, `PATCH/DELETE …/tracks/:id`, `PUT …/tracks/reorder` | adminAuth | the tracks: list / upload (audio types, converted to AAC) / rename / delete / reorder (routes/api/mediaItems.js) | TrackList |
 | `GET/PUT/DELETE /api/slideshows/:folder` | adminAuth | read / update / delete (the sample gives 403) | both slideshow views |
 | `GET/POST /api/slideshows/:folder/slides` | adminAuth (once per request) | list / upload (multer, max 50 files, 500 MB each) | SlideshowDetailView (list), SlideList |
 | `PATCH /api/slideshows/:folder/slides/:id` | adminAuth | `{ name }`: rename the slide (an empty name removes it; the file keeps its name; no playlist sent) | SlideList |
@@ -365,6 +370,9 @@ Read with JSON5, so comments and `_comment` keys are allowed. Written as plain J
 | `slideshows[]` | see below | `[]` | slideshowStore only (for the scheduler, the playlist, the routes and the sample sync) | slideshowStore (the routes, the sample sync) |
 | `sampleSlideshow` | `{ folder, signature }` | absent | sampleSlideshow, slideshowRules.isSample | sample sync |
 | `sampleSlideshowAdded` | bool, only in configs from before `sampleSlideshow` existed | absent | the sample sync, which replaces it with `sampleSlideshow` | the sample sync removes it (set to `undefined`, dropped when saved) |
+| `audioShows[]` | see below | absent (no audio shows) | audioShowStore (the audio routes) | audioShowStore |
+
+An audio show entry looks like `{ folder, name, enabled, order: 'in-order' | 'shuffle', transition: 'none' | 'crossfade', fadeSeconds, volume, addedAt }` (limits in `shared/contract.json` `audio`, D44).
 
 A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'always' | 'timed', days?: [0-6], startTime?: 'HH:MM', endTime?: 'HH:MM' }, enabled, hidden?, slideDurationSeconds?, addedAt }`.
 - A missing `enabled` counts as enabled.
@@ -393,7 +401,7 @@ A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'alway
 ### 5.4 Browser storage
 
 - `localStorage['noticeboard:navCollapsed']`, set by the admin panel: `'1'` or `'0'`.
-- `localStorage['noticeboard:collapsedCards']`, set by the admin panel: a JSON list of the folded cards' names (`settings-display`, `settings-mac`, `settings-branding`, `settings-password`, `settings-updates`, `settings-delete`, `slideshow-settings`, `slideshow-slides`).
+- `localStorage['noticeboard:collapsedCards']`, set by the admin panel: a JSON list of the folded cards' names (`settings-display`, `settings-mac`, `settings-branding`, `settings-password`, `settings-updates`, `settings-delete`, `slideshow-settings`, `slideshow-slides`, `audio-settings`, `audio-tracks`).
 - `sessionStorage['noticeboard:lastRecoveryReload']`, set by the viewer: a timestamp.
 
 ---
@@ -408,6 +416,8 @@ Under `/opt/noticeboard` on a server Pi.
 | `data/slideshows/<folder>/slideshow.json` | JSON `{ slides: [...] }`; a slide is `{ id, type, originalName?, name?, filename, status, duration, addedAt, format?, reprocessing?, thumbnail?, thumbnailPending?, thumbnailError?, error? }` (a video's `duration` is its length; `format`: `h265`/`h264`, recorded from 2026-09-28; `reprocessing`: while it's converted to another format, with `status: processing`) (`originalName`: the uploaded file's name, `null` if it had none, absent on slides from before names; `name`: only when renamed) | `slideshowStore.create` (atomic), sample sync | only `slideshowStore` (for the routes, uploadQueue, the playlist and the sample sync) | only `slideshowStore.modifySlides` (locked; written only when changed) | the viewer (through the playlist), the admin panel |
 | `data/slideshows/<folder>/slides/<uuid>.png\|.mp4` | media | uploadQueue (processing), sample sync (copy, keeping the extension: `.png`, `.mp4`, and `.jpg/.gif/.webp/.webm` possible) | `/media` static | slide delete, slideshow delete, sample replace | viewer, admin |
 | `data/slideshows/<folder>/slides/<uuid>-thumb.jpg` | JPEG | mediaService.createThumbnail | `/media` | slide delete, sample replace | admin list and preview |
+| `data/audioshows/<folder>/audioshow.json` | JSON `{ tracks: [{ id, type: 'audio', originalName, name?, filename, status, duration, addedAt, error? }] }` | audioShowStore.create | audioShowStore | audioShowStore.modifyItems (locked) | the admin panel (the screens from a later phase) |
+| `data/audioshows/<folder>/tracks/<uuid>.m4a` | AAC audio, loudness evened out | uploadQueue (mediaService.processAudio) | `/audio` | track delete, show delete | the admin panel's ▶ |
 | `data/branding/logo.png` | PNG within 500×500 | brandingService.saveLogo | `/branding/logo`, logoVersion (mtime) | removeLogo | viewer waiting screen, admin sidebar |
 | `data/update-branch.env` | `KEY=value` lines | requestSwitch (via updates/updateFiles), update.sh, install.sh | update.sh, install.sh, updates/updateFiles | same | branch following |
 | `data/update-status.json` | flat JSON, all values strings | install.sh and update.sh (`write_json`), requestSwitch (JSON.stringify) | services/updates (getInfo, versionInfo) | same | Software updates card, sidebar "Last updated" |
@@ -461,6 +471,7 @@ Outside the install folder:
 | Slideshow detail: name, priority, duration, schedule; publish, hide | `SlideshowDetailView`, `SlideshowSettingsCard`, `ScheduleEditor`, `slideshows.js` PUT |
 | Upload images and videos; processing status; polling | `SlideList`, `slides.js`, `uploadQueue`, `mediaService` |
 | Reorder and delete slides; preview; thumbnails; "Create thumbnails" | `SlideList`, `SlidePreview`, `slides.js` |
+| Audio shows: create, settings (order, transition, fade length, volume), publish; tracks: upload (evened out), ▶ to listen, rename, reorder, delete | `AudioShowsView`, `AudioShowDetailView`, `AudioShowSettingsCard`, `TrackList`, `audioshows.js`, `tracks.js`, `audioShowStore`, `audioShowRules`, `mediaService.processAudio` |
 | Slide names: the uploaded file's name by default, renamed with ✎ (the stored file keeps its name); older slides show their type and date added | `SlideList`, `SlidePreview`, `mediaDisplayName` (`shared/index.js`), `slides.js` PATCH, `mediaNames` |
 | Scheduling (always, or timed days/times), priority, maximum 5 active | `schedulerService` |
 | Sample slideshow (updated by software updates, hideable, not deletable) | `sampleSlideshow.js`, `sample-data/` |
@@ -766,7 +777,15 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`routes/api/mediaItems.js`**
 - **Purpose:** `createItemsRouter({ store, allowed, words, enqueue, changed, extend })`: the routes every show's items share: a show-exists check, upload (recording each file's `originalName`; 50 files, 500 MB each), list, rename, delete, reorder, and the upload error handler. Each kind passes its store, its MIME types, its words (so its messages and log lines are its own) and what to do after a change; `extend` adds its own routes.
-- **Uses:** mediaTypes (`typeFromMime`), mediaNames, uploadQueue (`queueSize`), uploads (`createUpload`), asyncRoute, logger. **Used by:** slides.js.
+- **Uses:** mediaTypes (`typeFromMime`), mediaNames, uploadQueue (`queueSize`), uploads (`createUpload`), asyncRoute, logger. **Used by:** slides.js, tracks.js.
+
+**`routes/api/audioshows.js`**
+- **Purpose:** the audio shows: list (with `trackCount`), create, read, change (audioShowRules), delete.
+- **Uses:** audioShowStore, audioShowRules, asyncRoute, logger.
+
+**`routes/api/tracks.js`**
+- **Purpose:** the tracks' routes: `createItemsRouter` with the audio show store, `AUDIO_MIME` and the tracks' words; uploads go to `uploadQueue.enqueueProcessing` with that store.
+- **Uses:** mediaItems, audioShowStore, mediaTypes, uploadQueue.
 
 ### 12.4 Services
 
@@ -799,7 +818,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/mediaService.js`**
 - **Purpose:** converting uploads into slides.
-- **API:** `processImage` (sharp → PNG), `processVideo(input, outDir, id, format)` (ffmpeg → H.265 MP4: libx265, CRF 28, `hvc1` tag; or H.264: libx264, CRF 23), `videoFormatOf` (ffprobe: `h265`, `h264`, …), `getMediaDuration` (ffprobe), `createThumbnail`.
+- **API:** `processImage` (sharp → PNG), `processVideo(input, outDir, id, format)` (ffmpeg → H.265 MP4: libx265, CRF 28, `hvc1` tag; or H.264: libx264, CRF 23), `processAudio` (ffmpeg → AAC `.m4a`, 192 kbit/s, `loudnorm` to −16 LUFS), `videoFormatOf` (ffprobe: `h265`, `h264`, …), `getMediaDuration` (ffprobe), `createThumbnail`.
 - **Used by:** uploadQueue.
 
 **`services/mediaNames.js`**
@@ -808,12 +827,12 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/mediaTypes.js`**
 - **Purpose:** every media type list, in one place, each the one its caller needs.
-- **API:** `IMAGE_MIME`, `VIDEO_MIME`, `typeFromMime`, `LOGO_MIME`, `SERVED_EXTENSIONS` (including the unused audio types), `SAMPLE_IMAGE_EXT`, `SAMPLE_VIDEO_EXT`.
+- **API:** `IMAGE_MIME`, `VIDEO_MIME`, `AUDIO_MIME`, `typeFromMime` (`image`, `video`, `audio`), `LOGO_MIME`, `SERVED_EXTENSIONS` (`/media`, including audio types nothing produces there), `AUDIO_SERVED_EXTENSIONS` (`/audio`: `.m4a`), `SAMPLE_IMAGE_EXT`, `SAMPLE_VIDEO_EXT`.
 - **Used by:** slides.js, settings/logo.js, routes/index.js (`/media`), uploadQueue, sampleSlideshow.
 
 **`services/uploadQueue.js`**
 - **Purpose:** p-queue (concurrency 2) for processing and thumbnails.
-- **API:** `enqueueProcessing` (records the video's `format`), `enqueueThumbnail` (also records a missing length, and sends the playlist), `queueSize`, `updateSlide` (internal: `store.modifySlides`; a slide deleted meanwhile stays deleted).
+- **API:** `enqueueProcessing({ store, folder, slideId, tmpPath, mime, changed })` (any show's store, the slideshows' by default; images, videos (records their `format`) and audio tracks (`processAudio`); `changed()` afterwards, the playlist by default), `enqueueThumbnail` (also records a missing length, and sends the playlist), `queueSize`, `updateItem` (internal: the store's `modifyItems`; an item deleted meanwhile stays deleted).
 - **Side effects:** updates `slideshow.json` through the store, deletes the temporary upload, `displayEvents.playlistChanged()` once a slide is ready.
 - **Used by:** slides.js, sampleSlideshow.
 
@@ -833,7 +852,15 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/showStore.js`**
 - **Purpose:** `createShowStore({ kind, configKey, rootDir, fileName, itemsKey, mediaDirName, fallbackSlug, newEntry })`: one owner for a kind of show's entries (`config[configKey]`) and folders (the JSON file with its items, and the items' files): `list`, `find`, `create`, `replace`, `remove`, `removeMany`, `commitEntries`, `readItems`, `modifyItems` (locked per `<kind>:<folder>`, written only when changed), `itemCount`, `itemFileExists`, `removeItemFiles`, `mediaDir`.
-- **Uses:** configService, configIO, folderLock, slugify. **Used by:** slideshowStore.
+- **Uses:** configService, configIO, folderLock, slugify. **Used by:** slideshowStore, audioShowStore.
+
+**`services/audioShowStore.js`**
+- **Purpose:** the audio shows' store: `config.audioShows` and `data/audioshows/<folder>/` (`audioshow.json` with `tracks`, and `tracks/`); a new show is unpublished, in order, without a transition, with the contract's fade length and volume.
+- **Uses:** showStore, pathHelpers (`audioShowsDir`), contract (`audio`). **Used by:** audioshows.js, tracks.js.
+
+**`services/audioShowRules.js`**
+- **Purpose:** `applyChange(before, body)` → `{ entry }` or `{ error }`: an audio show's settings checked against the contract's `audio` limits (D44).
+- **Used by:** audioshows.js.
 
 **`services/slideshowStore.js`**
 - **Purpose:** the one owner of the slideshow entries (`config.slideshows`) and each `data/slideshows/<folder>/` (its `slideshow.json` and `slides/`): a show store with the slideshows' settings, under the names below; `store` is the show store itself, for code shared by every kind.
@@ -942,7 +969,8 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `styles/base.css` | the global styles: CSS variables, layout, buttons, cards, fields, messages, badges, the page warnings' box (`.page-warning`), and the confirmation dialogs' texts (`.danger-dialog`: paragraphs, `.warnings`, `.choices`, `.tone-warn`, `.actions`) | none | |
 | `App.vue` | the layout: the sidebar, the warnings and the updater's notices (every page but the login page), then the page | NavBar, DefaultPasswordWarning, UpdateNotice, InstallerNotice, UpdateAvailableNotice, useNav | |
 | `composables/useApi.js` | one `request` core behind `api.get/post/put/patch/del/upload`; a 401 → the login page, unless `redirectOn401: false` (then thrown like any error); errors carry `status` and `serverMessage` | none | |
-| `composables/useSlideshowActions.js` | `setEnabled`, `setHidden` (errors shown in an alert) with `toggling` / `hiding` busy state | useApi | |
+| `composables/useShowActions.js` | `useShowActions(base)` (`/slideshows` or `/audioshows`): `setEnabled`, `setHidden` (errors shown in an alert) with `toggling` / `hiding` busy state | useApi | |
+| `composables/useItemList.js` | `useItemList({ items, path, busy })`: a show's item list: `load`, `upload` (with `fileInput`, `uploading`, `uploadErr`, `uploadCount`), reloading every 2 s while processing, `remove` (asks, naming it), `move`, `stop` | useApi, `@shared` mediaDisplayName | used by SlideList, TrackList |
 | `composables/useRename.js` | `useRename({ items, path })` → `{ renaming, renameInput, startRename, cancelRename, saveRename }`: renaming an item of a list in place (D38) | useApi | used by SlideList |
 | `composables/useFlash.js` | a reactive `{ text, tone, ok(text, clearAfterMs), error(text), clear() }` for "Saved." and error messages | none | |
 | `composables/useUpdateInfo.js` | the Software updates data: `GET /settings/updates` and `/branches`, polling every 3 s while an update runs or the server restarts, reloading the page when another version runs; helpers `short`, `when`, `runningName`, `canSwitch`, `missingSoftware` | useApi | |
@@ -950,7 +978,11 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `composables/useCollapsed.js` | `useCollapsed(name)` → `{ collapsed }`: which cards are folded, one list shared by every card, in `localStorage` (unreadable → every card open) | localStorage | |
 | `components/ui/CollapsibleCard.vue` | a section card that folds to its title: props `title`, `name`, `attention` (open and not foldable while true); slots: the body (kept mounted while folded) and `actions` (hidden while folded); attributes go to the card | useCollapsed | used by the six Settings cards, SlideshowSettingsCard and SlideList |
 | `views/LoginView.vue` | login form: a wrong password or "too many tries" shown on the page, "Could not reach server" without an answer | useApi | |
-| `views/SlideshowsView.vue` | home: device banner, list, create, publish, hide, delete | useApi, useSlideshowActions, StatusBadge, PublishToggle, TagPill | |
+| `views/SlideshowsView.vue` | home: device banner, list, create, publish, hide, delete | useApi, useShowActions, StatusBadge, PublishToggle, TagPill | |
+| `views/AudioShowsView.vue` | the audio shows: list with each one's summary, create (opens it), publish, delete | useApi, useShowActions, StatusBadge, PublishToggle | |
+| `views/AudioShowDetailView.vue` | one audio show (404 → the list): its settings card and track list | useApi, AudioShowSettingsCard, TrackList, StatusBadge | |
+| `components/audio/AudioShowSettingsCard.vue` | the settings at a glance, publish, the edit form (name, order, transition, fade length, volume) | useApi, useShowActions, useFlash, FlashMessage, CollapsibleCard, StatusBadge, PublishToggle, `@shared` AUDIO | |
+| `components/audio/TrackList.vue` | upload, rows (▶/■ to listen at the show's volume, name with ✎, length, file, status), reorder, delete | useItemList, useRename, CollapsibleCard, `@shared` audioUrl, mediaDisplayName, LIMITS | |
 | `views/SlideshowDetailView.vue` | loads the default duration, the slideshow (404 → the list) and its slides; the header with its tags; the disabled banner | useApi, SlideshowSettingsCard, SlideList, TagPill | |
 | `views/SettingsView.vue` | loads `GET /settings` once for the Display and MAC cards; the cards in order (Display, MAC filtering, Branding, Change password, Software updates, Delete content) | useApi, the settings and updates cards | |
 | `components/slideshow/SlideshowSettingsCard.vue` | the settings facts, publish/disable, hide/unhide, the edit form (name, priority, duration) | useApi, useSlideshowActions, useFlash, ScheduleEditor, StatusBadge, PublishToggle, FlashMessage, `@shared` LIMITS | |
@@ -958,7 +990,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/slideshow/SlideList.vue` | upload, rows (name, then type and stored file name), rename (✎: Enter or leaving the field saves, Esc cancels), reorder, delete (the question names the slide), missing thumbnails, polling while processing, preview (hover or pinned) | useApi, SlidePreview, `@shared` mediaUrl, mediaDisplayName, LIMITS | |
 | `components/slideshow/SlidePreview.vue` | hover or pinned preview, titled with the slide's name | `@shared` mediaUrl, mediaDisplayName | |
 | `components/settings/DisplaySettingsCard.vue` (the duration, the pin, the video format explained, with its warning, and converting the existing videos with its warning and progress), `MacFilterCard.vue` (with `MacFilterWarning`), `PasswordCard.vue`, `BrandingSettings.vue` (the logo, and the background colour: a colour picker and a code field kept in step) | one Settings card each | useApi, useFlash, FlashMessage; `@shared` LIMITS (duration, password), VIDEO_FORMATS and DEFAULT_VIDEO_FORMAT (display), DEFAULT_BACKGROUND and isColour (branding); useSecurity (password); useBranding (logo) | |
-| `components/NavBar.vue` | sidebar | useApi, useBranding, useNav, NavIcon, `@shared` PROJECT_URL | |
+| `components/NavBar.vue` | sidebar (Slideshows, Audio, Settings, Help, Open viewer) | useApi, useBranding, useNav, NavIcon, `@shared` PROJECT_URL | |
 | `components/NavIcon.vue` | inline SVG icons | none | |
 | `components/DefaultPasswordWarning.vue` | red banner | useSecurity | |
 | `components/updates/UpdateNotice.vue` | dismissable updater notice (in the layout: every page) | useApi | |
@@ -979,7 +1011,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 **`shared/contract.json`** and **`shared/index.js`**
 - `contract.json`: `socketEvents`, required by the server (realtime/displaySocket.js) and imported by index.js.
 - `contract.json` also has `limits` (`passwordMinLength`, `slideSeconds { min, max }`, `mediaNameMax`), read by adminPassword, slideshowRules and mediaNames, and `display` (`defaultBackground`, `colourPattern`, `videoFormats`, `defaultVideoFormat`), read by settingsService and brandingService.
-- `index.js`: `SOCKET_EVENTS` (the viewer), `LIMITS` (the duration inputs, the password card, the slide name field), `DEFAULT_BACKGROUND` (the viewer, the Branding card), `VIDEO_FORMATS`, `DEFAULT_VIDEO_FORMAT` (the Display card), `isColour(value)` (the Branding card), `PROJECT_URL` (NavBar), `installerCommand(branch)` (InstallerNotice), `mediaUrl(folder, file)` (SlideList, SlidePreview; the same as the server's `pathHelpers.mediaUrl`, checked by a unit test), `mediaDisplayName(item)` (SlideList, SlidePreview: what a slide is called, D38).
+- `index.js`: `SOCKET_EVENTS` (the viewer), `LIMITS` (the duration inputs, the password card, the slide name field), `DEFAULT_BACKGROUND` (the viewer, the Branding card), `VIDEO_FORMATS`, `DEFAULT_VIDEO_FORMAT` (the Display card), `isColour(value)` (the Branding card), `PROJECT_URL` (NavBar), `installerCommand(branch)` (InstallerNotice), `mediaUrl(folder, file)` (SlideList, SlidePreview; the same as the server's `pathHelpers.mediaUrl`, checked by a unit test), `mediaDisplayName(item)` (SlideList, SlidePreview, TrackList: what an item is called, D38), `AUDIO` (the audio show card), `audioUrl(folder, file)` (TrackList; the same as the server's `pathHelpers.audioUrl`, checked by a unit test).
 - **Rule:** public values only (they are built into the browsers' JavaScript).
 
 ### 12.9 Installers
@@ -1069,13 +1101,13 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 | D12 | Password minimum length (8) | `shared/contract.json` `limits.passwordMinLength` (adminPassword, PasswordCard) | |
 | D13 | Where uploads wait: `tmp/noticeboard-uploads` | `middleware/uploads.js` `createUpload` | Slides (`upload-…`, 500 MB each) and the logo (`logo-…`, 20 MB). update.sh waits while the folder has a recent file. |
 | D14 | Media type lists | `services/mediaTypes.js` | The lists overlap without being identical: slide images and videos, logo images, the extensions `/media` serves (including audio), the sample's file names. The admin panel's file pickers use broad `accept` lists; the server decides. |
-| D15 | Media URL `/media/<folder>/slides/<file>` | `pathHelpers.mediaUrl` (server) and `mediaUrl` in `shared/index.js` (admin panel) | A unit test keeps them equal. |
+| D15 | Media URLs `/media/<folder>/slides/<file>` and `/audio/<folder>/tracks/<file>` | `pathHelpers.mediaUrl`, `audioUrl` (server) and `mediaUrl`, `audioUrl` in `shared/index.js` (admin panel) | A unit test keeps them equal. |
 | D16 | Where the built apps are | `pathHelpers.displayDistDir`, `adminDistDir` | |
 | D17 | Serving an app for every path, or the "not built" page | `routes/spa.js` | |
 | D18 | Socket event names | `shared/contract.json` | |
 | D19 | Page wake-up events (visibility, resume, pageshow, focus, online) | `usePageWake` | SlideShow listens to `online` too; VideoSlide doesn't. |
 | D20 | Corner buttons and their pop-ups | `CornerButton`, `ScreenDialog` | The pin and the exit button keep their own opacity (0.3 / 0.5) and auto-close (90 s / 60 s). |
-| D21 | Published badge, publish toggle, tags, publish and hide | `StatusBadge`, `PublishToggle`, `TagPill`, `useSlideshowActions` | Used by SlideshowsView and SlideshowSettingsCard. |
+| D21 | Published badge, publish toggle, tags, publish and hide | `StatusBadge`, `PublishToggle`, `TagPill`, `useShowActions` | Used by SlideshowsView, SlideshowSettingsCard, AudioShowsView and AudioShowSettingsCard. |
 | D22 | Pop-up dialogs (overlay, Esc, click outside) | `ModalDialog` | Used by MacFilterWarning and SwitchDialogs. SlidePreview has its own lighter overlay: it's a hover preview. |
 | D23 | "Saved." and error messages | `useFlash` + `FlashMessage` | The caller sets the tone. |
 | D24 | API calls and a 401 | `useApi` `request` | The login check and LoginView pass `redirectOn401: false`. |
@@ -1098,6 +1130,7 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 | D41 | The update schedule: when an install is due | `installers/lib/schedule.sh` only (update.sh); it writes the next install time into update-check.json for the admin panel | The server only checks and saves the values (`updates/schedule.js`, `updateFiles`); `updateFiles.readSchedule` reads the file with the same defaults as `read_schedule`. |
 | D42 | Restore Defaults: what is reset and what is kept | the server (`contentReset.applyPendingRestore`, `KEPT_DATA`) for data/, tmp/ and logs/; update.sh (`RESTORE_KEEP`, `clean_folder`) for the rest of the folder | Two lists on purpose: each side resets what it owns. A file the installer adds to the folder must go on `RESTORE_KEEP` (`tests/installers/update-restore.sh` checks every file the installer writes). |
 | D43 | A video's format: choosing it, recording it, converting to it | `settingsService.videoFormat` (the choice), `mediaService` (`processVideo`, `videoFormatOf`), the slide's `format`, `videoConversion` (existing videos) | Uploads and conversions encode with the same `processVideo`; a slide without `format` is checked with ffprobe. |
+| D44 | An audio show's settings and their limits | `shared/contract.json` `audio` (orders, transitions, fadeSeconds, volume): `audioShowRules` checks, `audioShowStore` takes the defaults, the admin card offers them (`@shared` AUDIO) | |
 
 ---
 
@@ -1137,7 +1170,7 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 
 **Sessions and URLs**
 17. The session cookie `nb_admin_token`, signed with `config.jwtSecret`, must be accepted, so admins stay logged in across the update.
-18. These URLs must stay: `/`, `/admin`, `/admin/*`, `/admin/help`, `/media/<folder>/slides/<file>`, `/branding/logo?v=`, and every `/api` path in §4.1 (the admin panel is rebuilt with the code, but the kiosk scripts and open tabs are not).
+18. These URLs must stay: `/`, `/admin`, `/admin/*`, `/admin/help`, `/media/<folder>/slides/<file>`, `/audio/<folder>/tracks/<file>`, `/branding/logo?v=`, and every `/api` path in §4.1 (the admin panel is rebuilt with the code, but the kiosk scripts and open tabs are not).
 
 **Browser storage**
 19. The keys `noticeboard:navCollapsed`, `noticeboard:collapsedCards` and `noticeboard:lastRecoveryReload` (merely nice to keep).
@@ -1157,7 +1190,7 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 3. **An empty client IP counts as this Pi itself** in the MAC filter (D6).
 4. **`PUT /api/settings` does not validate `port` or the `macFiltering` shape.** A bad value is saved as it is. A port change takes effect only after a restart.
 5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.2).
-6. The media route allows audio extensions (`.mp3 .wav .ogg`) that nothing produces.
+6. The media route allows audio extensions (`.mp3 .wav .ogg`) that nothing produces there (audio shows' tracks are served at `/audio`).
 7. The admin panel ignores reorder errors (`.catch(() => {})`), so the order shown can differ from what was saved.
 8. `configService.init` **regenerates the defaults when `config.json` doesn't parse**. The admin password, the MAC list and the slideshow list are then lost from the config, although their folders remain.
 9. `configService.update` merges only the top level. `PUT /settings` therefore replaces the whole `macFiltering` object, which is intended (the admin panel sends everything).
@@ -1174,8 +1207,8 @@ Run them with `node tests/run.js <group> [filter]` or the npm scripts. `npm run 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|
 | unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (18 tests, including 30 simulated days, and videos with a length keeping to it); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS), the media name rule and mediaDisplayName (9) | Node 20+ |
-| api (`test:api`) | `tests/api/` | **contract.js**: 93 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), the update schedule's routes and the screens' mark (`update-schedule.js`), the video format for new uploads and converting the existing videos (`video-format.js`: H.265 by default, H.264 when chosen, checked with ffprobe; other formats refused; each video's length in the playlist; a conversion showing each video processing in its turn while the screens keep its file, then replacing it; a second run changing nothing; a restart mid-way), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files, default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
-| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), Delete All's card and dialogs (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the video format setting, its explanations and warning, and converting the existing videos (`video-format.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
+| api (`test:api`) | `tests/api/` | **contract.js**: 106 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), audio shows (`audio-shows.js`: defaults, limits, tracks converted to AAC with their length and name, rename, reorder, delete, `/audio`), the update schedule's routes and the screens' mark (`update-schedule.js`), the video format for new uploads and converting the existing videos (`video-format.js`: H.265 by default, H.264 when chosen, checked with ffprobe; other formats refused; each video's length in the playlist; a conversion showing each video processing in its turn while the screens keep its file, then replacing it; a second run changing nothing; a restart mid-way), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files, default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
+| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), the audio pages (`audio-shows.js`: create, settings, upload through the file picker, ▶/■, rename, reorder, delete, the list), Delete All's card and dialogs (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the video format setting, its explanations and warning, and converting the existing videos (`video-format.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
 | installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return, **the schedule** with a fake clock: `update-schedule.sh`; **Restore Defaults**: the clean, the keep list against every file the installer writes, a restart after a failed reinstall: `update-restore.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
@@ -1258,7 +1291,7 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 
 **Phases** (each designed here in detail before its code, tested with every group and committed):
 1. **Done:** foundations with no visible change: the store factory (`services/showStore.js`), the item-route factory (`routes/api/mediaItems.js`), the shared rename (`composables/useRename.js`), `getMediaDuration`. Every snapshot stayed identical.
-2. Audio shows in the admin panel: store, routes, `/audio`, processing, pages, track preview.
+2. **Done:** audio shows in the admin panel: store, routes, `/audio`, processing with loudness levelling, pages, track preview (D44).
 3. The audio engine and the show preview; a crossfade test on a real Pi (if it isn't smooth there, "no transition" stays and the limit is documented).
 4. Background audio on the screens, and the installer bump.
 5. Video sound.

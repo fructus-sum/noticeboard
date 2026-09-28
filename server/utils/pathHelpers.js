@@ -18,6 +18,7 @@ const ROOT = path.resolve(__dirname, '../..');
 
 function dataDir() { return path.join(ROOT, 'data'); }
 function slideshowsDir() { return path.join(ROOT, 'data', 'slideshows'); }
+function audioShowsDir() { return path.join(ROOT, 'data', 'audioshows'); }
 function slideshowDir(folderName) { return path.join(slideshowsDir(), folderName); }
 function slidesDir(folderName) { return path.join(slideshowDir(folderName), 'slides'); }
 function slideshowJsonPath(folderName) { return path.join(slideshowDir(folderName), 'slideshow.json'); }
@@ -50,11 +51,13 @@ function logoPath() { return path.join(brandingDir(), 'logo.png'); }
 function defaultLogoPath() { return path.join(sampleDataDir(), 'sample-logo.png'); }
 
 function mediaUrl(folderName, filename) { return `/media/${folderName}/slides/${filename}`; }
+function audioUrl(folderName, filename) { return `/audio/${folderName}/tracks/${filename}`; }
 
 module.exports = {
   ROOT,
   dataDir,
   slideshowsDir,
+  audioShowsDir,
   slideshowDir,
   slidesDir,
   slideshowJsonPath,
@@ -81,4 +84,5 @@ module.exports = {
   logoPath,
   defaultLogoPath,
   mediaUrl,
+  audioUrl,
 };

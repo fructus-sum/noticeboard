@@ -6,7 +6,7 @@
 // guards (routes/api/index.js).
 //
 // Provides
-//   mountRoutes(app): /media, /admin/help (the guide), /branding/logo, the admin panel (/admin),
+//   mountRoutes(app): /media, /audio (the audio shows' tracks), /admin/help (the guide), /branding/logo, the admin panel (/admin),
 //   the API (/api), the viewer (/); the two apps are their built copies, or a "not built" page
 //
 // Used by
@@ -25,9 +25,9 @@ const path = require('path');
 const macFilter = require('../middleware/macFilter');
 const { route } = require('../middleware/asyncRoute');
 const { spaFallback } = require('./spa');
-const { slideshowsDir, guidePath, logoPath, displayDistDir, adminDistDir } = require('../utils/pathHelpers');
+const { slideshowsDir, audioShowsDir, guidePath, logoPath, displayDistDir, adminDistDir } = require('../utils/pathHelpers');
 const { hasCustomLogo, placeholderLogo } = require('../services/brandingService');
-const { SERVED_EXTENSIONS } = require('../services/mediaTypes');
+const { SERVED_EXTENSIONS, AUDIO_SERVED_EXTENSIONS } = require('../services/mediaTypes');
 
 const DISPLAY_DIST = displayDistDir();
 const ADMIN_DIST = adminDistDir();
@@ -48,6 +48,19 @@ function mountRoutes(app) {
       next();
     },
     express.static(slideshowsDir())
+  );
+
+  // 1a. Audio shows' tracks (/audio/<folder>/tracks/<file>): MAC filtered like the media, only the
+  // processed tracks, streaming-capable
+  app.use(
+    '/audio',
+    macFilter,
+    (req, res, next) => {
+      if (!AUDIO_SERVED_EXTENSIONS.includes(path.extname(req.path).toLowerCase())) return res.status(404).send('Not Found');
+      res.setHeader('Accept-Ranges', 'bytes');
+      next();
+    },
+    express.static(audioShowsDir())
   );
 
   // User guide, opened from the admin sidebar's Help link — MAC filtered like the admin

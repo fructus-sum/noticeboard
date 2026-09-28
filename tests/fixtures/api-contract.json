@@ -865,6 +865,120 @@
     "type": "application/json",
     "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
   },
+  "audioshows: list, empty": {
+    "method": "GET",
+    "path": "/api/audioshows",
+    "status": 200,
+    "type": "application/json",
+    "content": "[]"
+  },
+  "audioshow: create": {
+    "method": "POST",
+    "path": "/api/audioshows",
+    "status": 201,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "enabled": "boolean",
+      "fadeSeconds": "number",
+      "folder": "string",
+      "name": "string",
+      "order": "string",
+      "trackCount": "number",
+      "transition": "string",
+      "volume": "number"
+    }
+  },
+  "audioshow: create, no name": {
+    "method": "POST",
+    "path": "/api/audioshows",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"name is required\"}"
+  },
+  "audioshow: get": {
+    "method": "GET",
+    "path": "/api/audioshows/contract-audio",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "enabled": "boolean",
+      "fadeSeconds": "number",
+      "folder": "string",
+      "name": "string",
+      "order": "string",
+      "trackCount": "number",
+      "transition": "string",
+      "volume": "number"
+    }
+  },
+  "audioshow: get, missing": {
+    "method": "GET",
+    "path": "/api/audioshows/no-such-show",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Audio show not found\"}"
+  },
+  "audioshow: bad setting": {
+    "method": "PUT",
+    "path": "/api/audioshows/contract-audio",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"volume must be a whole number from 0 to 100\"}"
+  },
+  "audioshow: update": {
+    "method": "PUT",
+    "path": "/api/audioshows/contract-audio",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "enabled": "boolean",
+      "fadeSeconds": "number",
+      "folder": "string",
+      "name": "string",
+      "order": "string",
+      "trackCount": "number",
+      "transition": "string",
+      "volume": "number"
+    }
+  },
+  "tracks: list, empty": {
+    "method": "GET",
+    "path": "/api/audioshows/contract-audio/tracks",
+    "status": 200,
+    "type": "application/json",
+    "content": "[]"
+  },
+  "tracks: upload unsupported": {
+    "method": "POST",
+    "path": "/api/audioshows/contract-audio/tracks",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Unsupported file type\"}"
+  },
+  "track: rename, missing": {
+    "method": "PATCH",
+    "path": "/api/audioshows/contract-audio/tracks/nope",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Track not found\"}"
+  },
+  "audio: not a track": {
+    "method": "GET",
+    "path": "/audio/contract-audio/audioshow.json",
+    "status": 404,
+    "type": "text/html",
+    "content": "Not Found"
+  },
+  "audioshow: delete": {
+    "method": "DELETE",
+    "path": "/api/audioshows/contract-audio",
+    "status": 200,
+    "type": "application/json",
+    "content": "{\"ok\":true}"
+  },
   "logout": {
     "method": "POST",
     "path": "/api/auth/logout",

@@ -8,6 +8,8 @@
 //                                     (SYSTEM_DESIGN §16 #12)
 //   getMediaDuration(file) → a video's or audio file's length in whole seconds, or null (ffprobe)
 //   createThumbnail(video, outDir, id) → a still for the admin panel
+//   processAudio(input, outDir, id) → an AAC .m4a (192 kbit/s), its loudness evened out (EBU R128,
+//                                     -16 LUFS) so one track isn't much louder than the next
 //   videoFormatOf(file) → 'h265' | 'h264' | another codec's name | null (ffprobe)
 //
 // Used by
@@ -63,6 +65,27 @@ function processVideo(inputPath, outDir, slideId, format = 'h265') {
   });
 }
 
+function processAudio(inputPath, outDir, trackId) {
+  const outFilename = `${trackId}.m4a`;
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .noVideo()
+      .audioCodec('aac')
+      .audioBitrate('192k')
+      .audioFilters('loudnorm=I=-16:TP=-1.5:LRA=11')
+      .outputOptions(['-movflags +faststart', '-map 0:a:0'])
+      .on('end', () => {
+        logger.info('Audio processed', { trackId, outFilename });
+        resolve(outFilename);
+      })
+      .on('error', (err) => {
+        logger.error('Audio processing failed', { trackId, err: err.message });
+        reject(err);
+      })
+      .save(path.join(outDir, outFilename));
+  });
+}
+
 // The format a video is in, as Settings → Display names them
 function videoFormatOf(filePath) {
   return new Promise((resolve) => {
@@ -106,4 +129,4 @@ async function createThumbnail(videoPath, outDir, slideId) {
   return outFilename;
 }
 
-module.exports = { processImage, processVideo, getMediaDuration, createThumbnail, videoFormatOf };
+module.exports = { processImage, processVideo, processAudio, getMediaDuration, createThumbnail, videoFormatOf };

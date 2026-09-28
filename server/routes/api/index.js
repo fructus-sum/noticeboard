@@ -11,7 +11,7 @@
 //
 // Uses
 //   express-rate-limit, middleware/macFilter (auth, device), middleware/adminAuth (the rest), and
-//   the routers: auth, device, settings, slideshows, slides
+//   the routers: auth, device, settings, slideshows, slides, audioshows, tracks
 //
 // Change impact
 //   The URLs, status codes and JSON shapes are a contract with open admin panels, the kiosk scripts
@@ -25,6 +25,8 @@ const deviceRouter = require('./device');
 const settingsRouter = require('./settings');
 const slideshowsRouter = require('./slideshows');
 const slidesRouter = require('./slides');
+const audioShowsRouter = require('./audioshows');
+const tracksRouter = require('./tracks');
 
 const router = express.Router();
 
@@ -49,5 +51,10 @@ const slideshowsApi = express.Router();
 slideshowsApi.use('/:folder/slides', slidesRouter);
 slideshowsApi.use('/', slideshowsRouter);
 router.use('/slideshows', adminAuth, slideshowsApi);
+// The audio shows, with their tracks inside, the same way
+const audioShowsApi = express.Router();
+audioShowsApi.use('/:folder/tracks', tracksRouter);
+audioShowsApi.use('/', audioShowsRouter);
+router.use('/audioshows', adminAuth, audioShowsApi);
 
 module.exports = router;
