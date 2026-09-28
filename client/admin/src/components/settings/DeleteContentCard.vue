@@ -37,6 +37,8 @@ const slideTotal = computed(() => toDelete.value.reduce((n, s) => n + (s.slideCo
 const deleteTitle = computed(() => (audioToDelete.value.length ? 'Delete all your slideshows and audio shows?' : 'Delete all your slideshows?'));
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const branch = computed(() => updates.value?.configuredBranch || 'main');
+// The installer to recommend: on main, the Release running (its installer matches it), else the branch's
+const installerRef = computed(() => (branch.value === 'main' && updates.value?.release) || branch.value);
 
 async function startDeleteAll() {
   msg.clear();
@@ -209,7 +211,7 @@ onUnmounted(() => clearInterval(pollTimer));
       <strong>Running the installer again afterwards is recommended.</strong> There will be no more reminders about it
       once the restore is complete. In a terminal on the Server, or over SSH:
     </p>
-    <p><code class="command">{{ installerCommand(branch) }}</code></p>
+    <p><code class="command">{{ installerCommand(installerRef) }}</code></p>
 
     <template #final>
       <p>

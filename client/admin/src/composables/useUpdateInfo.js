@@ -15,7 +15,8 @@
 //   Helpers for the card's parts:
 //   short(sha)            the 7-character commit
 //   when(iso)             a date and time as the browser writes them
-//   runningName(info)     the branch running, or its commit
+//   versionName(tag)      a Release's version: 0.8.0 for v0.8.0 (the server's releases.versionName)
+//   runningName(info)     the Release running on main ("Version 0.8.0"), else the branch, or the commit
 //   canSwitch(info)       branch switching is set up (the updater's timer or path unit)
 //   missingSoftware(checked)  what a checked branch needs that this noticeboard lacks
 //
@@ -27,7 +28,9 @@ import { api } from './useApi.js';
 
 export const short = (sha) => (sha ? sha.slice(0, 7) : '');
 export const when = (iso) => (iso ? new Date(iso).toLocaleString() : '');
-export const runningName = (info) => info?.branch || short(info?.commit);
+export const versionName = (tag) => String(tag ?? '').replace(/^v/, '');
+// On main, the Release ("Version 0.8.0"); else the branch, or the commit
+export const runningName = (info) => (info?.version ? `Version ${info.version}` : info?.branch || short(info?.commit));
 export const canSwitch = (info) => info?.available && (info.autoUpdates || info.instant);
 // The branch's system-requirements.json, checked against this noticeboard by the server
 export const missingSoftware = (checked) => (checked?.requirements?.listed

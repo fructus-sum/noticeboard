@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # update.sh
-# Keeps a Server on the latest commit of the GitHub branch it follows: main, unless another
-# branch was chosen in the admin panel (Settings → Software updates). When there's a new commit
-# it installs it, rebuilds, restarts the server and checks the server answers. If anything
+# Keeps a Server on the latest version of the GitHub branch it follows: main, unless another
+# branch was chosen in the admin panel (Settings → Software updates). On main that's the latest
+# published Release (lib/release.sh; never an older one by itself); on another branch, its latest
+# commit. When there's a new version it installs it, rebuilds, restarts the server and checks the
+# server answers. If anything
 # fails it puts the previous version back, and after a failed branch switch it also goes back
 # to following the previous branch. The noticeboard's content and settings (data/) are never
 # changed or deleted.
@@ -16,7 +18,7 @@
 # "install-now", "check" (only check, e.g. after the schedule changed), "restore-defaults", or
 # anything else (a branch switch, as older servers write it).
 #
-# Restore Defaults (data/restore-defaults, left by the server): the followed branch's latest commit
+# Restore Defaults (data/restore-defaults, left by the server): the followed branch's latest version
 # is reinstalled even if it's the one running, into a clean folder (everything untracked deleted
 # but RESTORE_KEEP), and the server is restarted even if that failed: at start-up it resets its
 # data, logs and waiting files (server/services/contentReset.js). Runs as the user that owns /opt/noticeboard, which is also the user the
@@ -30,9 +32,9 @@
 # Used by
 #   noticeboard-update.service (its timer and path units), set up by install.sh
 # Uses
-#   installers/lib/branch.sh and lib/json.sh (loaded before main); git, npm, systemctl, curl; the
-#   files it shares with the server (SYSTEM_DESIGN §4.2); GET /api/auth/status after a
-#   restart
+#   installers/lib/branch.sh, json.sh, schedule.sh and release.sh (loaded before main); git, npm,
+#   node, systemctl, curl; GitHub's Releases API (main's latest Release); the files it shares
+#   with the server (SYSTEM_DESIGN §4.2); GET /api/auth/status after a restart
 # Change impact
 #   This file runs the next update on every Server that installed it: a mistake here can stop updates
 #   everywhere. Its path is in every installed update unit, and after a rollback an older
@@ -41,6 +43,7 @@ set -euo pipefail
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_NAME="noticeboard"
+# The installer to recover with: main's until the target is known, then the target's (installer_url)
 INSTALLER_URL="https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh"
 BRANCH_FILE="$INSTALL_DIR/data/update-branch.env"    # NOTICEBOARD_BRANCH=<branch>, written by the admin panel
 STATUS_FILE="$INSTALL_DIR/data/update-status.json"   # the last update or branch switch, shown in the admin panel
@@ -48,6 +51,7 @@ CHECK_FILE="$INSTALL_DIR/data/update-check.json"     # the last check for update
 NOTICE_FILE="$INSTALL_DIR/data/update-notice.json"   # shown on the admin home page until someone closes it
 SCHEDULE_FILE="$INSTALL_DIR/data/update-schedule.env" # the update schedule, written by the admin panel (lib/schedule.sh)
 RESTORE_FILE="$INSTALL_DIR/data/restore-defaults"    # Restore Defaults asked for (the server deletes it at start-up)
+INSTALLER_RECORD="$INSTALL_DIR/data/installer.json"  # the last installer run, written by install.sh
 # What a Restore Defaults clean keeps (git clean patterns; a name without a slash in the middle also
 # matches deeper in the folder, which only keeps more, and none starts with / because Git Bash would
 # rewrite it on Windows, where the tests run): what the server
@@ -69,10 +73,11 @@ BRANCH_SUPPORT_MARKER="update-branch.env"
 export GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=60
 
 # Shared with install.sh: the branch setting (valid_branch, read_branch_setting,
-# read_main_at_switch, write_branch_setting) and the JSON files (write_json); and the update
-# schedule (read_schedule, install_due, next_install, set_install_at). Loaded now, from this
-# commit, before a checkout can replace them. If they can't be, nothing is touched.
-for lib in branch json schedule; do
+# read_main_at_switch, write_branch_setting), the JSON files (write_json) and main's latest
+# Release (latest_release, release_tag_ref); and the update schedule (read_schedule,
+# install_due, next_install, set_install_at). Loaded now, from this commit, before a checkout
+# can replace them. If they can't be, nothing is touched.
+for lib in branch json schedule release; do
   # shellcheck source=lib/branch.sh
   if ! source "$INSTALL_DIR/installers/lib/$lib.sh"; then
     echo "Can't load installers/lib/$lib.sh, so nothing was updated. To repair this noticeboard, run the installer: curl -fsSL $INSTALLER_URL | sudo bash" >&2
@@ -84,12 +89,16 @@ done
 # else main
 BRANCH="${NOTICEBOARD_BRANCH:-$(read_branch_setting)}"
 BRANCH="${BRANCH:-main}"
-# main's commit when this Server switched to its branch (see branch_merged)
+# The latest Release's commit when this Server switched to its branch (main's commit if it
+# switched before Releases): see branch_merged
 MAIN_AT_SWITCH=$(read_main_at_switch)
-RETURNED_FROM=""     # the branch this run went back to main from, because it was merged
+RETURNED_FROM=""     # the branch this run went back to main from, because a Release has its work
 PREVIOUS_BRANCH=""   # the branch and commit running before this update
 CURRENT=""
 TARGET=""            # the commit being installed
+RELEASE=""           # on main: the latest Release's tag, whose commit TARGET is
+TARGET_NAME=""       # TARGET as the admin reads it: "Release v0.8.0 (abc1234)" or "abc1234 from <branch>"
+INSTALLER_FOR=""     # a Release with the followed branch's work, waiting for the installer (branch_merged)
 NOW=""               # this run's time, in seconds (lib/schedule.sh now_epoch)
 INSTALL_CHECKED_AT="" # the last run that could install (update-check.json), for the schedule
 FETCHED_AT=""        # the last time GitHub was checked (update-check.json)
@@ -115,6 +124,7 @@ main() {
   read_schedule
   INSTALL_CHECKED_AT=$(check_value installCheckedAt)
   FETCHED_AT=$(check_value fetchedAt)
+  INSTALLER_FOR=$(check_value installerFor)
 
   # The admin panel asked for this run. The request is taken straight away: systemd starts this
   # whenever the file exists, so leaving it would start it again and again. Anything but "check"
@@ -162,6 +172,8 @@ main() {
   fi
   local switching=""
   if [ "$BRANCH" != "$PREVIOUS_BRANCH" ]; then switching=1; fi
+  # Only a branch that keeps being followed can be waiting for a Release's installer
+  if [ -n "$switching" ] || [ "$BRANCH" = main ]; then INSTALLER_FOR=""; fi
 
   local state
   state=$(systemctl is-active "$SERVICE_NAME" || true)
@@ -194,36 +206,27 @@ main() {
     exit 0
   fi
 
-  # A branch whose work is all in main now isn't needed any more: go back to main (an install,
-  # so only when one is due)
+  # A branch whose work is all in main's latest Release now isn't needed any more: go back to
+  # main (an install, so only when one is due)
   if [ -n "$due" ] && [ -z "$switching" ] && [ -z "$restore" ] && [ "$BRANCH" != main ] && [ "$(read_branch_setting)" = "$BRANCH" ] && branch_merged; then
-    echo "$BRANCH has been merged into main; going back to main."
+    echo "$BRANCH's work is in Release $RELEASE; going back to main."
     RETURNED_FROM=$BRANCH
     write_branch_setting main
     BRANCH=main
     switching=1
   fi
 
-  if ! git fetch --quiet --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"; then
-    local code=0 reason
-    git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1 || code=$?
-    if [ "$code" -eq 2 ]; then
-      reason="The branch $BRANCH doesn't exist on GitHub"
-    else
-      reason="Couldn't download $BRANCH from GitHub (is the Server online?)"
-    fi
-    if [ -n "$switching" ]; then
-      restore_branch_setting
-      write_status cancelled "$reason, so the switch was cancelled. Nothing was changed: still running $PREVIOUS_BRANCH (${CURRENT:0:7})."
-    elif [ "$code" -eq 2 ]; then
-      write_check error "$reason any more, so no updates can be installed. This noticeboard keeps running ${CURRENT:0:7}; choose another branch in Settings → Software updates."
-    else
-      write_check offline "Couldn't reach GitHub; trying again at the next check."
-    fi
-    echo "$reason." >&2
-    exit 1
+  if [ "$BRANCH" = main ]; then
+    fetch_release "$switching" "$restore"
+  else
+    fetch_branch_tip "$switching"
   fi
-  TARGET=$(git rev-parse "origin/$BRANCH")
+  if [ -n "$RELEASE" ]; then
+    TARGET_NAME="Release $RELEASE (${TARGET:0:7})"
+  else
+    TARGET_NAME="${TARGET:0:7} from $BRANCH"
+  fi
+  INSTALLER_URL=$(installer_url)
   FETCHED_AT=$(iso_time "$NOW")
   if [ -n "$due" ]; then
     INSTALL_CHECKED_AT=$(iso_time "$NOW")
@@ -240,14 +243,23 @@ main() {
       if [ -n "$RETURNED_FROM" ]; then
         returned_to_main
       else
-        write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH. Both have the same version (${TARGET:0:7}), so nothing needed installing."
+        write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH. Both have the same version ($TARGET_NAME), so nothing needed installing."
         remember_main
       fi
       echo "Switched to $BRANCH (${TARGET:0:7})."
     else
       echo "Up to date (${CURRENT:0:7})."
     fi
-    write_check up-to-date "Up to date: running ${TARGET:0:7} from $BRANCH."
+    write_check up-to-date "$(up_to_date_message)"
+    exit 0
+  fi
+
+  # main never goes back by itself: a Release already in what's running (a Server with newer
+  # commits of main, e.g. installed before the first Release) leaves it as it is. Only a switch
+  # to main or Restore Defaults installs an older Release.
+  if [ -n "$RELEASE" ] && [ -z "$switching" ] && [ -z "$restore" ] && git merge-base --is-ancestor "$TARGET" "$CURRENT" 2>/dev/null; then
+    echo "Up to date (${CURRENT:0:7} already has $RELEASE)."
+    write_check up-to-date "Up to date: running ${CURRENT:0:7} from main, which already has the latest Release, $RELEASE."
     exit 0
   fi
 
@@ -256,7 +268,7 @@ main() {
       restore_branch_setting
       write_status cancelled "The switch to $BRANCH was cancelled: its latest commit (${TARGET:0:7}) couldn't be installed before. Still running $PREVIOUS_BRANCH (${CURRENT:0:7})."
     fi
-    write_check skipped "${TARGET:0:7} from $BRANCH couldn't be installed before, so it's skipped until a newer commit arrives. Still running ${CURRENT:0:7}."
+    write_check skipped "$TARGET_NAME couldn't be installed before, so it's skipped until a newer version arrives. Still running ${CURRENT:0:7}."
     echo "Skipping ${TARGET:0:7}: it failed before. Push a fix, or retry with: bash $INSTALL_DIR/installers/update.sh --force"
     exit 0
   fi
@@ -264,8 +276,8 @@ main() {
   # Not due: the new version waits for its install time, or for the admin in manual mode
   if [ -z "$due" ]; then
     AVAILABLE=$TARGET
-    write_check available "A new version is waiting: ${TARGET:0:7} from $BRANCH. $(waiting_note)"
-    echo "Update available: ${TARGET:0:7} from $BRANCH (not due yet)."
+    write_check available "A new version is waiting: $TARGET_NAME. $(waiting_note)"
+    echo "Update available: $TARGET_NAME (not due yet)."
     exit 0
   fi
 
@@ -276,7 +288,7 @@ main() {
       restore_branch_setting
       write_status cancelled "Didn't switch to $BRANCH: $problem. Nothing was changed: still running $PREVIOUS_BRANCH (${CURRENT:0:7})."
     else
-      write_status failed "Didn't install ${TARGET:0:7} from $BRANCH: $problem. Still running ${CURRENT:0:7}."
+      write_status failed "Didn't install $TARGET_NAME: $problem. Still running ${CURRENT:0:7}."
     fi
     echo "Not installing ${TARGET:0:7}: $problem." >&2
     exit 1
@@ -292,10 +304,10 @@ main() {
     fi
     write_status updating "Switching from $PREVIOUS_BRANCH (${CURRENT:0:7}) to $BRANCH (${TARGET:0:7}): installing and building. This takes a few minutes; the noticeboard keeps running until it restarts."
   elif [ -n "$restore" ]; then
-    write_status updating "Restoring defaults: reinstalling ${TARGET:0:7} from $BRANCH into a clean folder. This takes a few minutes; the noticeboard keeps running until it restarts."
+    write_status updating "Restoring defaults: reinstalling $TARGET_NAME into a clean folder. This takes a few minutes; the noticeboard keeps running until it restarts."
     clean_folder
   else
-    write_status updating "Installing ${TARGET:0:7} from $BRANCH. The noticeboard keeps running until it restarts."
+    write_status updating "Installing $TARGET_NAME. The noticeboard keeps running until it restarts."
   fi
   echo "Updating ${CURRENT:0:7} -> ${TARGET:0:7} ($BRANCH)"
   PORT=$(server_port)
@@ -305,15 +317,15 @@ main() {
     echo "$TARGET" > "$FAILED_FILE"
     restore_branch_setting
     if install_commit "$PREVIOUS_BRANCH" "$CURRENT"; then
-      write_status rolled-back "${TARGET:0:7} from $BRANCH failed to install or build, so ${CURRENT:0:7} from $PREVIOUS_BRANCH was put back. The noticeboard kept running the whole time."
+      write_status rolled-back "$TARGET_NAME failed to install or build, so ${CURRENT:0:7} from $PREVIOUS_BRANCH was put back. The noticeboard kept running the whole time."
     else
-      write_status failed "${TARGET:0:7} from $BRANCH failed to install or build, and putting ${CURRENT:0:7} from $PREVIOUS_BRANCH back failed too. The noticeboard is still running, but might not start after a restart. To recover, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash"
+      write_status failed "$TARGET_NAME failed to install or build, and putting ${CURRENT:0:7} from $PREVIOUS_BRANCH back failed too. The noticeboard is still running, but might not start after a restart. To recover, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash"
       echo "ERROR: couldn't restore ${CURRENT:0:7}'s files. Fix this before the server next restarts." >&2
     fi
     if [ -n "$restore" ]; then
       # The reset still happens: the server applies it at start-up (and so clears the status above)
       restart_server || true
-      write_status failed "Restore Defaults: the settings and content were reset, but reinstalling ${TARGET:0:7} from $BRANCH failed, so ${CURRENT:0:7} was put back. To reinstall, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash"
+      write_status failed "Restore Defaults: the settings and content were reset, but reinstalling $TARGET_NAME failed, so ${CURRENT:0:7} was put back. To reinstall, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash"
     fi
     exit 1
   fi
@@ -324,10 +336,10 @@ main() {
     echo "$TARGET" > "$FAILED_FILE"
     restore_branch_setting
     if install_commit "$PREVIOUS_BRANCH" "$CURRENT" && restart_server; then
-      write_status rolled-back "${TARGET:0:7} from $BRANCH didn't start, so ${CURRENT:0:7} from $PREVIOUS_BRANCH was put back and restarted."
+      write_status rolled-back "$TARGET_NAME didn't start, so ${CURRENT:0:7} from $PREVIOUS_BRANCH was put back and restarted."
       echo "Rolled back to ${CURRENT:0:7}."
     else
-      write_status failed "${TARGET:0:7} from $BRANCH didn't start, and going back to ${CURRENT:0:7} from $PREVIOUS_BRANCH failed too. To recover, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash (server logs: journalctl -u $SERVICE_NAME)"
+      write_status failed "$TARGET_NAME didn't start, and going back to ${CURRENT:0:7} from $PREVIOUS_BRANCH failed too. To recover, run the installer on this Server: curl -fsSL $INSTALLER_URL | sudo bash (server logs: journalctl -u $SERVICE_NAME)"
       echo "ERROR: rollback to ${CURRENT:0:7} failed. Check: journalctl -u $SERVICE_NAME" >&2
     fi
     exit 1
@@ -337,14 +349,14 @@ main() {
   if [ -n "$RETURNED_FROM" ]; then
     returned_to_main
   elif [ -n "$restore" ]; then
-    write_status updated "Restored to defaults: running ${TARGET:0:7} from $BRANCH, as if newly installed."
+    write_status updated "Restored to defaults: running $TARGET_NAME, as if newly installed."
   elif [ -n "$switching" ]; then
     write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH: now running ${TARGET:0:7}. The settings from before the switch are saved in ${backup#"$INSTALL_DIR"/}."
     remember_main
   else
-    write_status updated "Updated to ${TARGET:0:7} from $BRANCH."
+    write_status updated "Updated to $TARGET_NAME."
   fi
-  write_check up-to-date "Up to date: running ${TARGET:0:7} from $BRANCH."
+  write_check up-to-date "$(up_to_date_message)"
   echo "Updated to ${TARGET:0:7}."
 }
 
@@ -378,39 +390,129 @@ restore_branch_setting() {
   fi
 }
 
-# After switching to a branch other than main, remember where main was: a new branch can
-# start out identical to main, so it only counts as merged once main has moved on
+# main: the target is the latest Release (TARGET, RELEASE), its tag fetched on its own (branch_merged
+# may have found it already). None published yet, or GitHub can't be asked: says so and exits,
+# except that Restore Defaults with none published reinstalls what's running.
+fetch_release() {   # fetch_release <switching> <restore>
+  local code=0 reason
+  if [ -z "$RELEASE" ]; then
+    RELEASE=$(latest_release) || code=$?
+  fi
+  if [ "$code" -eq 0 ] && git fetch --quiet --no-tags origin "$(release_tag_ref "$RELEASE")" \
+     && TARGET=$(git rev-parse -q --verify "refs/tags/$RELEASE^{commit}"); then
+    return 0
+  fi
+  RELEASE=""
+  if [ "$code" -eq 3 ] && [ -n "$2" ]; then
+    TARGET=$CURRENT
+    return 0
+  fi
+  if [ "$code" -eq 3 ]; then
+    reason="No Release of Noticeboard has been published on GitHub yet"
+    FETCHED_AT=$(iso_time "$NOW")
+  else
+    reason="Couldn't ask GitHub for main's latest Release (is the Server online?)"
+  fi
+  if [ -n "$1" ]; then
+    restore_branch_setting
+    write_status cancelled "$reason, so the switch to main was cancelled. Nothing was changed: still running $PREVIOUS_BRANCH (${CURRENT:0:7})."
+  elif [ "$code" -eq 3 ]; then
+    write_check up-to-date "$reason. This noticeboard keeps running ${CURRENT:0:7} from main, and installs the first Release once it's published."
+  else
+    write_check offline "Couldn't reach GitHub; trying again at the next check."
+  fi
+  echo "$reason." >&2
+  if [ "$code" -eq 3 ] && [ -z "$1" ]; then exit 0; fi
+  exit 1
+}
+
+# Another branch: the target is its latest commit. It can't be downloaded: says why and exits.
+fetch_branch_tip() {   # fetch_branch_tip <switching>
+  if git fetch --quiet --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"; then
+    TARGET=$(git rev-parse "origin/$BRANCH")
+    return 0
+  fi
+  local code=0 reason
+  git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1 || code=$?
+  if [ "$code" -eq 2 ]; then
+    reason="The branch $BRANCH doesn't exist on GitHub"
+  else
+    reason="Couldn't download $BRANCH from GitHub (is the Server online?)"
+  fi
+  if [ -n "$1" ]; then
+    restore_branch_setting
+    write_status cancelled "$reason, so the switch was cancelled. Nothing was changed: still running $PREVIOUS_BRANCH (${CURRENT:0:7})."
+  elif [ "$code" -eq 2 ]; then
+    write_check error "$reason any more, so no updates can be installed. This noticeboard keeps running ${CURRENT:0:7}; choose another branch in Settings → Software updates."
+  else
+    write_check offline "Couldn't reach GitHub; trying again at the next check."
+  fi
+  echo "$reason." >&2
+  exit 1
+}
+
+# The installer that matches the target: the Release's on main, else the branch's
+installer_url() {
+  echo "https://raw.githubusercontent.com/fructus-sum/noticeboard/${RELEASE:-$BRANCH}/installers/install.sh"
+}
+
+# The check's message when nothing needs installing
+up_to_date_message() {
+  local message="Up to date: running $TARGET_NAME."
+  if [ -n "$INSTALLER_FOR" ]; then
+    message+=" Release $INSTALLER_FOR has $BRANCH's work: this noticeboard goes back to main once the installer has been run (see the notice)."
+  fi
+  echo "$message"
+}
+
+# After switching to a branch other than main, remember the latest Release's commit: a new
+# branch can start out with nothing that isn't in it, so it only counts as in a Release once the
+# latest Release has changed. Nothing is recorded when there's none or GitHub can't be asked.
 remember_main() {
-  local main=""
+  local tag commit=""
   if [ "$BRANCH" = main ] || [ "$(read_branch_setting)" != "$BRANCH" ]; then
     return 0
   fi
-  if git fetch --quiet --no-tags origin "+refs/heads/main:refs/remotes/origin/main" 2>/dev/null; then
-    main=$(git rev-parse origin/main 2>/dev/null) || main=""
+  if tag=$(latest_release) && git fetch --quiet --no-tags origin "$(release_tag_ref "$tag")" 2>/dev/null; then
+    commit=$(git rev-parse -q --verify "refs/tags/$tag^{commit}" 2>/dev/null) || commit=""
   fi
-  write_branch_setting "$BRANCH" "$main"
+  write_branch_setting "$BRANCH" "$commit"
 }
 
-# Is all of the followed branch's work in main now (merged, squashed or rebased in)? For a
-# branch still on GitHub, only once main has moved on since the switch; for one deleted from
-# GitHub, if what's installed is in main (a branch deleted unmerged is left alone). Fails
-# when unsure, e.g. GitHub can't be reached.
+# Is all of the followed branch's work in main's latest Release now (merged, squashed or rebased
+# in)? For a branch still on GitHub, only once the latest Release has changed since the switch;
+# for one deleted from GitHub, if what's installed is in the Release (a branch deleted unmerged is
+# left alone). A Release that needs a newer installer than this Server's last run waits for it
+# (INSTALLER_FOR, the notice). Fails when unsure, e.g. GitHub can't be reached; INSTALLER_FOR is
+# only changed when it could tell. Sets RELEASE when it succeeds.
 branch_merged() {
-  local main tip code=0
-  git fetch --quiet --no-tags origin "+refs/heads/main:refs/remotes/origin/main" 2>/dev/null || return 1
-  main=$(git rev-parse origin/main 2>/dev/null) || return 1
+  local tag release tip code=0
+  tag=$(latest_release) || return 1
+  git fetch --quiet --no-tags origin "$(release_tag_ref "$tag")" 2>/dev/null || return 1
+  release=$(git rev-parse -q --verify "refs/tags/$tag^{commit}" 2>/dev/null) || return 1
   git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1 || code=$?
   if [ "$code" -eq 2 ]; then
     tip=$CURRENT
   elif [ "$code" -eq 0 ] && git fetch --quiet --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" 2>/dev/null; then
     tip=$(git rev-parse "origin/$BRANCH" 2>/dev/null) || return 1
-    if [ "$main" = "${MAIN_AT_SWITCH:-$tip}" ]; then
+    if [ "$release" = "${MAIN_AT_SWITCH:-$tip}" ]; then
+      INSTALLER_FOR=""
       return 1
     fi
   else
     return 1
   fi
-  git merge-base --is-ancestor "$tip" "$main" 2>/dev/null || contained_in "$tip" "$main"
+  if ! git merge-base --is-ancestor "$tip" "$release" 2>/dev/null && ! contained_in "$tip" "$release"; then
+    INSTALLER_FOR=""
+    return 1
+  fi
+  if installer_behind "$release"; then
+    INSTALLER_FOR=$tag
+    echo "Release $tag has $BRANCH's work, but needs the installer run first; staying on $BRANCH."
+    return 1
+  fi
+  INSTALLER_FOR=""
+  RELEASE=$tag
 }
 
 # Would merging <commit> into <main> change nothing, i.e. was it squashed or rebased in?
@@ -420,12 +522,26 @@ contained_in() {   # contained_in <commit> <main>
   [ -n "$merged" ] && [ "$merged" = "$(git rev-parse "$2^{tree}")" ]
 }
 
+# Does <commit> need a newer installer run than this Server's last one? Its
+# system-requirements.json's installer.version against data/installer.json's version. Without a
+# record (not set up by a recent installer), it never waits.
+installer_behind() {   # installer_behind <commit>
+  local have need
+  have=$(sed -n 's/.*"version":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$INSTALLER_RECORD" 2>/dev/null | head -n 1 || true)
+  [ -n "$have" ] || return 1
+  need=$(git show "$1:system-requirements.json" 2>/dev/null | node -e "
+    let s = ''; process.stdin.on('data', (d) => { s += d; }).on('end', () => {
+      try { const v = JSON.parse(s).installer.version; console.log(Number.isInteger(v) ? v : 0); } catch { console.log(0); }
+    });" 2>/dev/null || true)
+  [ "${need:-0}" -gt "$have" ]
+}
+
 # Tell the admin panel: in the Software updates card, and with a notice on the home page
 # that stays until someone closes it
 returned_to_main() {
-  local message="The branch $RETURNED_FROM has been merged into main, so its features are now part of main. This noticeboard has gone back to following main and is running ${TARGET:0:7}. Future updates come from main."
+  local message="The branch $RETURNED_FROM has been merged into main and published in Release $RELEASE, so its features are now part of main. This noticeboard has gone back to following main and is running $TARGET_NAME. Future updates come from main's Releases."
   write_status updated "$message"
-  write_json "$NOTICE_FILE" type branch-merged branch "$RETURNED_FROM" commit "$TARGET" \
+  write_json "$NOTICE_FILE" type branch-merged branch "$RETURNED_FROM" commit "$TARGET" release "$RELEASE" \
     message "$message" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 
@@ -453,18 +569,21 @@ write_status() {   # write_status <state> <message>
 
 # The last check for updates (result: up-to-date, available, waiting, skipped, offline or error),
 # with what the schedule needs next time (installCheckedAt, fetchedAt) and what the admin panel
-# shows: the next automatic install (nextInstall) and a waiting version (available, its subject
-# and date)
+# shows: the next automatic install (nextInstall), a waiting version (available, its subject and
+# date, and on main its Release), and a Release with the followed branch's work that waits for
+# the installer (installerFor, its tag)
 write_check() {   # write_check <result> <message>
-  local next="" subject="" committed=""
+  local next="" subject="" committed="" release=""
   next=$(next_install "$NOW" "$(to_epoch "$INSTALL_CHECKED_AT")")
   if [ -n "$AVAILABLE" ]; then
     subject=$(git log -1 --format=%s "$AVAILABLE" 2>/dev/null || true)
     committed=$(git log -1 --format=%cI "$AVAILABLE" 2>/dev/null || true)
+    release=$RELEASE
   fi
   write_json "$CHECK_FILE" result "$1" branch "$BRANCH" message "$2" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     installCheckedAt "$INSTALL_CHECKED_AT" fetchedAt "$FETCHED_AT" nextInstall "${next:+$(iso_time "$next")}" \
-    available "$AVAILABLE" availableSubject "$subject" availableDate "$committed"
+    available "$AVAILABLE" availableSubject "$subject" availableDate "$committed" availableRelease "$release" \
+    installerFor "$INSTALLER_FOR"
 }
 
 # A value from the last check (update-check.json), or nothing

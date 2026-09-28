@@ -4,7 +4,8 @@
 // Updates can't change what only the installer sets up (kiosk scripts, system services, desktop
 // shortcuts), so when this version needs a newer installer run than the Server had, the Slideshows
 // page says so, with the command to copy. It stays until the installer has been run: there's
-// nothing to close.
+// nothing to close. It also shows while a Release of main with the followed branch's work waits for
+// the installer before the Server returns to main (status.returning, SYSTEM_DESIGN §18.6).
 //
 // Used by: App.vue (every page but the login page)
 // Uses: useApi (GET /settings/updates/installer), installerCommand from @shared
@@ -15,7 +16,8 @@ import { api } from '../../composables/useApi.js';
 const status = ref(null);
 const copied = ref(false);
 
-const command = computed(() => installerCommand(status.value?.branch));
+// On main, the Release running (or waiting for it) has the installer that matches it
+const command = computed(() => installerCommand(status.value?.ref || status.value?.branch));
 
 onMounted(async () => {
   try {
@@ -39,7 +41,13 @@ async function copy() {
 <template>
   <div v-if="status?.needed" class="installer page-warning" role="alert">
     <strong>Run the installer again on the Server</strong>
-    <p>
+    <p v-if="status.returning">
+      The work of <strong>{{ status.returning.branch }}</strong>, the branch this noticeboard follows, is now in
+      Release {{ status.returning.release }} of main. That Release needs something that only the installer sets up,
+      so this noticeboard goes back to main once the installer has been run. When the installer asks which branch
+      to follow, choose main. What it brings:
+    </p>
+    <p v-else>
       This version of the noticeboard needs something that only the installer sets up, and updates can't do that
       by themselves. Until it's run, what's listed here stays as it was:
     </p>

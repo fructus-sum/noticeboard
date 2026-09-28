@@ -18,7 +18,7 @@
 import { ref, computed, watch } from 'vue';
 import { api } from '../../composables/useApi.js';
 import { useFlash } from '../../composables/useFlash.js';
-import { short, when } from '../../composables/useUpdateInfo.js';
+import { short, when, versionName } from '../../composables/useUpdateInfo.js';
 import FlashMessage from '../ui/FlashMessage.vue';
 
 const props = defineProps({ info: { type: Object, required: true } });
@@ -119,6 +119,7 @@ async function updateNow() {
   <div v-if="waiting && !info.busy" class="waiting" :class="{ 'waiting--manual': manual }">
     <strong>Update available</strong>
     <p>
+      <template v-if="waiting.release"><strong>Version {{ versionName(waiting.release) }}</strong> </template>
       <code>{{ short(waiting.commit) }}</code> {{ waiting.subject }}<template v-if="waiting.date"> ({{ when(waiting.date) }})</template>
     </p>
     <p v-if="setAt">It will be installed at <strong>{{ when(setAt) }}</strong>.</p>

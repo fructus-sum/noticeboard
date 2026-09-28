@@ -1,9 +1,11 @@
 // The Software updates card in a real browser: check a branch, both confirmations (wrong
 // password, cancelling at the last moment, Escape), a confirmed switch followed through a
-// server restart to the result. Same throwaway setup as tests/api/branch-switching.js.
+// server restart to the result; main shown and checked as its latest Release (SYSTEM_DESIGN §18.6).
+// Same throwaway setup as tests/api/branch-switching.js, with its GitHub Releases stand-in.
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const { copyChanges } = require('../helpers/app.js');
+const { startFakeGitHub } = require('../helpers/github.js');
 const os = require('os');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
@@ -17,6 +19,8 @@ const BASE = `http://localhost:${PORT}`;
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'nb-branch-ui-'));
 const APP = path.join(T, 'app');
 const SYSTEMD = path.join(T, 'systemd');
+const MOCK = path.join(T, 'mock');   // the Releases stand-ins' files (tests/helpers/github.js, github.sh)
+let github;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ok = true;
 const check = (name, pass, detail = '') => { ok &&= !!pass; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? '  (' + detail + ')' : ''}`); };
@@ -35,6 +39,9 @@ function setup() {
   git(work, 'add', '-A'); git(work, 'commit', '-qm', 'main with branch switching');
   git(work, 'remote', 'set-url', 'origin', path.join(T, 'origin.git'));
   git(work, 'push', '-q', 'origin', 'main');
+  fs.mkdirSync(MOCK, { recursive: true });   // main's first Release
+  git(work, 'tag', 'v0.1.0'); git(work, 'push', '-q', 'origin', 'refs/tags/v0.1.0');
+  fs.writeFileSync(path.join(MOCK, 'release'), 'v0.1.0\n');
   const branch = (name, change) => {
     git(work, 'checkout', '-q', '-b', name, 'main'); change(work); git(work, 'add', '-A', '-f'); git(work, 'commit', '-qm', `Try out ${name}`);
     git(work, 'push', '-q', 'origin', name); git(work, 'checkout', '-q', 'main');
@@ -64,14 +71,16 @@ function setup() {
   const script = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`);
   script('systemctl', 'case "$1" in is-active) echo active ;; show) n=$(cat "$(dirname "$0")/pid" 2>/dev/null || echo 3999000); echo "$n"; echo $((n + 1)) > "$(dirname "$0")/pid" ;; esac');
   script('npm', 'exit 0');
-  script('curl', 'exit 0');
+  script('curl', 'case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac\nexit 0');
   script('sleep', 'exit 0');
   script('flock', 'exit 0');
 }
 function runUpdater() {
   const posix = (p) => p.replace(/^([A-Za-z]):/, (m, d) => `/${d.toLowerCase()}`).replace(/\\/g, '/');
   return new Promise((resolve) => {
-    const child = spawn('bash', ['-c', `PATH="${posix(path.join(T, 'bin'))}:$PATH" bash "${posix(APP)}/installers/update.sh"`]);
+    const child = spawn('bash', ['-c', `PATH="${posix(path.join(T, 'bin'))}:$PATH" bash "${posix(APP)}/installers/update.sh"`], {
+      env: { ...process.env, MOCK: posix(MOCK), GITHUB_STANDIN: posix(path.join(REPO, 'tests/helpers/github.sh')) },
+    });
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
@@ -80,7 +89,7 @@ function runUpdater() {
 }
 let server;
 async function startServer() {
-  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD }, stdio: 'ignore' });
+  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD, NOTICEBOARD_GITHUB_API: github.url }, stdio: 'ignore' });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + '/api/auth/status')).ok) return; } catch { /* not yet */ } await sleep(250); }
   throw new Error('server did not start');
 }
@@ -90,6 +99,7 @@ const requested = () => fs.existsSync(path.join(APP, 'tmp/update-request'));
 
 (async () => {
   setup();
+  github = await startFakeGitHub(MOCK);
   await startServer();
   const c = await connect();
   await c.send('Page.enable');
@@ -111,7 +121,10 @@ const requested = () => fs.existsSync(path.join(APP, 'tmp/update-request'));
   await until(`(${card})?.innerText.includes('Running')`);
   const mainCommit = git(APP, 'rev-parse', 'HEAD').slice(0, 7);
   let text = await cardText();
-  check('card: running branch and version, update schedule, branch form', text.includes(`main ${mainCommit}`) && text.includes('Checked every 15 minutes') && text.includes('Updates come from the main branch'), text.replace(/\n/g, ' | ').slice(0, 200));
+  check("card: running version (main's Release), update schedule, branch form", text.includes(`Version 0.1.0 ${mainCommit}`) && text.includes('Checked every 15 minutes') && text.includes('Updates come from the main branch'), text.replace(/\n/g, ' | ').slice(0, 200));
+  await until(`!!document.querySelector('.nav__updated')`);
+  const nav = await c.evaluate(`document.querySelector('.nav__updated').innerText`);
+  check("the sidebar shows main's Release as the version", /^Version 0\.1\.0\s+Last updated/.test(nav), nav.replace(/\n/g, ' | '));
   await until(`document.querySelectorAll('#update-branches option').length >= 3`);
   check('branch list offered from GitHub', (await c.evaluate(`[...document.querySelectorAll('#update-branches option')].map((o) => o.value).join()`)) === 'main,feature/good,needs-more,no-list,old');
 
@@ -129,7 +142,7 @@ const requested = () => fs.existsSync(path.join(APP, 'tmp/update-request'));
   await until(`(${card}).innerText.includes('can be used')`);
   const goodCommit = git(path.join(T, 'origin.git'), 'rev-parse', 'feature/good').slice(0, 7);
   text = await cardText();
-  check('a good branch: verified, current → proposed shown', text.includes('feature/good exists on GitHub and can be used') && text.includes(`main ${mainCommit} → feature/good ${goodCommit}`) && text.includes('Try out feature/good'), text.split('\n').filter((l) => l.includes('→')).join());
+  check('a good branch: verified, current → proposed shown', text.includes('feature/good exists on GitHub and can be used') && text.includes(`Version 0.1.0 ${mainCommit} → feature/good ${goodCommit}`) && text.includes('Try out feature/good'), text.split('\n').filter((l) => l.includes('→')).join());
   check('checking changed nothing', setting() === null && !requested());
   await c.evaluate(`(${card}).scrollIntoView()`); await c.screenshot(path.join(SHOTS, 'updates-checked.png'));
 
@@ -160,9 +173,9 @@ const requested = () => fs.existsSync(path.join(APP, 'tmp/update-request'));
   await until(`document.querySelector('.dialog h2')?.textContent.includes('Last chance')`);
   text = await dialogText();
   check('final dialog: title, password already checked, last chance, what each button does', text.includes('Last chance to avoid doing something stupid!') && text.includes('Your password checked out') && text.includes('last chance to back out') && text.includes('Cancel leaves everything exactly as it is') && text.includes('Confirm starts the switch straight away'), text.replace(/\n/g, ' ').slice(0, 160));
-  check('Cancel has focus (the safe default)', (await c.evaluate(`document.activeElement?.textContent.trim()`)) === 'Cancel, keep main');
+  check('Cancel has focus (the safe default)', (await c.evaluate(`document.activeElement?.textContent.trim()`)) === 'Cancel, keep Version 0.1.0');
   await c.screenshot(path.join(SHOTS, 'updates-dialog2.png'));
-  await click('Cancel, keep main');
+  await click('Cancel, keep Version 0.1.0');
   await sleep(200);
   check('cancel at the last moment: nothing changed', (await cardText()).includes('Cancelled at the last moment. Nothing was changed.') && setting() === null && !requested());
 
@@ -187,7 +200,7 @@ const requested = () => fs.existsSync(path.join(APP, 'tmp/update-request'));
   await click('Continue');
   await until(`document.querySelector('.dialog h2')?.textContent.includes('Last chance')`);
   check('the final warning repeats what is missing', (await dialogText()).includes("still missing Node.js, Widget"));
-  await click('Cancel, keep main');
+  await click('Cancel, keep Version 0.1.0');
   check('and cancelling there changes nothing', setting() === null && !requested());
   await type('.row input', 'no-list'); await click('Check branch');
   await until(`!!(${card}).querySelector('.software--unknown')`);
@@ -222,8 +235,18 @@ const requested = () => fs.existsSync(path.join(APP, 'tmp/update-request'));
   check('updates now come from feature/good', text.includes('Updates come from the feature/good branch'));
   await c.evaluate(`(${card}).scrollIntoView()`); await c.screenshot(path.join(SHOTS, 'updates-done.png'));
 
+  // From the branch, main's latest Release is older than what runs: the check says so
+  await type('.row input', 'main'); await click('Check branch');
+  await until(`(${card}).innerText.includes('installs its latest Release')`);
+  text = await cardText();
+  check("checking main: its latest Release, and that it's older than what runs", text.includes('main installs its latest Release, Version 0.1.0, and can be used')
+    && text.includes(`feature/good ${goodCommit} → Version 0.1.0 ${mainCommit}`)
+    && text.includes("main's latest Release, Version 0.1.0, is older than what's running.") && text.includes('Switch to main'), text.split('\n').filter((l) => /Release|→/.test(l)).join(' | '));
+  await c.screenshot(path.join(SHOTS, 'updates-older-release.png'));
+
   c.close();
   await stopServer();
+  await github.close();
   fs.rmSync(T, { recursive: true, force: true });
   console.log(ok ? 'ALL PASSED' : 'SOME FAILED');
   process.exit(ok ? 0 : 1);

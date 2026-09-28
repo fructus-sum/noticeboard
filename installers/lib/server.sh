@@ -2,9 +2,9 @@
 # installers/lib/server.sh — setting up a Server (it also shows the slideshow on its own screen)
 #
 # Responsibilities
-#   System packages and Node.js, the install folder (a clone, or the chosen branch fetched and
-#   checked out), dependencies and the build, the first config.json, .env, the branch setting and
-#   update status, the service, the kiosk start-up, the Help shortcut, the update timer and path
+#   System packages and Node.js, the install folder (a clone, or the chosen branch fetched; then
+#   checked out, on main at its latest Release), dependencies and the build, the first
+#   config.json, .env, the branch setting and update status, the service, the kiosk start-up, the Help shortcut, the update timer and path
 #   units, and last the installer record. Then the summary.
 #
 # Provides
@@ -15,12 +15,15 @@
 #   write_installer_record              data/installer.json, written last: a run that stopped
 #                                       part way doesn't count
 #   fetch_branch <owner> <branch>
+#   main_ref <owner>                    main's latest Release fetched (MAIN_REF, MAIN_RELEASE), else
+#                                       main's latest commit
 #
 # Used by
 #   install.sh main()
 #
 # Uses
-#   system.sh, branch.sh, json.sh, kiosk.sh (write_server_kiosk), desktop.sh, ui.sh (banner);
+#   system.sh, branch.sh, json.sh, release.sh (latest_release), kiosk.sh (write_server_kiosk),
+#   desktop.sh, ui.sh (banner);
 #   the configuration in install.sh (INSTALL_DIR, INSTALL_BRANCH, the unit file paths, ...)
 #
 # Change impact
@@ -53,14 +56,14 @@ install_server() {
   echo "  Node.js $(node -v)  npm $(npm -v)"
 
   # ── Clone or update the repo ────────────────────────────────────────────────
+  local owner ref
   if [ -d "$INSTALL_DIR/.git" ]; then
     echo "▸ Updating existing installation ($INSTALL_BRANCH)..."
     lock_install_dir
     # This installs the branch the admin panel asked for, so its pending request is done
     rm -f "$INSTALL_DIR/tmp/update-request"
     # Run git as the folder's owner (git refuses repos owned by someone else), and
-    # force the checkout so npm's edits to package-lock.json can't block the update
-    local owner
+    # force the checkout (below) so npm's edits to package-lock.json can't block the update
     owner=$(stat -c %U "$INSTALL_DIR")
     if ! fetch_branch "$owner" "$INSTALL_BRANCH"; then
       if [ "$INSTALL_BRANCH" = main ]; then
@@ -74,12 +77,18 @@ install_server() {
         exit 1
       fi
     fi
-    runuser -u "$owner" -- git -C "$INSTALL_DIR" checkout --quiet --force -B "$INSTALL_BRANCH" "origin/$INSTALL_BRANCH"
   else
     echo "▸ Cloning repository..."
     git clone "$REPO_URL" "$INSTALL_DIR"
     lock_install_dir
   fi
+  ref="origin/$INSTALL_BRANCH"
+  owner=$(stat -c %U "$INSTALL_DIR")
+  if [ "$INSTALL_BRANCH" = main ]; then
+    main_ref "$owner"
+    ref=$MAIN_REF
+  fi
+  runuser -u "$owner" -- git -C "$INSTALL_DIR" checkout --quiet --force -B "$INSTALL_BRANCH" "$ref"
 
   # ── Install dependencies + build SPAs ───────────────────────────────────────
   echo "▸ Installing Node dependencies..."
@@ -162,6 +171,28 @@ fetch_branch() {   # fetch_branch <owner> <branch>
   runuser -u "$1" -- git -C "$INSTALL_DIR" fetch --quiet --no-tags origin "+refs/heads/$2:refs/remotes/origin/$2"
 }
 
+# What installing main means: its latest published Release (SYSTEM_DESIGN §18.6), fetched as the
+# folder's owner, in MAIN_REF (and its tag in MAIN_RELEASE). Main's latest commit when none is
+# published yet or GitHub can't be asked; update.sh then installs the next Release once there is one.
+MAIN_REF="origin/main"
+MAIN_RELEASE=""
+main_ref() {   # main_ref <owner>
+  local tag code=0
+  MAIN_REF="origin/main"
+  MAIN_RELEASE=""
+  tag=$(latest_release) || code=$?
+  if [ "$code" -eq 0 ] \
+     && runuser -u "$1" -- git -C "$INSTALL_DIR" fetch --quiet --no-tags origin "$(release_tag_ref "$tag")"; then
+    MAIN_REF="refs/tags/$tag"
+    MAIN_RELEASE=$tag
+    echo "  main's latest Release: $tag"
+  elif [ "$code" -eq 3 ]; then
+    echo "  No Release has been published yet, so this installs main's latest commit."
+  else
+    echo "  Couldn't ask GitHub for main's latest Release, so this installs main's latest commit."
+  fi
+}
+
 # Record the branch this installed, for update.sh and the admin panel's Software updates card
 save_branch_setting() {
   # Only when the branch changed: the file also remembers where main was at the switch (update.sh)
@@ -170,10 +201,12 @@ save_branch_setting() {
   if [ "$INSTALL_BRANCH" != "${current:-main}" ]; then
     write_branch_setting "$INSTALL_BRANCH"
   fi
-  local commit
+  local commit installed
   commit=$(git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" rev-parse HEAD)
+  installed="${commit:0:7} from $INSTALL_BRANCH"
+  if [ "$INSTALL_BRANCH" = main ] && [ -n "$MAIN_RELEASE" ]; then installed="Release $MAIN_RELEASE (${commit:0:7})"; fi
   write_json "$INSTALL_DIR/data/update-status.json" state updated branch "$INSTALL_BRANCH" commit "$commit" \
-    message "Installed ${commit:0:7} from $INSTALL_BRANCH with the installer." time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    message "Installed $installed with the installer." time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 
 write_service() {
@@ -258,5 +291,5 @@ summary_server() {
   echo ""
   echo "  Service logs : sudo journalctl -u noticeboard -f"
   echo "  Auto-update  : every 15 minutes (logs: journalctl -u noticeboard-update)"
-  echo "  Branch       : $INSTALL_BRANCH (change it in the admin panel: Settings → Software updates)"
+  echo "  Branch       : $INSTALL_BRANCH${MAIN_RELEASE:+, Release $MAIN_RELEASE} (change it in the admin panel: Settings → Software updates)"
 }

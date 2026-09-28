@@ -6,7 +6,8 @@
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T=$(mktemp -d); BIN="$T/bin"; export MOCK="$T/mock"; mkdir -p "$BIN" "$MOCK"
-export MOCK_INSTALL="$T/install"; I="$MOCK_INSTALL"
+export MOCK_INSTALL="$T/install" GITHUB_STANDIN="$REPO/tests/helpers/github.sh"; I="$MOCK_INSTALL"
+source "$GITHUB_STANDIN"   # main follows Releases: main-1 is published as one
 
 cat > "$BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
@@ -28,6 +29,7 @@ exit 0
 EOF
 cat > "$BIN/curl" <<'EOF'
 #!/usr/bin/env bash
+case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac
 [ -f "$MOCK_INSTALL/START_FAILS" ] && exit 7    # the checked-out version never answers
 exit 0
 EOF
@@ -42,7 +44,7 @@ git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 W="$T/work"; cd "$W" && git checkout -q -b main
 g() { git -c commit.gpgsign=false -c user.name=t -c user.email=t@t "$@"; }
 mkdir -p installers && cp -r "$REPO/installers/update.sh" "$REPO/installers/lib" installers/ && printf 'data/\ntmp/\n' > .gitignore
-echo main-1 > VERSION && git add -A && g commit -qm main-1 && git push -q origin main
+echo main-1 > VERSION && git add -A && g commit -qm main-1 && git push -q origin main && publish_release v1
 branch() {   # branch <name> <setup command>: a branch off main with one commit
   git checkout -q -b "$1" main && eval "$2" && git add -A && g commit -qm "$1" && git push -q origin "$1" && git checkout -q main
 }

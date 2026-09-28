@@ -46,7 +46,7 @@ INSTALLER_VERSION=4
 # A Server follows main unless another branch was chosen in the admin panel (choose_branch)
 INSTALL_BRANCH=main
 # The installer's parts, from the same commit as this script (see load_modules)
-INSTALLER_MODULES=(ui branch json system sudo server display kiosk desktop firewall)   # installers/lib/<name>.sh
+INSTALLER_MODULES=(ui branch json release system sudo server display kiosk desktop firewall)   # installers/lib/<name>.sh
 KIOSK_TEMPLATES=(server display)                                                        # installers/kiosk/<name>.sh
 
 # Everything runs from main(), called on the last line, so a half-downloaded
@@ -80,8 +80,8 @@ main() {
   fi
   if [ "$MODE" = server ]; then
     choose_branch
-    use_branch_installer "$@"
   fi
+  use_branch_installer "$@"
   if [ "$MODE" = display ]; then
     ask_server_url
   fi
@@ -122,8 +122,8 @@ use_latest_installer() {
   run_installer_from main "$@" || echo "${INSTALLER_PROBLEM^}; carrying on with this one."
 }
 
-# Download <branch>'s latest installer and run it instead of this one. Only returns if it
-# can't, with the reason in INSTALLER_PROBLEM.
+# Download <branch>'s latest installer (or a Release's, given its tag) and run it instead of this
+# one. Only returns if it can't, with the reason in INSTALLER_PROBLEM.
 INSTALLER_PROBLEM=""
 run_installer_from() {   # run_installer_from <branch> <arguments...>
   local branch=$1 sha file
@@ -148,7 +148,9 @@ run_installer_from() {   # run_installer_from <branch> <arguments...>
     INSTALLER_PROBLEM="it's too old"
     return 1
   fi
-  if [ "$branch" = main ]; then
+  if [ "$branch" = "${NOTICEBOARD_INSTALLER_RELEASE:-}" ]; then
+    echo "Running the installer of Release $branch (${sha:0:7})..."
+  elif [ "$branch" = main ]; then
     echo "Running the latest installer (${sha:0:7})..."
   else
     echo "Running the latest installer from $branch (${sha:0:7})..."
@@ -157,17 +159,34 @@ run_installer_from() {   # run_installer_from <branch> <arguments...>
   exec bash "$file" "$@"
 }
 
-# The installer came from the branch this Server followed. If the answer to the branch question
-# was another branch, hand over to that branch's installer, with the answers so far.
+# The installer came from the branch this Server followed (a Client's: main's). Once the questions
+# are answered, hand over with the answers so far to the installer of what will be installed: the
+# chosen branch's, or on main the latest Release's (lib/release.sh; main's own when none is
+# published or GitHub can't be asked). A Release's installer doesn't hand over again
+# (NOTICEBOARD_INSTALLER_RELEASE).
 use_branch_installer() {
-  local from=${NOTICEBOARD_INSTALLER_BRANCH:-}
-  if [ -z "$from" ] || [ "$from" = "$INSTALL_BRANCH" ] || [ "${NOTICEBOARD_INSTALLER_SHA:-}" = local ]; then
+  local from=${NOTICEBOARD_INSTALLER_BRANCH:-} ref=$INSTALL_BRANCH tag
+  if [ -z "$from" ] || [ "${NOTICEBOARD_INSTALLER_SHA:-}" = local ]; then
+    return 0
+  fi
+  if [ "$INSTALL_BRANCH" = main ]; then
+    if [ -n "${NOTICEBOARD_INSTALLER_RELEASE:-}" ]; then
+      return 0
+    fi
+    if tag=$(latest_release); then
+      ref=$tag
+    fi
+  fi
+  if [ "$from" = "$ref" ]; then
     return 0
   fi
   export NOTICEBOARD_MODE="$MODE" NOTICEBOARD_INSTALL_BRANCH="$INSTALL_BRANCH"
-  run_installer_from "$INSTALL_BRANCH" "$@" \
-    || echo "The installer from $INSTALL_BRANCH can't be used ($INSTALLER_PROBLEM), so this one carries on."
-  unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH
+  if [ "$ref" != "$INSTALL_BRANCH" ]; then
+    export NOTICEBOARD_INSTALLER_RELEASE="$ref"
+  fi
+  run_installer_from "$ref" "$@" \
+    || echo "The installer from $ref can't be used ($INSTALLER_PROBLEM), so this one carries on."
+  unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH NOTICEBOARD_INSTALLER_RELEASE
 }
 
 # The branch this Server follows (Settings → Software updates), or main

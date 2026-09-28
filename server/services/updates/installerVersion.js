@@ -15,8 +15,13 @@
 //                                 for a version whose system-requirements.json is <list>; changes
 //                                 are only the versions this Server missed; displays: Clients
 //                                 need it too
-//   status()                    → Promise<installerNeeds for the running version + { branch }>
-//                                 (the branch the installer command should come from)
+//   status()                    → Promise<installerNeeds + { branch, ref, returning }>: for the
+//                                 running version, with ref the Release's tag on main (else main,
+//                                 or the followed branch) for the installer command; or, while a
+//                                 Release with the followed branch's work waits for the installer
+//                                 before update.sh returns to main, that Release's needs, with
+//                                 ref and returning.release its tag and returning.branch the branch
+//                                 (SYSTEM_DESIGN §18.6)
 //
 // Used by
 //   services/updates/index.js (the branch check, the home page status), services/displaySettings.js
@@ -24,11 +29,15 @@
 //   server/test/installer.test.js
 //
 // Uses
-//   utils/configIO, utils/pathHelpers, services/updates/updateFiles (the branch)
+//   utils/configIO, utils/pathHelpers, services/updates/updateFiles (the branch, the last check),
+//   ./releases (releaseAt), ./git, ./branchName
 const fs = require('fs/promises');
 const { readJsonFile } = require('../../utils/configIO');
 const { installerRecordPath, serverKioskPath, requirementsPath } = require('../../utils/pathHelpers');
-const { readBranchSetting } = require('./updateFiles');
+const { readBranchSetting, readCheck } = require('./updateFiles');
+const { releaseAt } = require('./releases');
+const { git } = require('./git');
+const { validBranchName } = require('./branchName');
 
 async function installedVersion() {
   const record = readJsonFile(installerRecordPath());
@@ -53,8 +62,19 @@ function installerNeeds(list, installed) {
 }
 
 async function status() {
-  const [installed, branch] = await Promise.all([installedVersion(), readBranchSetting()]);
-  return { ...installerNeeds(readJsonFile(requirementsPath()), installed), branch };
+  const [installed, branch, lastCheck] = await Promise.all([installedVersion(), readBranchSetting(), readCheck()]);
+  // A Release with the followed branch's work that waits for the installer before update.sh
+  // returns to main (update-check.json's installerFor, SYSTEM_DESIGN §18.6)
+  const waiting = branch !== 'main' && validBranchName(lastCheck?.installerFor) ? lastCheck.installerFor : null;
+  if (waiting) {
+    const text = await git(['show', `refs/tags/${waiting}:system-requirements.json`]).catch(() => null);
+    let list = null;
+    try { list = JSON.parse(text); } catch { /* unreadable: nothing to say about it */ }
+    const needs = installerNeeds(list, installed);
+    if (needs.needed) return { ...needs, branch, ref: waiting, returning: { release: waiting, branch } };
+  }
+  const ref = branch === 'main' ? (await releaseAt()) || 'main' : branch;
+  return { ...installerNeeds(readJsonFile(requirementsPath()), installed), branch, ref, returning: null };
 }
 
 module.exports = { installedVersion, installerNeeds, status };

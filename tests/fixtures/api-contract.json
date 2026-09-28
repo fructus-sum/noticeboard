@@ -347,6 +347,7 @@
       "instant": "boolean",
       "lastCheck": "null",
       "pending": "boolean",
+      "release": "null",
       "schedule": {
         "at": "null",
         "day": "number",
@@ -354,6 +355,7 @@
         "time": "string"
       },
       "status": "null",
+      "version": "null",
       "waiting": "null"
     }
   },
@@ -375,7 +377,9 @@
       "displays": "boolean",
       "installed": "null",
       "needed": "boolean",
-      "required": "number"
+      "ref": "string",
+      "required": "number",
+      "returning": "null"
     }
   },
   "updates: version": {
@@ -388,7 +392,8 @@
         "branch": "string",
         "commit": "string",
         "date": "string",
-        "installedAt": "null"
+        "installedAt": "null",
+        "version": "null"
       }
     }
   },

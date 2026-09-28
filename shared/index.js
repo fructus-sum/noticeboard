@@ -21,7 +21,8 @@
 //   audioUrl(folder, file)      the URL of an audio show's track; the server's pathHelpers.audioUrl
 //                               makes the same (server/test/foundations.test.js)
 //   PROJECT_URL                 the project on GitHub
-//   installerCommand(branch)    the one-line command that runs <branch>'s installer on a Pi
+//   installerCommand(ref)       the one-line command that runs the installer of <ref> (a branch, or
+//                               a Release's tag: SYSTEM_DESIGN §18.6) on a Pi
 //   mediaUrl(folder, file)      the URL of a slide's file (or its thumbnail); the server's
 //                               pathHelpers.mediaUrl makes the same (server/test/foundations.test.js)
 //   mediaDisplayName(item)      what the admin panel calls a slide (and later an audio track): its
@@ -53,9 +54,10 @@ export const isColour = (value) => typeof value === 'string' && COLOUR.test(valu
 // The project on GitHub (the installers use the same repository)
 export const PROJECT_URL = 'https://github.com/fructus-sum/noticeboard';
 
-// The command that runs <branch>'s installer on a Pi (in a terminal on it, or over SSH)
-export function installerCommand(branch = 'main') {
-  return `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/${branch}/installers/install.sh | sudo bash`;
+// The command that runs the installer of <ref> (a branch, or a Release's tag) on a Pi (in a
+// terminal on it, or over SSH)
+export function installerCommand(ref = 'main') {
+  return `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/${ref}/installers/install.sh | sudo bash`;
 }
 
 // An audio show's track as the server serves it

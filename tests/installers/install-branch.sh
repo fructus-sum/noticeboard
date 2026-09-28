@@ -4,7 +4,8 @@
 # to main when the branch is gone. Real git against a local origin; system commands are stand-ins.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO/tests/helpers/installer.sh"
-T=$(mktemp -d); export T
+T=$(mktemp -d); export T MOCK="$T/mock"; mkdir -p "$MOCK"
+source "$REPO/tests/helpers/github.sh"   # the Releases API: none published until the last scenarios
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
 bad() { fail=$((fail+1)); echo "FAIL  $1"; }
@@ -15,7 +16,7 @@ stubs() {
   chown()     { :; }
   flock()     { :; }
   hostname()  { echo "192.168.1.50"; }
-  curl()      { :; }
+  curl()      { case "$*" in */releases/latest*) fake_latest_release "$@"; return $? ;; esac; }
   runuser()   { shift 3; "$@"; }
   node()      { case "$*" in *process.version*) printf 24 ;; *) : ;; esac; }
   has_tty()   { return 0; }
@@ -81,5 +82,25 @@ scenario gone deleted-branch "" ""
 scenario invalid 'bad name!' ""
 [ $RC = 0 ] && [ "$ON" = main ] && grep -q "isn't valid" "$T/invalid.out" && ok "an invalid setting installs main" || { bad "invalid"; tail -8 "$T/invalid.out"; }
 [ "$(cat "$T/opt/data/config.json")" = '{"x":1}' ] && ok "data/config.json untouched" || bad "data changed"
+
+grep -q "No Release has been published yet, so this installs main's latest commit" "$T/plain.out" \
+  && ok "no Release published yet: main's latest commit, and says so" || bad "no release note"
+
+# main's latest Release is an older commit than main's latest
+( cd "$T/work" && git checkout -q main && publish_release v0.1.0 && echo main-2 > VERSION && git add -A \
+  && git -c user.name=t -c user.email=t@t commit -qm main-2 && git push -q origin main ) 2>/dev/null
+scenario release "" ""
+STATUS_MSG=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).message)" "$T/opt/data/update-status.json" 2>/dev/null)
+[ $RC = 0 ] && [ "$ON" = main ] && [ "$VER" = main ] && grep -q "main's latest Release: v0.1.0" "$T/release.out" \
+  && [[ "$STATUS_MSG" == "Installed Release v0.1.0 ("* ]] && grep -q "Branch       : main, Release v0.1.0" "$T/release.out" \
+  && ok "main: installs its latest Release, not main's newer commit, and says which" || { bad "release"; tail -8 "$T/release.out"; echo "$STATUS_MSG"; }
+scenario back-release feature/good "" "2"
+[ $RC = 0 ] && [ "$ON" = main ] && [ "$VER" = main ] && [ "$SETTING" = main ] \
+  && ok "going back to main from a branch: the Release too" || { bad "back-release"; tail -8 "$T/back-release.out"; }
+touch "$MOCK/github-down"
+scenario api-down "" ""
+[ $RC = 0 ] && [ "$ON" = main ] && [ "$VER" = main-2 ] && grep -q "Couldn't ask GitHub for main's latest Release" "$T/api-down.out" \
+  && ok "the Releases API unreachable: main's latest commit, and says so" || { bad "api-down"; tail -8 "$T/api-down.out"; }
+rm -f "$MOCK/github-down"
 
 rm -rf "$T"; echo "passed=$pass failed=$fail"; [ $fail -eq 0 ]

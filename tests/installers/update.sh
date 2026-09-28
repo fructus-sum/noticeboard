@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
 # Exercise installers/update.sh against a throwaway git origin, with systemctl, npm,
-# curl and sleep replaced by stand-ins. A background `sleep` plays the server process.
+# curl and sleep replaced by stand-ins (GitHub's Releases API too: tests/helpers/github.sh). A
+# background `sleep` plays the server process. Each commit to main is published as a Release.
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T=$(mktemp -d); BIN="$T/bin"; export MOCK="$T/mock"; mkdir -p "$BIN" "$MOCK"
-export MOCK_INSTALL="$T/install"
+export MOCK_INSTALL="$T/install" GITHUB_STANDIN="$REPO/tests/helpers/github.sh"
+source "$GITHUB_STANDIN"
 
 cat > "$BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
@@ -26,6 +28,7 @@ exit 0
 EOF
 cat > "$BIN/curl" <<'EOF'
 #!/usr/bin/env bash
+case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac
 [ -f "$MOCK_INSTALL/START_FAILS" ] && exit 7    # the checked-out version never answers
 exit 0
 EOF
@@ -38,7 +41,7 @@ git init -q --bare -b main "$T/origin.git"
 git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 cd "$T/work" && git checkout -q -b main
 mkdir -p installers && cp -r "$REPO/installers/update.sh" "$REPO/installers/lib" installers/
-commit() { git -c commit.gpgsign=false commit -qm "$1" && git push -q origin main; }
+commit() { git -c commit.gpgsign=false commit -qm "$1" && git push -q origin main && publish_release "r-$1"; }
 echo v1 > VERSION && git add -A && commit v1
 git clone -q "$T/origin.git" "$T/install"
 /usr/bin/sleep 1000 >/dev/null 2>&1 & echo $! > "$MOCK/pid"

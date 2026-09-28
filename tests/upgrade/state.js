@@ -5,8 +5,9 @@
 //   node state.js compare  <before.json> <after.json>              exit 1 and list the differences
 //
 // A snapshot holds what an update must not change: every file in data/ (except the updater's own
-// status files), the media, the API's view of the slideshows and settings, the playlist a
-// display receives, that the admin's existing login still works, and the kiosk-exit answer.
+// status files and branch setting, and the settings backups a branch switch makes), the media,
+// the API's view of the slideshows and settings, the playlist a display receives, that the
+// admin's existing login still works, and the kiosk-exit answer.
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -98,8 +99,9 @@ async function snapshot() {
   await waitQuiet(cookie);
   const data = filesUnder(path.join(dir, 'data'));
   for (const k of Object.keys(data)) {
-    // The updater's own records, and the Server's own copy of its config (config.last-good.json, 0.6.9)
-    if (/^update-.*\.json$|^installer\.json$|^backups\/|^config\.last-good\.json$/.test(k)) delete data[k];
+    // The updater's own records and branch setting (the rehearsal goes back by a switch), and the
+    // Server's own copy of its config (config.last-good.json, 0.6.9)
+    if (/^update-.*\.json$|^update-branch\.env$|^installer\.json$|^backups\/|^config\.last-good\.json$/.test(k)) delete data[k];
   }
   const slideshows = (await api('GET', '/api/slideshows', null, cookie)).json;
   const slides = {};

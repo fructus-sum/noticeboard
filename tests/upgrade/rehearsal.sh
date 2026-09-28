@@ -9,8 +9,11 @@
 #   2. The BASELINE's update.sh installs the code under test (the working tree): real git, real
 #      npm run build, real restart and health check. Then data, API, playlist, login and kiosk
 #      answer must be exactly as before.
-#   3. The NEW update.sh (now on disk) installs a following commit.
-#   4. Going back: the baseline is installed again, and everything is still as before.
+#   3. The NEW update.sh (now on disk) installs a following commit, published as main's latest
+#      Release (main follows Releases, SYSTEM_DESIGN §18.6; GitHub's API is stood in by
+#      tests/helpers/github.sh).
+#   4. Going back: the baseline is installed again (by a switch to a branch holding it: main never
+#      goes back by itself), its update.sh takes over, and everything is still as before.
 # npm install/prune are skipped (node_modules is linked from this repository, and must not be
 # changed); FFMPEG_PATH/FFPROBE_PATH are passed on to the server when set.
 set -uo pipefail
@@ -27,7 +30,15 @@ bad() { fail=$((fail+1)); echo "FAIL  $1"; [ -n "${2:-}" ] && sed 's/^/        /
 
 # ── Stand-ins: systemd reports the supervised server; npm only builds ──
 REAL_NPM=$(command -v npm)
-export REAL_NPM
+REAL_CURL=$(command -v curl)
+export REAL_NPM REAL_CURL GITHUB_STANDIN="$REPO/tests/helpers/github.sh"
+source "$GITHUB_STANDIN"
+# curl: GitHub's Releases API from the stand-in; everything else (the health check) is real
+cat > "$BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac
+exec "$REAL_CURL" "$@"
+EOF
 cat > "$BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
@@ -144,14 +155,23 @@ fi
 git -C "$T/cand" -c user.name=t -c user.email=t@t commit -qm "a later commit" --allow-empty
 NEXT=$(git -C "$T/cand" rev-parse HEAD)
 git -C "$T/cand" push -q -f "$T/origin.git" HEAD:refs/heads/main
-if update "$NEXT" "2. new updater → next commit"; then
+( cd "$T/cand" && git remote set-url origin "$T/origin.git" && publish_release v99.0.0 )
+if update "$NEXT" "2. new updater → next commit (main's latest Release)"; then
   same_as_before "2. after the next update"
 fi
 
-# ── 3. Going back to the baseline ──
-git -C "$REPO" push -q -f "$T/origin.git" "$BASELINE:refs/heads/main"
+# ── 3. Going back to the baseline: a switch to a branch holding it ──
+git -C "$REPO" push -q -f "$T/origin.git" "$BASELINE:refs/heads/baseline"
+echo "NOTICEBOARD_BRANCH=baseline" > "$PI/data/update-branch.env"
+echo switch > "$PI/tmp/update-request"
 if update "$BASELINE_SHA" "3. back to the baseline"; then
   same_as_before "3. after going back"
+  out=$(bash "$PI/installers/update.sh" 2>&1); rc=$?
+  if [ "$rc" -eq 0 ] && grep -q "Up to date" <<<"$out" && [ "$(git -C "$PI" rev-parse HEAD)" = "$BASELINE_SHA" ]; then
+    ok "3. the baseline's own update.sh takes over again"
+  else
+    bad "3. the baseline's update.sh after going back (exit $rc)" "$out"
+  fi
 fi
 
 echo "passed=$pass failed=$fail"; [ "$fail" -eq 0 ]

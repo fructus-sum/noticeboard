@@ -2,8 +2,8 @@
 // client/admin/src/components/NavBar.vue — the sidebar
 //
 // The logo and title, the pages, Help (the user guide at /admin/help), the project on GitHub, the
-// version with when this noticeboard installed it ("Last updated"), and Log out. Collapsible to
-// icons, each named in its tooltip.
+// version (on main, the Release's: "Version 0.8.0") with when this noticeboard installed it ("Last
+// updated"), and Log out. Collapsible to icons, each named in its tooltip.
 //
 // Used by: App.vue
 // Uses: useApi (GET /settings/version, POST /auth/logout), useBranding, useNav, NavIcon,
@@ -26,8 +26,13 @@ const { collapsed, toggle } = useNav();
 const version = ref(null);
 const dateTime = (iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const lastUpdated = computed(() => version.value && dateTime(version.value.installedAt || version.value.date));
-const versionTitle = computed(() => version.value
-  && `Version ${version.value.commit.slice(0, 7)}${version.value.branch ? ` from ${version.value.branch}` : ''}, made ${dateTime(version.value.date)}. Opens the project on GitHub.`);
+// On main, the Release's version (SYSTEM_DESIGN §18.6) with its commit; else the commit
+const versionTitle = computed(() => {
+  const v = version.value;
+  if (!v) return '';
+  const commit = v.commit.slice(0, 7);
+  return `Version ${v.version ? `${v.version} (${commit})` : commit}${v.branch ? ` from ${v.branch}` : ''}, made ${dateTime(v.date)}. Opens the project on GitHub.`;
+});
 
 onMounted(async () => {
   refreshLogo();
@@ -91,10 +96,10 @@ async function logout() {
       rel="noopener"
       class="nav__updated"
       :title="collapsed ? `Last updated ${lastUpdated}. ${versionTitle}` : versionTitle"
-      :aria-label="`Last updated ${lastUpdated}`"
+      :aria-label="`${version.version ? `Version ${version.version}. ` : ''}Last updated ${lastUpdated}`"
     >
       <NavIcon v-if="collapsed" name="updated" />
-      <template v-else>Last updated<br><span>{{ lastUpdated }}</span></template>
+      <template v-else><template v-if="version.version">Version {{ version.version }}<br></template>Last updated<br><span>{{ lastUpdated }}</span></template>
     </a>
     <button class="nav__logout" title="Log out" aria-label="Log out" @click="logout">
       <NavIcon name="logout" /><span class="nav__label">Log out</span>
