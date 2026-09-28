@@ -2,6 +2,7 @@
 // and what they carry (the playlist's slides, the display settings). Recorded in
 // tests/fixtures/socket-events.json from the code before the playlist and the socket had their
 // own modules; the sequence must stay exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
+// When a step differs, the server's log is printed, to show what sent the extra or missing events.
 const fs = require('fs');
 const path = require('path');
 const { MODULES, makeApp, server, check, done, sleep } = require('../helpers/app.js');
@@ -85,9 +86,19 @@ function summary(name, payload) {
     for (const [name, events] of Object.entries(steps)) console.log(`      ${name}: ${events.join(' | ') || '(nothing)'}`);
   } else {
     const want = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
+    let differs = false;
     for (const name of Object.keys(want)) {
-      check(`${name}: the same events`, JSON.stringify(want[name]) === JSON.stringify(steps[name]),
+      const same = JSON.stringify(want[name]) === JSON.stringify(steps[name]);
+      differs ||= !same;
+      check(`${name}: the same events`, same,
         `was ${want[name].join(' | ') || '(nothing)'}; now ${(steps[name] || []).join(' | ') || '(nothing)'}`);
+    }
+    // What the server did, to find out why (e.g. a playlist sent twice on connect, SYSTEM_DESIGN §17)
+    if (differs) {
+      const log = path.join(env.APP, 'logs', 'app.log');
+      const lines = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : [];
+      console.log('      the server\'s log up to the first steps:');
+      for (const line of lines.slice(0, 40)) console.log(`        ${line.slice(0, 220)}`);
     }
   }
   done(env);
