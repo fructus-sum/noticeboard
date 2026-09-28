@@ -61,6 +61,8 @@ test('socket event names in the shared contract are the ones open screens use', 
     DISPLAY_BUILD: 'display:build',
     DISPLAY_SETTINGS: 'display:settings',
     AUDIO_UPDATE: 'audio:update',   // added for background audio (§18.3); older screens ignore it
+    TIME_PING: 'time:ping',         // added for screens in step (§18.8): a screen asks the time
+    TIME_PONG: 'time:pong',         //   … and the Server answers with its own
   });
 });
 

@@ -1,13 +1,18 @@
 // client/display/src/composables/useSocket.js — the viewer's live connection to the server
 //
 // Provides
-//   useSocket() → { playlist, connected, received, settings, audio }
+//   useSocket() → { playlist, connected, received, settings, audio, serverNow }
 //   Sends display:ready on every connect; takes playlist:update, display:settings, audio:update
-//   (the background audio: { shows, slideshows, event }, SYSTEM_DESIGN §18.3) and display:build. Reconnects by itself after any outage (every 2–10 s, never giving up), and
+//   (the background audio: { shows, slideshows, event }, SYSTEM_DESIGN §18.3) and display:build.
+//   Measures this screen's clock against the Server's (time:ping / time:pong, serverClock.js): a
+//   burst of exchanges on every connect, then one every 5 minutes; serverNow() is the Server's time
+//   as this screen can best tell it (SYSTEM_DESIGN §18.8). ?debugClockOffset=<ms> shifts this
+//   screen's own clock, for tests that check screens with wrong clocks still line up. Reconnects by itself after any outage (every 2–10 s, never giving up), and
 //   reloads onto a new build when display:build changes (once the server answers).
 //
 // Used by: App.vue
-// Uses: socket.io-client, SOCKET_EVENTS and DEFAULT_BACKGROUND from @shared, recovery.js (reloadSoon)
+// Uses: socket.io-client, SOCKET_EVENTS and DEFAULT_BACKGROUND from @shared, recovery.js (reloadSoon),
+//   serverClock.js
 //
 // Change impact
 //   The event names and payloads are a contract with the server (SYSTEM_DESIGN §3.4, §15).
@@ -15,6 +20,7 @@ import { ref, onUnmounted } from 'vue';
 import { io } from 'socket.io-client';
 import { SOCKET_EVENTS, DEFAULT_BACKGROUND } from '@shared/index.js';
 import { reloadSoon } from '../recovery.js';
+import { createServerClock, BURST, BURST_GAP_MS, REFRESH_MS } from '../serverClock.js';
 
 export function useSocket() {
   const playlist = ref({ slides: [] });
@@ -25,16 +31,28 @@ export function useSocket() {
   // The background audio: none until the server says (an older server never does)
   const audio = ref({ shows: {}, slideshows: {}, event: null });
 
+  // The Server's time, as this screen can best tell it
+  const skew = Number(new URLSearchParams(window.location.search).get('debugClockOffset')) || 0;
+  const clock = createServerClock({ now: () => Date.now() + skew });
+  let burstTimers = [];
+  let refreshTimer = null;
+
   // Reconnects on its own after any outage, retrying every 2–10 s for as long as it takes
   const socket = io({
     reconnectionDelay: 2000,
     reconnectionDelayMax: 10000,
   });
 
+  const askTime = () => socket.emit(SOCKET_EVENTS.TIME_PING, clock.ping());
   socket.on('connect', () => {
     connected.value = true;
     socket.emit(SOCKET_EVENTS.DISPLAY_READY);
+    burstTimers.forEach(clearTimeout);
+    burstTimers = Array.from({ length: BURST }, (_, i) => setTimeout(askTime, i * BURST_GAP_MS));
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(askTime, REFRESH_MS);
   });
+  socket.on(SOCKET_EVENTS.TIME_PONG, (answer) => clock.pong(answer));
 
   socket.on('disconnect', (reason) => {
     connected.value = false;
@@ -72,7 +90,13 @@ export function useSocket() {
     else if (id && id !== buildId) reloadSoon();
   });
 
-  onUnmounted(() => socket.disconnect());
+  onUnmounted(() => {
+    burstTimers.forEach(clearTimeout);
+    clearInterval(refreshTimer);
+    socket.disconnect();
+  });
+  // Read-only diagnostic: window.noticeboardClock()
+  window.noticeboardClock = () => ({ ...clock.state(), serverNow: clock.serverNow() });
 
-  return { playlist, connected, received, settings, audio };
+  return { playlist, connected, received, settings, audio, serverNow: clock.serverNow };
 }

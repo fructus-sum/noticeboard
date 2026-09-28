@@ -5,7 +5,9 @@
     "PLAYLIST_UPDATE": "playlist:update",
     "DISPLAY_BUILD": "display:build",
     "DISPLAY_SETTINGS": "display:settings",
-    "AUDIO_UPDATE": "audio:update"
+    "AUDIO_UPDATE": "audio:update",
+    "TIME_PING": "time:ping",
+    "TIME_PONG": "time:pong"
   },
   "limits": {
     "passwordMinLength": 8,

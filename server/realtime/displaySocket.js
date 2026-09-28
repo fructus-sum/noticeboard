@@ -17,6 +17,8 @@
 //                                and when the installer state changes (checked when a display
 //                                connects and every 5 minutes), only when the settings differ
 //                                from the last ones sent
+//     time:ping → time:pong { sent, server }: the Server's clock, which every screen keeps its
+//       slides and music to (SYSTEM_DESIGN §18.8)
 //       audio:update to all      on a config 'change', on displayEvents.audioChanged and on the
 //                                event clock's 'update', only when it differs from the last one
 //                                sent (SYSTEM_DESIGN §18.3)
@@ -132,6 +134,11 @@ function initDisplaySocket(httpServer) {
       socket.emit(EVENTS.PLAYLIST_UPDATE, playlist);
       logger.info('Socket: playlist sent to display', { id: socket.id, slideCount: playlist.slides.length });
       socket.emit(EVENTS.AUDIO_UPDATE, currentAudio());
+    });
+
+    // A screen measuring its clock against the Server's
+    socket.on(EVENTS.TIME_PING, (ask) => {
+      socket.emit(EVENTS.TIME_PONG, { sent: ask?.sent ?? null, server: Date.now() });
     });
 
     socket.on('disconnect', () => {
