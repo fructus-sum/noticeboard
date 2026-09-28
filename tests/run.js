@@ -15,7 +15,11 @@
 // ran, so a test that stops without printing a failure still says why. A file whose Node.js process
 // crashed (killed by a signal, or a Windows crash code such as 0xC0000409, seen now and then on
 // Windows within a second of starting, before any check) is run once more, and the summary says
-// so; a test that fails a check (exit code 1) is never run again.
+// so; a test that fails a check (exit code 1) is never run again. The summary gives every file's
+// time and each group's, to show where a run's time goes.
+// Only one run at a time may use the api, browser or upgrade groups (fixed ports, one Chrome): a
+// run holds a lock (in the temporary folder, shared with tests/snapshot.js's runs) only while it's
+// in one of those groups, so unit and installer tests can run beside a background full run.
 //
 // Needs: `npm run build` first (api, browser, upgrade copy the built apps); FFMPEG_PATH and
 // FFPROBE_PATH, or ffmpeg on the PATH, for the video tests; bash (on Windows: Git Bash, or BASH).
@@ -95,10 +99,14 @@ function run(cmd, args) {
       code: code ?? 1,
       how: signal ? `killed by ${signal}, ${took()}` : `exit code ${code} (0x${(code >>> 0).toString(16)}), ${took()}`,
       crashed: !!signal || (code >>> 0) >= 0xC0000000,
+      ms: Date.now() - started,
     }));
-    child.on('error', (e) => resolve({ code: 1, how: `could not start: ${e.message}` }));
+    child.on('error', (e) => resolve({ code: 1, how: `could not start: ${e.message}`, ms: Date.now() - started }));
   });
 }
+
+const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
+const minutes = (ms) => (ms < 60000 ? seconds(ms) : `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`);
 
 async function runGroup(group, filter) {
   const results = [];
@@ -107,8 +115,9 @@ async function runGroup(group, filter) {
       ...filesIn('server/test', /\.test\.js$/, filter),
       ...filesIn('client/display/test', /\.test\.mjs$/, filter),
     ];
+    const started = Date.now();
     const code = spawnSync(process.execPath, ['--test', ...files], { cwd: REPO, stdio: 'inherit' }).status;
-    return [{ name: `unit (${files.length} files)`, result: code === 0 ? 'pass' : 'FAIL' }];
+    return [{ name: `unit (${files.length} files)`, result: code === 0 ? 'pass' : 'FAIL', ms: Date.now() - started }];
   }
 
   const isShell = group === 'installers' || group === 'upgrade';
@@ -124,17 +133,19 @@ async function runGroup(group, filter) {
   try {
     for (const file of files) {
       console.log(`\n━━ ${group}/${path.basename(file)}`);
-      let { code, how, crashed } = await run(isShell ? bash : process.execPath, [file]);
+      let { code, how, crashed, ms } = await run(isShell ? bash : process.execPath, [file]);
       if (code !== 0) console.log(`(${path.basename(file)} ended: ${how})`);
       let note = code === 0 ? '' : how;
       if (crashed) {
         console.log(`(${path.basename(file)}: the process crashed rather than failing a check; running it once more)`);
         const first = how;
-        ({ code, how } = await run(isShell ? bash : process.execPath, [file]));
+        const again = await run(isShell ? bash : process.execPath, [file]);
+        ({ code, how } = again);
+        ms += again.ms;
         if (code !== 0) console.log(`(${path.basename(file)} ended: ${how})`);
         note = code === 0 ? `passed on a second run; the first crashed: ${first}` : `${how}; the first run crashed: ${first}`;
       }
-      results.push({ name: `${group}/${path.basename(file)}`, result: code === 0 ? 'pass' : 'FAIL', how: note });
+      results.push({ name: `${group}/${path.basename(file)}`, result: code === 0 ? 'pass' : 'FAIL', how: note, ms });
     }
   } finally {
     if (chrome) await chrome.stop();
@@ -142,33 +153,57 @@ async function runGroup(group, filter) {
   return results;
 }
 
-// One run at a time: the suites use fixed ports, so two runs at once would test each other's servers
+// The groups that start servers on fixed ports or use the one Chrome: only one run at a time may be
+// in them, or two runs would test each other's servers. Unit and installer tests need no lock.
+const LOCKED_GROUPS = ['api', 'browser', 'upgrade'];
+const LOCK = path.join(os.tmpdir(), 'noticeboard-tests.lock');
+let holdingLock = false;
+
 function takeLock() {
-  const lock = path.join(os.tmpdir(), 'noticeboard-tests.lock');
+  if (holdingLock) return;
   try {
-    const pid = Number(fs.readFileSync(lock, 'utf8'));
-    process.kill(pid, 0);   // throws if that run has ended
-    console.error(`Another test run (process ${pid}) is still going; wait for it to finish.`);
-    process.exit(2);
+    const pid = Number(fs.readFileSync(LOCK, 'utf8'));
+    if (pid !== process.pid) {
+      process.kill(pid, 0);   // throws if that run has ended
+      console.error(`Another test run (process ${pid}) is using the api, browser or upgrade tests; wait for it to finish, or run only unit or installer tests meanwhile.`);
+      process.exit(2);
+    }
   } catch {
     // No lock, or a stale one from a run that ended
   }
-  fs.writeFileSync(lock, String(process.pid));
-  process.on('exit', () => { try { fs.rmSync(lock); } catch { /* already gone */ } });
+  fs.writeFileSync(LOCK, String(process.pid));
+  holdingLock = true;
 }
+
+function releaseLock() {
+  if (!holdingLock) return;
+  try { fs.rmSync(LOCK); } catch { /* already gone */ }
+  holdingLock = false;
+}
+process.on('exit', releaseLock);
 
 (async () => {
   const [which = 'unit', filter] = process.argv.slice(2);
-  if (which !== 'unit') takeLock();
   const groups = which === 'all' ? GROUPS : [which];
   if (!groups.every((g) => GROUPS.includes(g))) {
     console.error(`Unknown group "${which}". Groups: ${GROUPS.join(', ')}, all`);
     process.exit(2);
   }
   const results = [];
-  for (const g of groups) results.push(...(await runGroup(g, filter)));
+  const groupTimes = [];
+  for (const g of groups) {
+    if (LOCKED_GROUPS.includes(g)) takeLock(); else releaseLock();
+    const started = Date.now();
+    results.push(...(await runGroup(g, filter)));
+    groupTimes.push(`${g} ${minutes(Date.now() - started)}`);
+  }
+  releaseLock();
   console.log('\n━━ Summary');
-  for (const r of results) console.log(`  ${r.result.padEnd(20)} ${r.name}${r.how ? `  (${r.how})` : ''}`);
+  for (const r of results) {
+    const time = r.ms !== undefined ? seconds(r.ms).padStart(8) : ''.padStart(8);
+    console.log(`  ${r.result.padEnd(20)} ${time}  ${r.name}${r.how ? `  (${r.how})` : ''}`);
+  }
+  console.log(`\n  Time: ${groupTimes.join(', ')}`);
   const failed = results.filter((r) => r.result === 'FAIL').length;
   console.log(failed ? `\n${failed} failed` : '\nNo failures');
   process.exit(failed ? 1 : 0);

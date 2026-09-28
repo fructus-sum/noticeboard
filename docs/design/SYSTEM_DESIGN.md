@@ -108,6 +108,7 @@ New videos are H.265 (HEVC) by default; H.264 is the fallback for older hardware
 
 ```
 noticeboard/
+├── .github/workflows/tests.yml  the full test run on GitHub Actions for every push (§17)
 ├── package.json               npm workspaces root (server, client/display, client/admin); build, start and test scripts
 ├── package-lock.json          lockfile for all three workspaces (contains linux-arm64 optional deps: never regenerate on Windows)
 ├── system-requirements.json   system software each branch needs, and the installer version (read by the server and tests)
@@ -153,7 +154,8 @@ noticeboard/
 │   │                          test/musicTimeline.test.mjs
 │   └── admin/                 the admin panel: src/ (views, components/{ui,slideshow,settings,updates},
 │                              composables, router, styles/base.css)
-└── tests/                     run.js (the runner: unit, api, browser, installers, upgrade, all), helpers/,
+└── tests/                     run.js (the runner: unit, api, browser, installers, upgrade, all), snapshot.js (a run on
+                               a snapshot of a commit), helpers/,
                                fixtures/, api/, browser/, installers/, upgrade/ (§17)
 ```
 
@@ -1295,7 +1297,12 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 
 ## 17. Tests
 
-Run them with `node tests/run.js <group> [filter]` or the npm scripts. A file that fails is followed by how it ended (exit code, signal, or why it could not start) and how long it ran. A file whose Node.js process crashed rather than failing a check (a signal, or a Windows crash code such as 0xC0000409, seen now and then on Windows, at any point in a test: after 0.7 to 5 s so far) is run once more, and the summary says so; one that fails a check is never run again. `socket-events.js` waits for the start-up job that makes the sample video's thumbnail (and fills in its length) before it connects: that job resends the playlist when it finishes, which now and then landed in the first step as a second, identical empty playlist (found through the Server's log, which the test prints when a step differs). `npm run build` must come first for api, browser and upgrade.
+Run them with `node tests/run.js <group> [filter]` or the npm scripts. A file that fails is followed by how it ended (exit code, signal, or why it could not start) and how long it ran. A file whose Node.js process crashed rather than failing a check (a signal, or a Windows crash code such as 0xC0000409, seen now and then on Windows, at any point in a test: after 0.7 to 5 s so far) is run once more, and the summary says so; one that fails a check is never run again. `socket-events.js` waits for the start-up job that makes the sample video's thumbnail (and fills in its length) before it connects: that job resends the playlist when it finishes, which now and then landed in the first step as a second, identical empty playlist (found through the Server's log, which the test prints when a step differs). `npm run build` must come first for api, browser and upgrade. The summary gives each file's time and each group's.
+
+**Without waiting for them** (DEVELOPMENT step 4):
+- **GitHub Actions** (`.github/workflows/tests.yml`) runs `npm ci`, `npm run build` and `npm run test:all` on Linux with Node.js 20 for every push and pull request; a newer push to the branch cancels the run still going. `npm ci` also proves `package-lock.json` installs on Linux (the Pi's packages, §11).
+- **`node tests/snapshot.js [<commit>] [<group>] [filter]`** runs the tests on a snapshot of a commit (a git worktree in the temporary folder, with this checkout's `node_modules` linked in and removed link first), so the working tree can change meanwhile. Its log is `<temporary folder>/noticeboard-snapshot-<commit>.log`.
+- **One run at a time in the api, browser and upgrade groups** (fixed ports, one Chrome): `run.js` holds a lock in the temporary folder only while it's in one of them, so unit and installer tests can run beside a background run.
 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|

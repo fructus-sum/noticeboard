@@ -156,6 +156,8 @@ The other test groups each run a throwaway copy of the app, never this folder's 
 
 Video tests need ffmpeg: on the `PATH`, or set `FFMPEG_PATH` and `FFPROBE_PATH`. The installer tests need bash (Git Bash on Windows).
 
+Every push runs the whole suite on GitHub Actions (Linux, Node.js 20: `.github/workflows/tests.yml`). To run it locally without holding up work, `node tests/snapshot.js` tests the last commit in a separate worktree, so this folder can change meanwhile (`node tests/snapshot.js <commit> <group> [filter]` for part of it).
+
 There is one version of the software: run on a PC, it works exactly as on a Server. After changing the viewer or the admin panel, run `npm run build` again; after changing the server, restart it. Changes are tried out on a GitHub branch, which a Server can follow (Settings → Software updates).
 
 Runtime settings live in `data/config.json` (created on first run); slideshows and their slides in `data/slideshows/`. On an installed Server, systemd loads `/opt/noticeboard/.env`: `SECURE_COOKIES=true` only when serving over HTTPS, and `NOTICEBOARD_LOG_LEVEL=debug` for more detail in the log when troubleshooting.
