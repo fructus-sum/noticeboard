@@ -1,6 +1,10 @@
 # Noticeboard
 
-A self-hosted digital notice board and slideshow system for the Raspberry Pi. It shows images and videos on screens across a local network, managed from a browser-based admin panel, and is built to run unattended for months.
+**Noticeboard** is a self-hosted digital signage system for the Raspberry Pi, designed around one central Server and one or more Clients connected to TVs or displays across the same local network. Content is managed through a web-based Admin interface, with support for different slideshows, schedules, display groups, images, video, audio, event audio, visitor logging, and device-specific content. Clients automatically receive and display the content assigned to them, allowing inexpensive, low-power hardware to be used for individual screens, and the whole system is built to run unattended for months.
+
+It would work well anywhere that needs centrally managed information or media across one or more displays, including **schools, colleges, community centres, scout halls, cafés, restaurants, offices, event centres, sports clubs, churches, hotels, reception areas, waiting rooms, shops, conference venues, and exhibition spaces**. For example, an event centre could run different schedules on reception, conference-room and public-area screens; a school could separate student, staff and reception displays; while a café could use it for menus, promotions, events and general information.
+
+> **Note:** Support for multiple Display Groups is currently under construction. At present, the system supports one Display Group only.
 
 **Full details are in the user guide**, [`noticeboard-guide.html`](noticeboard-guide.html): open it in any browser, click **Help** in the admin panel, use the **Noticeboard Help** shortcut the installer puts on the Pi's desktop, or go to `http://<server-ip>:3000/admin/help`. Reading it needs no login.
 
