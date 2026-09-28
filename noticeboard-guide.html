@@ -1749,6 +1749,9 @@
         <h2>Troubleshooting</h2>
       </div>
 
+      <h3>The background music stops, or there is no sound</h3>
+      <p>Check the screen's sound first: the TV or monitor's volume, and that its cable carries sound (HDMI does). To see what the noticeboard is doing, leave full screen with the exit button and open the viewer with <code>?debug=audio</code> after its address (e.g. <code>http://&lt;server-ip&gt;:3000/?kiosk=off&amp;debug=audio</code>): a panel in the bottom-left corner shows the audio show and track, whether each sound is playing and at what volume, and the video on screen. If the panel says <em>BLOCKED</em>, the browser refused sound: run the installer again on that Server or Client. Tracks and videos uploaded before version 0.6.14 can stop the music while a video plays its sound on some screens: upload them again.</p>
+
       <h3>Display says "No slideshow published" or stays black</h3>
       <p><em>No slideshow published</em> means the screen is connected but has nothing to show. A black screen with only a faint pulsing dot means it can't reach the Server. The usual causes:</p>
 

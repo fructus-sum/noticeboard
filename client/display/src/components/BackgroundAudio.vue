@@ -29,7 +29,9 @@ const props = defineProps({
   videoSound: { type: Object, default: null },
 });
 
-const player = createAudioPlayer({ createElement: () => new Audio() });
+// The audio elements the engine makes, kept for the read-only diagnostic below
+const elements = [];
+const player = createAudioPlayer({ createElement: () => { const el = new Audio(); elements.push(el); return el; } });
 
 // The event's show, else the one for the slideshow on screen; the engine ignores the same show sent again
 const show = computed(() => {
@@ -50,8 +52,11 @@ watch(() => props.videoSound, (now, before) => {
 const retry = () => player.retryNow();
 onMounted(() => {
   for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, retry, true);
-  // Read-only diagnostic, e.g. from remote DevTools: window.noticeboardAudio()
-  window.noticeboardAudio = () => player.state();
+  // Read-only diagnostic (remote DevTools, or ?debug=audio: AudioDebug): the engine's state and its elements
+  window.noticeboardAudio = () => ({
+    ...player.state(),
+    elements: elements.map((el) => ({ src: (el.getAttribute('src') || '').split('/').pop(), paused: el.paused, volume: el.volume, time: el.currentTime })),
+  });
 });
 onUnmounted(() => {
   for (const type of ['pointerdown', 'keydown']) window.removeEventListener(type, retry, true);

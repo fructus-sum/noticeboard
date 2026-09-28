@@ -47,6 +47,11 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:
     await sleep(100);
   }
   await s.api('PUT', `/api/slideshows/${ss}`, { enabled: true });
+  // The clip's sound came in at 44.1 kHz: processed, it's 48 kHz like the tracks (§18.3 phase 8)
+  const FFPROBE = ffmpegEnv().FFPROBE_PATH || 'ffprobe';
+  const clipFile = (await s.api('GET', `/api/slideshows/${ss}/slides`)).data.find((x) => x.type === 'video').filename;
+  const clipRate = execFileSync(FFPROBE, ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', path.join(env.APP, 'data', 'slideshows', ss, 'slides', clipFile)], { encoding: 'utf8' }).trim();
+  check('a video\'s sound is processed to 48 kHz', clipRate === '48000', clipRate);
   const music = (await s.api('POST', '/api/audioshows', { name: 'Lobby music' })).data.folder;
   const tune = new FormData();
   tune.append('files', new Blob([fs.readFileSync(path.join(dir, 'tune.mp3'))], { type: 'audio/mpeg' }), 'tune.mp3');
@@ -164,6 +169,9 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:
   check('None: the fact says so', await c.until(`${fact} === 'Background audio None'`), await c.evaluate(fact));
   check('  … and the screen\'s audio stops', await v.until(`${audioState}?.show === null`, 10000));
 
+  // ?debug=audio: the read-only panel showing what the audio is doing (§18.3 phase 8)
+  await v.go(env.base + '/?kiosk=off&debug=audio');
+  check('?debug=audio shows the engine, its audio elements and the video', await v.until(`/engine: /.test(document.querySelector('.audio-debug')?.innerText ?? '') && /video: /.test(document.querySelector('.audio-debug').innerText)`, 10000), await v.evaluate(`document.querySelector('.audio-debug')?.innerText ?? '(no panel)'`));
   v.close();
   c.close();
   await s.stop();

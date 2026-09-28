@@ -16,7 +16,8 @@
 //
 // Uses
 //   useSocket (playlist, connection, display settings, audio), useActivity, recovery.js
-//   (startDailyReload), SlideShow, WaitingScreen, DeviceInfo, ExitKiosk, AdminWarning, BackgroundAudio
+//   (startDailyReload), SlideShow, WaitingScreen, DeviceInfo, ExitKiosk, AdminWarning, BackgroundAudio,
+//   AudioDebug (?debug=audio)
 import { ref, computed } from 'vue';
 import { useSocket } from './composables/useSocket.js';
 import { useActivity } from './composables/useActivity.js';
@@ -26,6 +27,7 @@ import DeviceInfo from './components/DeviceInfo.vue';
 import ExitKiosk from './components/ExitKiosk.vue';
 import AdminWarning from './components/AdminWarning.vue';
 import BackgroundAudio from './components/BackgroundAudio.vue';
+import AudioDebug from './components/AudioDebug.vue';
 import { startDailyReload } from './recovery.js';
 
 const { playlist, connected, received, settings, audio } = useSocket();
@@ -42,6 +44,8 @@ const videoSound = computed(() => {
 // ?kiosk=off: this screen left kiosk mode (the kiosk script reopens the viewer like this in a
 // normal window), so it's an ordinary web page now: no exit button, no nightly reload
 const kiosk = new URLSearchParams(window.location.search).get('kiosk') !== 'off';
+// ?debug=audio: what the audio is doing, on screen (AudioDebug)
+const audioDebug = new URLSearchParams(window.location.search).get('debug') === 'audio';
 if (kiosk) startDailyReload(() => connected.value);
 </script>
 
@@ -53,6 +57,7 @@ if (kiosk) startDailyReload(() => connected.value);
     <ExitKiosk v-if="kiosk" :visible="active" />
     <AdminWarning v-if="settings.installerNeeded || settings.updateAvailable || settings.restartNeeded" />
     <BackgroundAudio :audio="audio" :on-air="audioFor" :video-sound="videoSound" />
+    <AudioDebug v-if="audioDebug" />
   </div>
 </template>
 

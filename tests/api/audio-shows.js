@@ -20,6 +20,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nb-audio-'));
 // Two short tracks: an MP3 (as most music is) and a WAV
 execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3', '-c:a', 'libmp3lame', path.join(dir, 'Morning theme.mp3')]);
 execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=660:duration=2', path.join(dir, 'chime.wav')]);
+const rateOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', file], { encoding: 'utf8' }).trim();
 const codecOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', file], { encoding: 'utf8' }).trim();
 
 (async () => {
@@ -58,6 +59,7 @@ const codecOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams
   const tracksDir = path.join(env.APP, 'data', 'audioshows', show.folder, 'tracks');
   check('both are ready: AAC in .m4a, with their length and name', tracks.length === 2 && tracks.every((t) => t.status === 'ready' && /\.m4a$/.test(t.filename) && codecOf(path.join(tracksDir, t.filename)) === 'aac')
     && tracks[0].originalName === 'Morning theme.mp3' && tracks[0].duration === 3 && tracks[1].duration === 2, JSON.stringify(tracks.map((t) => [t.status, t.filename, t.duration, t.originalName])));
+  check('  … at 48 kHz, whatever they came in at (one rate for every sound: SYSTEM_DESIGN §18.3 phase 8)', tracks.every((t) => rateOf(path.join(tracksDir, t.filename)) === '48000'), tracks.map((t) => rateOf(path.join(tracksDir, t.filename))).join(','));
   check('the list shows the track count', (await s.api('GET', '/api/audioshows')).data[0].trackCount === 2);
   const bad = new FormData();
   bad.append('files', new Blob([await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).png().toBuffer()], { type: 'image/png' }), 'picture.png');
