@@ -13,6 +13,9 @@
 // Provides
 //   start()           → the status: starts a run (409 when one is running)
 //   status()          → { running, total, done, converted, skipped, failed, current, format, finishedAt }
+//   formats()         → { format, total, other }: the videos uploaded, and how many aren't in the
+//                     selected format (their recorded format, else ffprobe; nothing is written), for
+//                     the Display card's warning (SYSTEM_DESIGN §18.5 item 12)
 //   recover()         at start-up: a slide left marked by a run the server didn't finish is ready
 //                     again with its old file (still there), and the unfinished outputs are deleted
 //
@@ -117,6 +120,20 @@ async function run(videos, format) {
   logger.info('Converting existing videos finished', { converted: state.converted, skipped: state.skipped, failed: state.failed });
 }
 
+// How many of the videos uploaded aren't in the selected format
+async function formats() {
+  const format = videoFormat();
+  const videos = readyVideos();
+  let other = 0;
+  for (const { folder, id } of videos) {
+    const slide = store.readSlides(folder).slides.find((s) => s.id === id);
+    if (!slide) continue;
+    const current = slide.format ?? await videoFormatOf(path.join(slidesDir(folder), slide.filename));
+    if (current !== format) other += 1;
+  }
+  return { format, total: videos.length, other };
+}
+
 function start() {
   if (state.running) throw Object.assign(new Error('Videos are already being converted.'), { status: 409, expose: true });
   const format = videoFormat();
@@ -150,4 +167,4 @@ async function recover() {
   }
 }
 
-module.exports = { start, status, recover };
+module.exports = { start, status, formats, recover };

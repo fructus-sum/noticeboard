@@ -71,6 +71,8 @@ const codecOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams
 
   // Convert the existing videos to H.265
   await s.api('PUT', '/api/settings', { display: { videoFormat: 'h265' } });
+  const mixed = (await s.api('GET', '/api/settings/videos/formats')).data;
+  check('the videos not in the selected format are counted (the Display card warns)', mixed.format === 'h265' && mixed.total >= 2 && mixed.other === mixed.total - 1, JSON.stringify(mixed));
   const secondFile = second.filename;
   const started = await s.api('POST', '/api/settings/videos/convert');
   // Every video on this noticeboard: these two and the sample slideshow's
@@ -99,6 +101,8 @@ const codecOf = (file) => execFileSync(FFPROBE, ['-v', 'error', '-select_streams
   for (let i = 0; i < 240 && (await s.api('GET', '/api/settings/videos/convert')).data.running; i++) await sleep(250);
   const second2 = (await s.api('GET', '/api/settings/videos/convert')).data;
   check('run again: every video is already H.265, nothing converted', rerun.status === 200 && second2.converted === 0 && second2.skipped === all, JSON.stringify(second2));
+  const allSame = (await s.api('GET', '/api/settings/videos/formats')).data;
+  check('  … and none is counted as another format any more', allSame.other === 0 && allSame.total === all, JSON.stringify(allSame));
   const converted = (await slides()).find((x) => x.id === second.id);
   check('the converted video is ready, H.265, in a new file', converted.status === 'ready' && !converted.reprocessing && converted.format === 'h265'
     && converted.filename !== secondFile && codecOf(file(converted)) === 'hevc,hvc1');
