@@ -1196,8 +1196,9 @@ Every planned change starts here, before any code: what changes and why, the par
 |---|---|---|
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
 | 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
+| 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | In progress on `feature/audio-support`, in phases (approved by the owner 2026-09-28) |
 
-On the branch `QALife-updates`, done: friendly names (D38), folding cards (D39), Delete All (D40), the update schedule (D41) and Restore Defaults (D42). None of them changes the installer: `INSTALLER_VERSION` stays 2.
+Design notes D44–D47 are reserved for 18.3.
 
 ### 18.1 The viewer's black screen that only a power cycle cleared
 
@@ -1228,3 +1229,34 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Pi's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
 
+### 18.3 Audio
+
+**What changes (the owner's 2do features "Audio Support" and "Master / Event Audio Override"):** audio shows (tracks uploaded, named, ordered, played in order or shuffled, with no transition or a crossfade of a chosen length, a show volume, previewed in the admin panel, published or not); a slideshow's background audio (one published audio show, or none); a video's own sound, with the background audio lowered or paused while it plays; and event audio, which takes over from the background audio at a time.
+
+**The owner's decisions:** every screen plays the audio; the kiosk is allowed to play sound through an installer bump (`INSTALLER_VERSION` 3: until a Pi's installer is run again its screen stays silent, nothing breaks); moving to a slideshow with another audio show switches at once with that show's transition (none: fade out); loudness is evened out when a track is uploaded; when an event ends, background audio starts its next track; events start now (until stopped, and never past the next scheduled event), once (from a date and time to another) or repeat (days and times, like a slideshow's schedule); saving an event that overlaps another is refused.
+
+**Data (new; nothing existing changes shape):**
+- `config.audioShows[]`: `{ folder, name, enabled, order: 'in-order' | 'shuffle', transition: 'none' | 'crossfade', fadeSeconds, volume, event?, addedAt }`; `event`: `{ mode: 'now' | 'once' | 'repeat', from?, to?, days?, startTime?, endTime? }`.
+- `data/audioshows/<folder>/audioshow.json`: `{ tracks: [{ id, type: 'audio', originalName, name?, filename, status, duration, addedAt }] }`, the files in `tracks/`, served at `/audio/<folder>/tracks/<file>`.
+- A slideshow entry gains `audioShow` (a folder, or absent for none); a video slide gains `sound`, `withSound: 'lower' | 'pause'`, `lowerTo` (%).
+
+**How it fits (reuse, not copies):**
+- **One store for both kinds:** `slideshowStore` becomes an instance of a store factory (`services/showStore.js`), `audioShowStore` another; `slideshowStore` keeps its API, so its callers and its files are unchanged.
+- **Uploads:** the slide routes' upload, list, rename, delete and reorder become one route factory used for slides and tracks; the upload queue takes the store; `mediaService.processAudio` (ffmpeg → AAC `.m4a`, `loudnorm`) sits beside `processVideo`; names use `mediaNames` and `mediaDisplayName` (D38). update.sh waits for audio uploads like any other.
+- **Screens:** a new socket event `audio:update` (`{ shows, slideshows, event }`; older viewers ignore it), sent on connect and on `displayEvents.audioChanged()`. Playlist video entries gain `sound`, `withSound`, `lowerTo` (keys only added). The engine, `shared/audioPlayer.js`, is plain JavaScript with injectable media elements and timers (like the slide clock) and unit-tested; the viewer's `BackgroundAudio.vue` and the admin panel's show preview both use it. A refused `play()` (a kiosk without the new flag) leaves the screen silent.
+- **Events:** `services/audioEvents.js` (pure) decides the active event and checks overlaps; repeating events reuse the slideshow schedule's rules.
+- **Admin panel:** "Audio" in the sidebar (list and detail pages, a track list with ▶, "Preview the show", an event card); "Background audio" on a slideshow's settings; "Play its sound" on a video. Shared pieces: CollapsibleCard, PublishToggle, StatusBadge, ConfirmDangerDialogs, and the rename field (moved out of SlideList).
+- Delete All and Restore Defaults include audio shows.
+
+**Phases** (each designed here in detail before its code, tested with every group and committed):
+1. Foundations with no visible change: the store factory, the item-route factory, the shared rename field, `getMediaDuration`. Every snapshot must stay identical.
+2. Audio shows in the admin panel: store, routes, `/audio`, processing, pages, track preview.
+3. The audio engine and the show preview; a crossfade test on a real Pi (if it isn't smooth there, "no transition" stays and the limit is documented).
+4. Background audio on the screens, and the installer bump.
+5. Video sound.
+6. Event audio.
+7. Delete All, Restore Defaults and the documents.
+
+**Risks:** the installer bump asks every Pi for an installer run (the owner accepted it); the playlist and `display:settings` only gain keys, and `audio:update` is new, so open screens and older viewers are unaffected; slideshows' data stays byte-for-byte the same (the data-files test).
+
+**Tests:** `audioPlayer` and `audioEvents` unit tests over simulated time; api tests for audio shows, tracks, processing (ffprobe), `/audio` and `audio:update`; browser tests for the pages, the preview, the slideshow and video settings, the event card; the golden files and installer version for the kiosk flag; the upgrade rehearsal.
