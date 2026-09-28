@@ -88,6 +88,8 @@ function lanAddress() {
   await a('settings: security', 'GET', '/api/settings/security', { exact: true });
   await a('settings: logo', 'GET', '/api/settings/logo');
   await a('settings: bad duration', 'PUT', '/api/settings', { body: { display: { defaultSlideDurationSeconds: 0 } }, exact: true });
+  await a('videos: conversion status', 'GET', '/api/settings/videos/convert');
+  await a('settings: bad video format', 'PUT', '/api/settings', { body: { display: { videoFormat: 'av1' } }, exact: true });
   await a('settings: nothing to change', 'PUT', '/api/settings', { body: { nope: 1 }, exact: true });
   await a('settings: display saved', 'PUT', '/api/settings', { body: { display: { defaultSlideDurationSeconds: 10, showDeviceInfo: true } } });
   await a('password: wrong current', 'PUT', '/api/settings/password', { body: { current: 'nope', newPassword: 'longenough1' }, exact: true });
@@ -100,6 +102,11 @@ function lanAddress() {
   await a('updates: branches', 'GET', '/api/settings/updates/branches');
   await a('updates: check, invalid name', 'POST', '/api/settings/updates/check', { body: { branch: '../x' }, exact: true });
   await a('updates: check, missing branch', 'POST', '/api/settings/updates/check', { body: { branch: 'no-such-branch-xyz' }, exact: true });
+  // The update schedule (this copy has no updater units: checked, then refused)
+  await a('updates: schedule, bad', 'PUT', '/api/settings/updates/schedule', { body: { every: 'sometimes' }, exact: true });
+  await a('updates: schedule, updater not set up', 'PUT', '/api/settings/updates/schedule', { body: { every: 'manual' }, exact: true });
+  await a('updates: install at, bad', 'PUT', '/api/settings/updates/install-at', { body: { at: 'soon' }, exact: true });
+  await a('updates: install now, updater not set up', 'POST', '/api/settings/updates/install-now', { exact: true });
   await a('updates: verify, wrong password', 'POST', '/api/settings/updates/verify-password', { body: { password: 'nope', branch: 'main' }, exact: true });
   await a('updates: switch, no token', 'POST', '/api/settings/updates/switch', { body: { branch: 'main', token: 'x' }, exact: true });
 
@@ -134,6 +141,9 @@ function lanAddress() {
   records['media headers'] = { content: [media.res.headers.get('accept-ranges')] };
   await a('slides: reorder, bad body', 'PUT', `/api/slideshows/${folder}/slides/reorder`, { body: { order: 'x' }, exact: true });
   await a('slides: reorder', 'PUT', `/api/slideshows/${folder}/slides/reorder`, { body: { order: [id] } });
+  await a('slide: rename', 'PATCH', `/api/slideshows/${folder}/slides/${id}`, { body: { name: 'Front desk' } });
+  await a('slide: rename, too long', 'PATCH', `/api/slideshows/${folder}/slides/${id}`, { body: { name: 'x'.repeat(201) }, exact: true });
+  await a('slide: rename, missing', 'PATCH', `/api/slideshows/${folder}/slides/no-such-slide`, { body: { name: 'x' }, exact: true });
   await a('slides: thumbnails', 'POST', `/api/slideshows/${folder}/slides/thumbnails`, { exact: true });
   await s.api('PUT', `/api/slideshows/${folder}`, { enabled: true });
 
@@ -171,6 +181,16 @@ function lanAddress() {
   } else {
     console.log('(no network address found: the MAC-denied checks are skipped)');
   }
+
+  // Delete All: the password step, then the action with its token
+  await a('maintenance: verify, unknown action', 'POST', '/api/settings/maintenance/verify-password', { body: { password: 'Admin@12345', action: 'x' }, exact: true });
+  await a('maintenance: verify, wrong password', 'POST', '/api/settings/maintenance/verify-password', { body: { password: 'nope', action: 'delete-all' }, exact: true });
+  await a('maintenance: delete all, no token', 'POST', '/api/settings/maintenance/delete-all', { body: {}, exact: true });
+  const verified = await a('maintenance: verify', 'POST', '/api/settings/maintenance/verify-password', { body: { password: 'Admin@12345', action: 'delete-all' } });
+  await a('maintenance: delete all', 'POST', '/api/settings/maintenance/delete-all', { body: { token: verified.json.token } });
+  await a('maintenance: restore defaults, no token', 'POST', '/api/settings/maintenance/restore-defaults', { body: {}, exact: true });
+  const forRestore = await s.api('POST', '/api/settings/maintenance/verify-password', { password: 'Admin@12345', action: 'restore-defaults' });
+  await a('maintenance: restore defaults, updater not set up', 'POST', '/api/settings/maintenance/restore-defaults', { body: { token: forRestore.data.token }, exact: true });
 
   await a('logout', 'POST', '/api/auth/logout', { exact: true });
   await s.stop();

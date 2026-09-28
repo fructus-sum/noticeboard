@@ -8,9 +8,9 @@
 // Props: slide, folder, position (1-based), pinned
 // Emits: close
 // Used by: slideshow/SlideList (which also closes it on Esc)
-// Uses: mediaUrl from @shared
+// Uses: mediaUrl and mediaDisplayName from @shared (the slide's name is the caption's first line)
 import { computed } from 'vue';
-import { mediaUrl } from '@shared/index.js';
+import { mediaUrl, mediaDisplayName } from '@shared/index.js';
 
 const props = defineProps({
   slide: { type: Object, required: true },
@@ -43,6 +43,7 @@ const thumb = computed(() => media(props.slide.thumbnail));
       <img v-else-if="slide.type === 'video' && thumb" :src="thumb" alt="" class="media" />
       <div v-else class="none">No preview yet</div>
       <p class="caption">
+        <strong class="caption__name">{{ mediaDisplayName(slide) }}</strong>
         Slide {{ position }} · {{ slide.type }}
         <template v-if="slide.type === 'video' && !pinned"> · click to play</template>
       </p>
@@ -91,6 +92,15 @@ const thumb = computed(() => media(props.slide.thumbnail));
   border-radius: 4px;
 }
 .caption { margin-top: 8px; font-size: 12px; color: var(--text-muted); text-align: center; }
+.caption__name {
+  display: block;
+  max-width: min(500px, calc(100vw - 56px));
+  margin: 0 auto 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
 .close {
   position: absolute;
   top: -12px;

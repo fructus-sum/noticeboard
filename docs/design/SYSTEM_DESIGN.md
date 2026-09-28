@@ -106,22 +106,23 @@ noticeboard/
 ├── installers/
 │   ├── install.sh             the one installer: configuration, latest-installer switch, loading its parts, main()
 │   ├── lib/                   its steps: ui, branch, json, system, sudo, server, display, kiosk, desktop, firewall
-│   │                          (branch.sh and json.sh are also loaded by update.sh)
+│   │                          (branch.sh and json.sh are also loaded by update.sh; schedule.sh only by update.sh)
 │   ├── kiosk/                 server.sh, display.sh: the kiosk scripts it installs, as they are installed
 │   └── update.sh              the self-updater run by systemd on the server Pi
 ├── server/                    CommonJS, Express 4, socket.io 4
 │   ├── index.js, app.js       the entry point (systemd runs server/index.js) and the Express app
 │   ├── config/                defaults.js (a new config.json), passwordDefaults.js (the default password)
 │   ├── middleware/            access.js (MAC filter, admin check), macFilter.js and adminAuth.js (their names),
-│   │                          asyncRoute.js, uploads.js, errorHandler.js
+│   │                          asyncRoute.js, uploads.js, passwordLimiter.js, errorHandler.js
 │   ├── realtime/              displaySocket.js (socket.io: the live connection to the displays)
 │   ├── routes/                index.js (mounting), spa.js (the apps' catch-all and "not built" page)
 │   │   └── api/               index.js, auth.js, device.js, slideshows.js, slides.js
-│   │       └── settings/      index.js, general.js, security.js, logo.js, updates.js (the Settings page)
+│   │       └── settings/      index.js, general.js, security.js, logo.js, updates.js, maintenance.js (the Settings page)
 │   ├── services/              configService, slideshowStore, slideshowRules, playlistService, displayEvents,
 │   │                          schedulerService, settingsService, adminPassword, adminSession, macService,
-│   │                          mediaService, mediaTypes, uploadQueue, brandingService, sampleSlideshow
-│   │   └── updates/           index.js, git.js, branchName.js, updateFiles.js, installerVersion.js, switchTokens.js
+│   │                          mediaService, mediaTypes, mediaNames, uploadQueue, brandingService, sampleSlideshow,
+│   │                          contentReset, actionTokens
+│   │   └── updates/           index.js, git.js, branchName.js, updateFiles.js, installerVersion.js, schedule.js
 │   ├── utils/                 pathHelpers, configIO, logger, macLookup, network, slugify, slideshowLock,
 │   │                          displayBuildId, systemCheck
 │   └── test/                  unit tests (node:test): foundations, installer version, Node.js version rule
@@ -150,7 +151,7 @@ Git ignores the runtime folders `data/`, `tmp/` and `logs/`, the built apps in `
 | Process | Started by | Runs as | What it is |
 |---|---|---|---|
 | `node server/index.js` | `noticeboard.service` (`Restart=always`, `RestartSec=5`) | desktop user | The whole server: HTTP, socket.io, scheduler, upload queue |
-| `bash installers/update.sh` | `noticeboard-update.timer` (boot+5 min, then every 15 min) or `noticeboard-update.path` (when `tmp/update-request` exists) | desktop user (`User=` in the unit; it re-execs itself as the owner if started as root) | Self-updater (oneshot) |
+| `bash installers/update.sh` | `noticeboard-update.timer` (boot+5 min, then every 15 min) or `noticeboard-update.path` (when `tmp/update-request` exists) | desktop user (`User=` in the unit; it re-execs itself as the owner if started as root) | Self-updater (oneshot): checks every run, installs when the update schedule says so or the admin asks (§9.1) |
 | `/opt/noticeboard/start-kiosk.sh` | XDG autostart `/etc/xdg/autostart/noticeboard-kiosk.desktop` at desktop login | desktop user | Bash loop that keeps Chromium in kiosk mode on `http://localhost:3000/` |
 | Chromium | the kiosk script | desktop user | Shows the viewer (`/`) |
 
@@ -158,7 +159,9 @@ On a remote display Pi, `/usr/local/bin/noticeboard-kiosk.sh` is started by the 
 
 ### 3.2 Server start-up (`server/index.js`)
 
+0. `contentReset.applyPendingRestore()`: when Restore Defaults left its marker (`data/restore-defaults`), it deletes the marker, everything in `data/` but `update-branch.env` and `installer.json`, the files in `tmp/` but `update.lock`, and the logs (`app.log` emptied in place), so the server starts as a new install (D42).
 1. `configService.init()` creates `data/` and `data/slideshows/`, and reads `data/config.json` with JSON5.
+1a. `videoConversion.recover()`: a video left marked by a conversion the server didn't finish is ready again with its old file, and the unfinished outputs are deleted (D43).
    - If the file is missing, it writes defaults with a bcrypt hash of `Admin@12345` and a random `jwtSecret`.
    - If the file can't be parsed, it **regenerates the defaults**, which replaces the password and the MAC list.
 2. `syncSampleSlideshow()` keeps the "Sample slideshow" in step with `sample-data/sample-slideshow/`. Any error is logged and start-up continues.
@@ -194,18 +197,18 @@ socket.io attaches directly to the `http.Server`, so **`/socket.io` never passes
 | Event | Direction | When | Payload |
 |---|---|---|---|
 | `display:build` | server → one socket | on connect | 12-character SHA-1 of `client/display/dist/index.html`, or `null` |
-| `display:settings` | server → one socket, and broadcast | on connect; broadcast on `configService 'change'`, on `displayEvents.displaySettingsChanged` (the logo), and when the installer state changes (checked at start-up, when a display connects and every 5 minutes), when the settings differ from the last broadcast | `{ showDeviceInfo, logo: { url } \| null, background, installerNeeded }` (built by `services/displaySettings.js`) |
+| `display:settings` | server → one socket, and broadcast | on connect; broadcast on `configService 'change'`, on `displayEvents.displaySettingsChanged` (the logo), and when the installer or update state changes (checked at start-up, when a display connects and every 5 minutes), when the settings differ from the last broadcast | `{ showDeviceInfo, logo: { url } \| null, background, installerNeeded, updateAvailable }` (built by `services/displaySettings.js`) |
 | `display:ready` | display → server | on every (re)connect | none |
-| `playlist:update` | server → that socket (reply to `display:ready`), and broadcast | on `display:ready`; on `schedulerService 'update'`; on `displayEvents.playlistChanged` (a slideshow change, a slide deleted or reordered, an upload processed) | `{ slides: [{ type, url, duration, slideshow }] }` |
+| `playlist:update` | server → that socket (reply to `display:ready`), and broadcast | on `display:ready`; on `schedulerService 'update'`; on `displayEvents.playlistChanged` (a slideshow change, a slide deleted or reordered, an upload processed, a video converted) | `{ slides: [{ type, url, duration, slideshow, length? }] }` (`length`: videos only) |
 
 The event names are defined once, in `shared/contract.json`. `realtime/displaySocket.js` requires it, and the viewer imports it through `shared/index.js` (`SOCKET_EVENTS`).
 
 `buildPlaylist(active)` (services/playlistService.js), for each active slideshow in priority order:
 1. Take the current entry from the store (`store.find`), because the scheduler's cached copy may be stale.
 2. Read the slides with `store.readSlides`: a missing or broken file, or one without a slides list, gives no slides.
-3. Keep the `status === 'ready'` slides and map them to `{ type, url: /media/<folder>/slides/<filename>, duration, slideshow }`.
+3. Keep the `status === 'ready'` slides, and videos being converted (`reprocessing`, with their current file), and map them to `{ type, url: /media/<folder>/slides/<filename>, duration, slideshow }`, and for a video `length`.
    - Images: `duration = slide.duration ?? slideshow.slideDurationSeconds ?? display.defaultSlideDurationSeconds ?? 10`.
-   - Videos: `duration = null`.
+   - Videos: `duration = null` (they play to the end); `length = slide.duration` (the video's length in seconds, from ffprobe; null if unknown), which a screen that can't play it keeps to.
 
 ### 3.5 The viewer (`client/display`)
 
@@ -215,11 +218,11 @@ The event names are defined once, in `shared/contract.json`. `realtime/displaySo
 - It shows `SlideShow` when there are slides, otherwise `WaitingScreen`.
 - `DeviceInfo` (the location pin) appears if `showDeviceInfo` is on.
 - `ExitKiosk` appears unless `?kiosk=off`.
-- `InstallerWarning` (a small red triangle, bottom right) appears on every screen while `installerNeeded` is true; tapping it shows only "Please check the Admin panel for details."
+- `AdminWarning` (a small red triangle, bottom right) appears on every screen while `installerNeeded` or `updateAvailable` (manual updates, a new version waiting) is true; tapping it shows only "Please check the Admin panel for details."
 - The cursor is hidden while idle (`.app--idle`).
 - `startDailyReload` runs unless `?kiosk=off`.
 
-`SlideShow.vue` holds no timing logic of its own; `slideshowClock.js` makes every timing decision. It is plain JavaScript with deadlines, a watchdog, skipping of failed slides and deferred playlist changes, and it is tested over simulated weeks.
+`SlideShow.vue` holds no timing logic of its own; `slideshowClock.js` makes every timing decision. It is plain JavaScript with deadlines, a watchdog, skipping of failed slides and deferred playlist changes, and it is tested over simulated weeks. **A video with a `length` is never skipped early:** one that can't be played (e.g. a format the screen can't decode), never starts or stops keeps its place until its expected end (`holding`), then the slideshow moves on; one that plays moves on when it ends, or, if it's still moving after its expected end (it buffered), a moment after it stops moving. A video without a `length` (from an older server) is skipped when it fails or stalls for 30 s, as before.
 
 `SlideShow.vue` renders one or two `SlideFrame` layers for the cross-fade. It calls `clock.resume()` on page lifecycle events and on reconnect.
 
@@ -236,8 +239,9 @@ A Vue Router SPA under `/admin/`:
 - **Mounting:** `main.js` mounts only after `router.isReady()`. Before that the router reports `/` as the page, so the sidebar would show on the login page, and its requests (which need a login) would send the browser to the login page again and again.
 - **Login check:** a global `beforeEach` asks `GET /api/auth/status` (through useApi, which never redirects for this call) and sends the user to `/login` when they aren't logged in.
 - **API calls:** go through `composables/useApi.js`, which sends the cookie with each request. A 401 response loads `/admin/login`, unless the browser is already on it.
-- **The frame on every page but the login page:** the sidebar, the default-password warning and the updater's notices (`UpdateNotice`, `InstallerNotice`), in `App.vue`. It stays while moving between pages, so a notice is the same on every page, and closing one closes it everywhere.
-- **Shared state:** module-level singletons shared between components: `useBranding` (logo), `useSecurity` (default-password flag) and `useNav` (sidebar collapsed, stored in `localStorage`).
+- **The frame on every page but the login page:** the sidebar, the default-password warning and the updater's notices (`UpdateNotice`, `InstallerNotice`, `UpdateAvailableNotice`), in `App.vue`. It stays while moving between pages, so a notice is the same on every page, and closing one closes it everywhere.
+- **Section cards:** every section card of the Settings and slideshow pages is a `CollapsibleCard`: it folds away to its title and is remembered in the browser (`useCollapsed`). A card holding a warning stays open (D39).
+- **Shared state:** module-level singletons shared between components: `useBranding` (logo), `useSecurity` (default-password flag), `useCollapsed` (the folded cards) and `useNav` (sidebar collapsed, stored in `localStorage`).
 - **Views:**
   - `LoginView`
   - `SlideshowsView` (home): device banner, list, create, publish, hide, delete
@@ -249,10 +253,11 @@ A Vue Router SPA under `/admin/`:
 | What | Where | Trigger |
 |---|---|---|
 | Recompute the active slideshows | `schedulerService.computeActive` | every 60 s, and on every `configService 'change'`. It emits `'update'` only when the ordered list of folders changes. |
-| Media processing | `uploadQueue` (p-queue, concurrency 2) | after an upload. Images: sharp → PNG. Videos: ffmpeg → H.264/AAC MP4, then ffprobe for the duration, then a JPEG thumbnail. |
-| Video thumbnails | `uploadQueue.enqueueThumbnail` | the sample slideshow's videos, and "Create thumbnails" in the admin panel |
+| Media processing | `uploadQueue` (p-queue, concurrency 2) | after an upload. Images: sharp → PNG. Videos: ffmpeg → the chosen format (H.265 by default, or H.264: `settingsService.videoFormat`)/AAC MP4, recorded as the slide's `format` (§16 #12), then ffprobe for the length, then a JPEG thumbnail. |
+| Video thumbnails (and the length of a video without one) | `uploadQueue.enqueueThumbnail` | the sample slideshow's videos, and "Create thumbnails" in the admin panel |
+| Converting the existing videos | `videoConversion` (one video at a time, beside the upload queue) | "Convert existing videos" in Settings → Display (D43) |
 | Sample slideshow sync | `sampleSlideshow.syncSampleSlideshow` | once at start-up |
-| Branch-switch token expiry | `updates/switchTokens.take` | lazily, when tokens are used |
+| Password-check token expiry (branch switch, Delete All) | `actionTokens.take` | lazily, when tokens are used |
 | Kiosk exit requests | `device.js` (in-memory `Map`) | expire after 60 s, cleaned up when claimed |
 
 ### 3.8 Running it
@@ -273,24 +278,32 @@ A Vue Router SPA under `/admin/`:
 | `GET /api/device` | macFilter | server IPs (the one used first) and port | `DeviceInfo.vue` |
 | `POST /api/device/kiosk-exit` | macFilter | stores an exit request for the caller's IP | `ExitKiosk.vue` |
 | `POST /api/device/kiosk-exit/claim` | macFilter | `{"exit":true\|false}`, consuming the request | **kiosk scripts** (curl, exact string compare) |
-| `GET/PUT /api/settings` | adminAuth | sanitised config / partial update of `port`, `macFiltering`, `display` | SettingsView (for DisplaySettingsCard and MacFilterCard), LogoSettings, SlideshowDetailView (the default duration) |
+| `GET/PUT /api/settings` | adminAuth | sanitised config / partial update of `port`, `macFiltering`, `display` | SettingsView (for DisplaySettingsCard and MacFilterCard), BrandingSettings, SlideshowDetailView (the default duration) |
 | `GET /api/settings/device` | adminAuth | LAN interfaces with MACs | SlideshowsView banner |
 | `GET /api/settings/my-device` | adminAuth | `{ local, mac }` of the caller | MacFilterWarning |
 | `GET /api/settings/security` | adminAuth | `{ defaultPassword }` | useSecurity |
-| `GET/POST/DELETE /api/settings/logo` | adminAuth | logo info / upload / reset | useBranding, LogoSettings |
+| `GET/POST/DELETE /api/settings/logo` | adminAuth | logo info / upload / reset | useBranding, BrandingSettings |
 | `PUT /api/settings/password` | adminAuth | change the password (403 when the current one is wrong) | PasswordCard |
-| `GET /api/settings/updates` | adminAuth | update info (git, the status and check files, systemd unit presence) | useUpdateInfo |
+| `GET /api/settings/updates` | adminAuth | update info (git, the status and check files, systemd unit presence, the schedule, the waiting version) | useUpdateInfo, UpdateAvailableNotice |
+| `PUT /api/settings/updates/schedule` | adminAuth | `{ every, time, day }` → saves the schedule, asks update.sh to check (400 not valid, 409 without the updater) | UpdateSchedule |
+| `PUT /api/settings/updates/install-at` | adminAuth | `{ at }` → a set time for the waiting version, then a check | UpdateSchedule |
+| `POST /api/settings/updates/install-now` | adminAuth | status `requested`, request `install-now` (409 while an update runs) | UpdateSchedule |
 | `GET/DELETE /api/settings/updates/notice` | adminAuth | read or dismiss `update-notice.json` | UpdateNotice |
 | `GET /api/settings/updates/installer` | adminAuth | whether the installer needs running again | InstallerNotice |
 | `GET /api/settings/version` | adminAuth | `{ commit, date, installedAt, branch }` | NavBar |
 | `GET /api/settings/updates/branches` | adminAuth | `git ls-remote --heads` | useUpdateInfo |
 | `POST /api/settings/updates/check` | adminAuth | fetch the branch, validate it, requirements and installer needs | BranchSwitcher |
-| `POST /api/settings/updates/verify-password` | adminAuth, 5 wrong per 15 min | one-time token (5 min) | SwitchDialogs |
+| `POST /api/settings/updates/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | one-time token for the switch (5 min) | SwitchDialogs |
 | `POST /api/settings/updates/switch` | adminAuth + token | writes the branch file, status and request | SwitchDialogs |
+| `POST /api/settings/maintenance/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | `{ password, action: 'delete-all' | 'restore-defaults' }` → one-time token for that action (5 min) | DeleteContentCard |
+| `POST /api/settings/maintenance/delete-all` | adminAuth + token | every slideshow but the sample deleted → `{ deleted: [names] }`; the playlist sent | DeleteContentCard |
+| `POST /api/settings/maintenance/restore-defaults` | adminAuth + token (action `restore-defaults`) | the marker, status `requested`, request `restore-defaults` (409 without the updater or while an update runs) | DeleteContentCard |
 | `GET/POST /api/slideshows` | adminAuth | list (with `sample`, `slideCount`) / create | SlideshowsView |
 | `GET/PUT/DELETE /api/slideshows/:folder` | adminAuth | read / update / delete (the sample gives 403) | both slideshow views |
 | `GET/POST /api/slideshows/:folder/slides` | adminAuth (once per request) | list / upload (multer, max 50 files, 500 MB each) | SlideshowDetailView (list), SlideList |
+| `PATCH /api/slideshows/:folder/slides/:id` | adminAuth | `{ name }`: rename the slide (an empty name removes it; the file keeps its name; no playlist sent) | SlideList |
 | `DELETE /api/slideshows/:folder/slides/:id` | adminAuth | remove the slide and its files | SlideList |
+| `GET/POST /api/settings/videos/convert` | adminAuth | the conversion's progress / start converting every video that isn't in the saved format (409 while one runs) | DisplaySettingsCard |
 | `PUT /api/slideshows/:folder/slides/reorder` | adminAuth | `{ order: [ids] }` | SlideList |
 | `POST /api/slideshows/:folder/slides/thumbnails` | adminAuth | queue the missing thumbnails | SlideList |
 
@@ -305,9 +318,11 @@ Error conventions:
 | File | Server side | update.sh side |
 |---|---|---|
 | `data/update-branch.env` | `updateFiles.saveSwitch` writes `NOTICEBOARD_BRANCH=<b>`; `updateFiles.readBranchSetting` reads it | reads `NOTICEBOARD_BRANCH` and `NOTICEBOARD_MAIN_AT_SWITCH`; `write_branch_setting` (lib/branch.sh) writes both |
-| `tmp/update-request` | `requestSwitch` writes it | the systemd `.path` unit starts `update.sh`, which deletes the file at once |
+| `tmp/update-request` | `requestSwitch` (`<time> <branch>`), `installNow` (`install-now`), `setSchedule` and `setInstallAt` (`check`) write it | the systemd `.path` unit starts `update.sh`, which deletes the file at once; `check` only checks, anything else may install |
+| `data/update-schedule.env` | `updateFiles.saveSchedule` (`EVERY`, `TIME`, `DAY`, `SINCE`), `saveInstallAt` (`AT`); `readSchedule` | `lib/schedule.sh` reads it; `set_install_at` removes `AT` once its time has come (or sets it, when Update now finds the lock busy) |
+| `data/restore-defaults` | `contentReset.requestRestore` writes it; `applyPendingRestore` deletes it at start-up | update.sh: while it exists, a run is a restore (reinstall into a clean folder, restart even after a failure) |
 | `data/update-status.json` | `requestSwitch` writes `state: requested`; `getInfo` and `versionInfo` read it | `write_status` for every other state |
-| `data/update-check.json` | `getInfo` reads it | `write_check` |
+| `data/update-check.json` | `getInfo` reads it (the waiting version: `waitingUpdate`) | `write_check`, with `installCheckedAt`, `fetchedAt`, `nextInstall`, `available`, `availableSubject`, `availableDate` |
 | `data/update-notice.json` | `getNotice` reads it; `dismissNotice` deletes it | `returned_to_main` writes it |
 | `tmp/noticeboard-uploads/*` | multer puts uploads here; the queue deletes them | a file younger than 60 min means "upload in progress, wait" |
 | `tmp/update.lock` | none | `flock`, also held by `install.sh` |
@@ -343,8 +358,9 @@ Read with JSON5, so comments and `_comment` keys are allowed. Written as plain J
 | `macFiltering.enabled` | bool | false | macService | `PUT /settings` |
 | `macFiltering.approved[]` | `{ mac, label, addedAt }` | `[{ mac:'localhost', label:'Server itself' }]` | macService, my-device (client side) | `PUT /settings` (the whole list, **not validated**) |
 | `display.defaultSlideDurationSeconds` | int 1–3600 | 10 | playlistService.buildPlaylist; the admin panel | `PUT /settings` (validated in settingsService `mergeDisplay`) |
-| `display.showDeviceInfo` | bool | true | brandingService.displaySettings | `PUT /settings` |
+| `display.showDeviceInfo` | bool | true | services/displaySettings | `PUT /settings` |
 | `display.logo.enabled` | bool | true | brandingService | `PUT /settings` |
+| `display.videoFormat` | `h265` \| `h264` | absent (H.265, `shared/contract.json` `display.defaultVideoFormat`) | settingsService.videoFormat (uploadQueue: what new videos are converted to) | `PUT /settings` (checked in settingsService `mergeDisplay` against `display.videoFormats`) |
 | `display.backgroundColor` | `#rrggbb`, lower case | absent (black, `shared/contract.json` `display.defaultBackground`) | brandingService.backgroundColour | `PUT /settings` (checked in settingsService `mergeDisplay`) |
 | `slideshows[]` | see below | `[]` | slideshowStore only (for the scheduler, the playlist, the routes and the sample sync) | slideshowStore (the routes, the sample sync) |
 | `sampleSlideshow` | `{ folder, signature }` | absent | sampleSlideshow, slideshowRules.isSample | sample sync |
@@ -368,15 +384,16 @@ A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'alway
 ### 5.3 Hard-coded settings (not configurable)
 
 - **Admin:** default password `Admin@12345` (`config/passwordDefaults.js`); JWT lifetime 7 days and cookie `nb_admin_token` (`services/adminSession.js`); new passwords at least 8 characters (`shared/contract.json` `limits.passwordMinLength`).
-- **Rate limits:** API 120/min; login 5/15 min; branch-switch password 5 wrong/15 min.
+- **Rate limits:** API 120/min; login 5/15 min; the password checks inside the admin panel (branch switch, Delete All) 5 wrong/15 min, counted together.
 - **Uploads:** 500 MB per file, 50 files; logo upload 20 MB; logo fits within 500×500.
 - **Scheduler and viewer:** at most 5 active slideshows; scheduler interval 60 s; display clock constants in `slideshowClock.js`.
-- **Updates:** a stale update counts after 60 min; switch token lasts 5 min; timer every 15 min; kiosk exit request expires after 60 s.
+- **Updates:** a stale update counts after 60 min; a password-check token lasts 5 min; timer every 15 min (the schedule decides when a run installs; manual mode checks once a day); kiosk exit request expires after 60 s.
 - **Kiosk:** the server kiosk URL is `http://localhost:3000/` regardless of `config.port` (see §16).
 
 ### 5.4 Browser storage
 
 - `localStorage['noticeboard:navCollapsed']`, set by the admin panel: `'1'` or `'0'`.
+- `localStorage['noticeboard:collapsedCards']`, set by the admin panel: a JSON list of the folded cards' names (`settings-display`, `settings-mac`, `settings-branding`, `settings-password`, `settings-updates`, `settings-delete`, `slideshow-settings`, `slideshow-slides`).
 - `sessionStorage['noticeboard:lastRecoveryReload']`, set by the viewer: a timestamp.
 
 ---
@@ -388,13 +405,15 @@ Under `/opt/noticeboard` on a server Pi.
 | Item | Format | Created by | Read by | Changed by | Depended on by |
 |---|---|---|---|---|---|
 | `data/config.json` | JSON (JSON5 allowed) | configService.init / installer (via configService) | configService, update.sh and install.sh (port) | configService | everything |
-| `data/slideshows/<folder>/slideshow.json` | JSON `{ slides: [...] }` | `slideshowStore.create` (atomic), sample sync | only `slideshowStore` (for the routes, uploadQueue, the playlist and the sample sync) | only `slideshowStore.modifySlides` (locked; written only when changed) | the viewer (through the playlist), the admin panel |
+| `data/slideshows/<folder>/slideshow.json` | JSON `{ slides: [...] }`; a slide is `{ id, type, originalName?, name?, filename, status, duration, addedAt, format?, reprocessing?, thumbnail?, thumbnailPending?, thumbnailError?, error? }` (a video's `duration` is its length; `format`: `h265`/`h264`, recorded from 2026-09-28; `reprocessing`: while it's converted to another format, with `status: processing`) (`originalName`: the uploaded file's name, `null` if it had none, absent on slides from before names; `name`: only when renamed) | `slideshowStore.create` (atomic), sample sync | only `slideshowStore` (for the routes, uploadQueue, the playlist and the sample sync) | only `slideshowStore.modifySlides` (locked; written only when changed) | the viewer (through the playlist), the admin panel |
 | `data/slideshows/<folder>/slides/<uuid>.png\|.mp4` | media | uploadQueue (processing), sample sync (copy, keeping the extension: `.png`, `.mp4`, and `.jpg/.gif/.webp/.webm` possible) | `/media` static | slide delete, slideshow delete, sample replace | viewer, admin |
 | `data/slideshows/<folder>/slides/<uuid>-thumb.jpg` | JPEG | mediaService.createThumbnail | `/media` | slide delete, sample replace | admin list and preview |
 | `data/branding/logo.png` | PNG within 500×500 | brandingService.saveLogo | `/branding/logo`, logoVersion (mtime) | removeLogo | viewer waiting screen, admin sidebar |
 | `data/update-branch.env` | `KEY=value` lines | requestSwitch (via updates/updateFiles), update.sh, install.sh | update.sh, install.sh, updates/updateFiles | same | branch following |
 | `data/update-status.json` | flat JSON, all values strings | install.sh and update.sh (`write_json`), requestSwitch (JSON.stringify) | services/updates (getInfo, versionInfo) | same | Software updates card, sidebar "Last updated" |
-| `data/update-check.json` | flat JSON | update.sh | updates/updateFiles | update.sh | Software updates card |
+| `data/update-check.json` | flat JSON | update.sh | updates/updateFiles | update.sh | Software updates card, the schedule's next run (`installCheckedAt`, `fetchedAt`), the waiting version |
+| `data/update-schedule.env` | `KEY=value` lines (`NOTICEBOARD_UPDATE_EVERY`, `_TIME`, `_DAY`, `_SINCE`, `_AT`) | the admin panel (updates/updateFiles) | update.sh (lib/schedule.sh), updates/updateFiles | the admin panel; update.sh (`_AT`) | the update schedule (missing: every 15 minutes) |
+| `data/restore-defaults` | text (the time asked, and by whom) | contentReset.requestRestore | update.sh, contentReset | deleted by the server at start-up | Restore Defaults |
 | `data/update-notice.json` | flat JSON | update.sh (branch merged) | updates/updateFiles | dismissNotice (deletes) | home page notice |
 | `data/installer.json` | `{ version (number), branch, commit, time }` | install.sh (last step of a server install) | updates/installerVersion (`installedVersion`) | install.sh | home page installer box, switch check |
 | `data/backups/<time>-from-<branch>/…` | copies of the `.json`/`.env` files in `data/` | update.sh before a branch switch | the admin (manually) | none | recovery |
@@ -428,11 +447,12 @@ Outside the install folder:
 | Behaviour | Implemented in |
 |---|---|
 | Slides shown whole, as large as fits, never cut off or stretched, on the chosen background colour | `ImageSlide.vue`, `VideoSlide.vue` (`contain`), `App.vue` (`--nb-background`), `brandingService.backgroundColour` |
-| Slides cycle with a fade; each image for its duration; videos to the end; unattended for months | `slideshowClock.js`, `SlideShow.vue`, `SlideFrame.vue`, `ImageSlide.vue`, `VideoSlide.vue` |
+| Slides cycle with a fade; each image for its duration; videos to the end, and a video a screen can't play for its length; unattended for months | `slideshowClock.js`, `SlideShow.vue`, `SlideFrame.vue`, `ImageSlide.vue`, `VideoSlide.vue` |
 | A playlist change waits for the current slide to finish | `slideshowClock.setSlides` (pending) |
-| "No slideshow published" with the logo; a pulsing dot while disconnected | `WaitingScreen.vue`, `brandingService.displaySettings` |
+| "No slideshow published" with the logo; a pulsing dot while disconnected | `WaitingScreen.vue`, `services/displaySettings` |
 | Location pin with the server's address | `DeviceInfo.vue` → `GET /api/device` (`network.lanInterfaces`) |
-| The updater's notices on every admin page; the warning mark on every screen while the installer needs running again | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`; `InstallerWarning.vue`, `services/displaySettings` (`installerNeeded`), `updates/installerVersion` |
+| The updater's notices on every admin page; the warning mark on every screen while the installer needs running again, or (manual updates) a new version waits | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`, `UpdateAvailableNotice`; `AdminWarning.vue`, `services/displaySettings` (`installerNeeded`, `updateAvailable`), `updates/installerVersion`, `services/updates` |
+| Update schedule: every 15 minutes, every 2 hours, daily or weekly at a time, or manual; a waiting version with Update now, Set a time, or the automatic install | `UpdateSchedule`, `UpdateStatus`, `settings/updates.js`, `services/updates` (`schedule.js`, `updateFiles`), `installers/lib/schedule.sh`, update.sh |
 | Exit button (kiosk only), cursor hides when idle | `ExitKiosk.vue`, `useActivity.js`, device.js exit requests, kiosk scripts |
 | Screens reload after an update; nightly reload; recovery reload | `useSocket.js` (`display:build`), `recovery.js`, `displayBuildId.js` |
 | Login, 7-day session, logout | `LoginView`, `auth.js`, `adminAuth.js`, router guard |
@@ -441,13 +461,18 @@ Outside the install folder:
 | Slideshow detail: name, priority, duration, schedule; publish, hide | `SlideshowDetailView`, `SlideshowSettingsCard`, `ScheduleEditor`, `slideshows.js` PUT |
 | Upload images and videos; processing status; polling | `SlideList`, `slides.js`, `uploadQueue`, `mediaService` |
 | Reorder and delete slides; preview; thumbnails; "Create thumbnails" | `SlideList`, `SlidePreview`, `slides.js` |
+| Slide names: the uploaded file's name by default, renamed with ✎ (the stored file keeps its name); older slides show their type and date added | `SlideList`, `SlidePreview`, `mediaDisplayName` (`shared/index.js`), `slides.js` PATCH, `mediaNames` |
 | Scheduling (always, or timed days/times), priority, maximum 5 active | `schedulerService` |
 | Sample slideshow (updated by software updates, hideable, not deletable) | `sampleSlideshow.js`, `sample-data/` |
-| Display settings (default duration, pin); Branding (logo upload/toggle/reset, background colour) | `DisplaySettingsCard`, `BrandingSettings`, `settings/general.js` and `settings/logo.js`, `settingsService`, `brandingService` |
+| Display settings (default duration, pin, the video format for new uploads with its H.265 warning); Branding (logo upload/toggle/reset, background colour) | `DisplaySettingsCard`, `BrandingSettings`, `settings/general.js` and `settings/logo.js`, `settingsService`, `brandingService` |
+| Convert existing videos to the saved format: warned first, one at a time, each "processing" in its turn while the screens keep its current file | `DisplaySettingsCard`, `settings/videos.js`, `videoConversion`, `mediaService` |
 | MAC filtering with the warning pop-up and "add this device" | `MacFilterCard`, `MacFilterWarning`, `macFilter`/`macService`/`macLookup`, `settings/general.js` my-device |
 | Password change | `PasswordCard`, `settings/security.js`, `adminPassword` |
+| Delete All: every slideshow but the sample, after a warning listing them, the password and a last chance | `DeleteContentCard`, `ConfirmDangerDialogs`, `settings/maintenance.js`, `contentReset`, `actionTokens` |
+| Restore Defaults: as if newly installed on the followed branch (warning, password, last chance; the installer recommended afterwards) | `DeleteContentCard`, `ConfirmDangerDialogs`, `settings/maintenance.js`, `contentReset` (`requestRestore`, `applyPendingRestore`), update.sh (restore mode) |
 | Software updates: status, branch switch with two confirmations, software check, merged-branch notice, installer-needed box | `components/updates/` (SoftwareUpdates, UpdateStatus, BranchSwitcher, SwitchDialogs, UpdateNotice, InstallerNotice), `useUpdateInfo`, `services/updates`, `systemCheck`, update.sh |
 | Sidebar: logo, By Fructus Sum, links, Last updated, collapse | `NavBar`, `NavIcon`, `useNav`, `useBranding` |
+| Section cards fold away to their title (remembered; a card with a warning stays open) | `CollapsibleCard`, `useCollapsed`, and the eight cards that use it |
 | User guide | `noticeboard-guide.html`, served at `/admin/help` |
 
 ---
@@ -518,29 +543,34 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
 
 1. Work out `BRANCH`: `NOTICEBOARD_BRANCH` (a one-off) → `update-branch.env` → `main`. Also read `MAIN_AT_SWITCH`.
 2. If running as root while the folder is owned by someone else, re-exec as the owner. Refuse to run as any other user.
-3. If `tmp/update-request` exists, delete it at once and set `requested` and `force`. `--force` also sets `force`.
-4. `flock -n tmp/update.lock`. If it's busy, write `status: requested` (for a switch) and exit 0.
+3. Read the schedule (`read_schedule`), the time (`now_epoch`), and `installCheckedAt`/`fetchedAt` from the check file. If `tmp/update-request` exists, delete it at once; unless it says `check`, set `requested` and `force`. `--force` also sets `force`.
+4. `flock -n tmp/update.lock`. If it's busy, write `status: requested` (for a switch, or for Update now, which also sets the schedule's `AT` to now so the next run installs) and exit 0.
 5. `PREVIOUS_BRANCH` = the current symbolic ref, `CURRENT` = `HEAD`. `valid_branch`, else cancel and restore the setting.
 6. The service must be `active` or `activating`, else `check: waiting`.
 7. Uploads in progress (a file younger than 60 min in `tmp/noticeboard-uploads`) → `check: waiting`.
-8. **Merged-branch return**, when following a non-main branch and not switching: `branch_merged`.
+7a. **May this run install?** `due` when requested, when switching, or when `install_due` (lib/schedule.sh) says so. Otherwise it only checks; in manual mode, not at all if the last check was less than a day ago.
+8. **Merged-branch return**, only when `due`, following a non-main branch and not switching: `branch_merged`.
    - Fetch main.
    - If the branch was deleted (`ls-remote` exit code 2), compare `CURRENT`.
    - Otherwise require main to have moved on from `MAIN_AT_SWITCH`.
    - Then `merge-base --is-ancestor`, or `merge-tree --write-tree` to detect a squash or rebase.
    - If merged: `write_branch_setting main`, `switching=1`, `RETURNED_FROM`.
 9. `git fetch origin +refs/heads/B:refs/remotes/origin/B`. On failure: a switch is cancelled; a deleted branch gives `check: error`; otherwise `check: offline`.
-10. `TARGET = origin/B`. If it equals `CURRENT`: when switching, check out the branch and write the notice or status. Always `check: up-to-date`.
+10. `TARGET = origin/B`; record `fetchedAt`, and when `due` `installCheckedAt` (and remove a set time that has come). If it equals `CURRENT`: when switching, check out the branch and write the notice or status. Always `check: up-to-date`.
 11. A previously failed target (`tmp/update-failed-commit`) is skipped unless forced.
+11a. **Not due:** `check: available` with the waiting commit, its subject and date, and when it will be installed; exit 0.
 12. `refuse_reason`: the target has files in `data tmp logs .env`, or (when switching) its `update.sh` lacks the text `update-branch.env`.
 13. On a switch, `backup_settings` → `data/backups/<time>-from-<prev>/`.
 14. `status: updating`. `PORT = server_port` (node + configIO).
+14a. **Restore Defaults** (`data/restore-defaults` exists): the run is due and forced, skips the merged-branch return, installs even when `TARGET` equals `CURRENT`, first cleans the folder (`clean_folder`: `git clean -ffdxq` keeping `RESTORE_KEEP`: `data/`, `tmp/`, `logs/`, `.env`, `start-kiosk.sh`, `node_modules/`, `client/*/dist/`), restarts the server even if the install failed and was rolled back (the server resets its data at start-up), and writes its status after the restart.
 15. `install_commit`: `checkout --force -B`, `npm install --include=dev`, `npm run build`, `npm prune --omit=dev`. On failure: re-install `CURRENT` → `rolled-back`, or `failed`.
 16. `wait_for_uploads` (at most 30 min), then `restart_server`:
     - `kill -TERM` the `MainPID`; systemd restarts the service.
     - Wait up to 90 s for a new PID that answers `GET http://localhost:$PORT/api/auth/status`.
     - On failure, roll back and restart again.
 17. Success: remove the failed-commit file, write the status (`updated`, the switched message, or the merged notice), `remember_main` (records `NOTICEBOARD_MAIN_AT_SWITCH` after a switch to a non-main branch), `check: up-to-date`.
+
+Every `write_check` also records `installCheckedAt`, `fetchedAt` and `nextInstall` (`next_install`), so the admin panel shows when the next automatic install is without working it out itself. **The schedule's rules** (`lib/schedule.sh`, D41): 15 minutes, every run; 2 hours, 2 hours since the last run that could install (or since the schedule was chosen, `SINCE`); daily and weekly, the first run at or after the chosen time since then, so a Pi that was off catches up at its next run; manual, never by itself. A set time (`AT`) takes the place of the automatic install until it has come. Times are the Pi's local clock; `NOTICEBOARD_NOW` sets the time for tests.
 
 `write_json` (`lib/json.sh`, shared with the installer) builds flat JSON objects from strings in bash, stripping control characters and escaping `\` and `"`, and replaces the file atomically.
 
@@ -551,6 +581,7 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
 - **The switch has three steps:** `checkBranch`, then `verify-password` issues a one-time token, then `switch` consumes it and calls `requestSwitch`.
   - `requestSwitch` rechecks the branch and refuses missing software unless `acceptMissing`.
   - `updateFiles.saveSwitch` writes the branch file, then `status: requested`, then the request file, and restores all three on failure.
+- **The schedule:** `setSchedule` and `setInstallAt` check the values (`updates/schedule.js`), save them (`updateFiles`) and write a `check` request, so update.sh records the new next install time within seconds; `installNow` writes status `requested` and an `install-now` request. `getInfo` adds the schedule and the waiting version (`waitingUpdate`: the check file's `available`, unless it is the running commit); `manualUpdateWaiting` gives the screens' `updateAvailable`.
 - **Installer-needed:** `installerVersion.installedVersion` reads `data/installer.json`, else estimates from `start-kiosk.sh` (contains `kiosk-exit` → 1, else 0; no file → null). It is compared with `installer.version` in `system-requirements.json`.
 
 ---
@@ -601,7 +632,7 @@ noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
 | jsonwebtoken | services/adminSession.js | sessions |
 | bcrypt (native) | configService (the default hash), services/adminPassword.js | passwords |
 | json5 | configIO | parsing config.json |
-| multer | middleware/uploads.js (and the error class in slides.js) | uploads |
+| multer | middleware/uploads.js (and the error class in slides.js) | uploads (file names read as UTF-8: `defParamCharset`) |
 | sharp (native) | mediaService, brandingService | images and the logo |
 | fluent-ffmpeg | mediaService | video transcoding, duration, thumbnails (needs the `ffmpeg` and `ffprobe` binaries) |
 | p-queue 7 (ESM only) | uploadQueue (`require('p-queue').default`) | processing queue. Needs Node's `require(esm)`, available from **Node 20.19** or **22.12** |
@@ -623,7 +654,7 @@ Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the b
 | `curl` | installers, kiosk scripts | downloads, health and exit checks |
 | `chromium` / `chromium-browser` | kiosk scripts | display |
 | `arp` (net-tools) | node-arp | MAC filter |
-| `systemctl`, `systemd-run`, `flock`, `runuser`, `logger`, `xset`, `xdg-user-dir`, `getent`, `visudo`, `passwd`, `ss`, `ps`, `sshd`, `ufw`, `firewall-cmd`, `nft`, `iptables`, `apt-get`, `apt-cache`, `hostname`, `stat` | installers | OS set-up |
+| `date` (GNU: `-d`, used by lib/schedule.sh), `systemctl`, `systemd-run`, `flock`, `runuser`, `logger`, `xset`, `xdg-user-dir`, `getent`, `visudo`, `passwd`, `ss`, `ps`, `sshd`, `ufw`, `firewall-cmd`, `nft`, `iptables`, `apt-get`, `apt-cache`, `hostname`, `stat` | installers | OS set-up |
 
 `system-requirements.json` lists Node.js, npm, Git, FFmpeg, FFprobe, curl and Chromium, with version ranges and install hints. It also holds `installer.version` and `installer.changes`.
 
@@ -678,8 +709,12 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** auth.js, slideshows.js, slides.js, and every settings route. No route has its own try/catch (D36).
 
 **`middleware/uploads.js`**
-- **Purpose:** `createUpload({ prefix, maxFileBytes, allowed, rejectMessage })`, the one multer set-up. Files wait in `tmp/noticeboard-uploads/` as `<prefix>-<time>-<random><ext>` (update.sh waits for that folder); a refused type is an Error with status 400.
+- **Purpose:** `createUpload({ prefix, maxFileBytes, allowed, rejectMessage })`, the one multer set-up. Each file's own name is read as UTF-8, as browsers send it. Files wait in `tmp/noticeboard-uploads/` as `<prefix>-<time>-<random><ext>` (update.sh waits for that folder); a refused type is an Error with status 400.
 - **Used by:** slides.js, settings/logo.js.
+
+**`middleware/passwordLimiter.js`**
+- **Purpose:** `wrongPasswordLimiter`, the one limit on wrong passwords inside the admin panel: 5 per 15 minutes, only 403s counted, shared by every password check (D40).
+- **Used by:** settings/updates.js, settings/maintenance.js.
 
 **`middleware/errorHandler.js`**
 - **Purpose:** the last Express error handler: logs the error with its details, then answers "Internal server error" (JSON for `/api/`, plain text otherwise).
@@ -711,11 +746,13 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Relied on by:** the kiosk scripts (exact JSON).
 
 **`routes/api/settings/`**
-- **`index.js`:** mounts the four parts under `/api/settings` (their paths don't overlap).
+- **`index.js`:** mounts the five parts under `/api/settings` (their paths don't overlap).
 - **`general.js`:** `GET/PUT /` (settingsService), `/device` (network), `/my-device` (`req.clientMac`).
 - **`security.js`:** `/security` and `/password` (adminPassword).
 - **`logo.js`:** `/logo` GET/POST/DELETE (`logoInfo`, uploads with prefix `logo`, 20 MB, `LOGO_MIME`; brandingService; `displayEvents.displaySettingsChanged`).
-- **`updates.js`:** the software-update routes and `/version` (services/updates, `jsonRoute`, the branch-switch password limiter: 5 wrong per 15 min).
+- **`updates.js`:** the software-update routes and `/version` (services/updates, `jsonRoute`, `wrongPasswordLimiter`).
+- **`maintenance.js`:** `/maintenance/verify-password` (the password for an action → its token; `wrongPasswordLimiter`) , `/maintenance/delete-all` (with the token: `contentReset.deleteAllContent`) and `/maintenance/restore-defaults` (with the token: `contentReset.requestRestore`).
+- **`videos.js`:** `GET/POST /videos/convert` (videoConversion `status`, `start`).
 
 **`routes/api/slideshows.js`**
 - **Purpose:** slideshow CRUD, thin.
@@ -723,9 +760,9 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Uses:** slideshowStore (list, find, create, replace, remove, slideCount), slideshowRules (duration, hide rule, `isSample`, the sample message), asyncRoute, displayEvents (`playlistChanged` after a change), logger.
 
 **`routes/api/slides.js`**
-- **Purpose:** slide upload, list, delete, reorder, thumbnails, thin.
+- **Purpose:** slide upload (recording each file's `originalName`), list, rename, delete, reorder, thumbnails, thin.
 - **Owns:** a slideshow-exists middleware and its multer error handler.
-- **Uses:** slideshowStore (find, readSlides, modifySlides, slideFileExists, removeSlideFiles), uploads (`createUpload`: prefix `upload`, 500 MB, the media MIME types), mediaTypes, uploadQueue, asyncRoute, displayEvents, logger.
+- **Uses:** slideshowStore (find, readSlides, modifySlides, slideFileExists, removeSlideFiles), mediaNames (`nameFromUpload`, `cleanName`, `MAX_LENGTH`), uploads (`createUpload`: prefix `upload`, 500 MB, the media MIME types), mediaTypes, uploadQueue, asyncRoute, displayEvents, logger.
 - **Side effects:** `displayEvents.playlistChanged()` after delete and reorder.
 
 ### 12.4 Services
@@ -759,8 +796,12 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/mediaService.js`**
 - **Purpose:** converting uploads into slides.
-- **API:** `processImage` (sharp → PNG), `processVideo` (ffmpeg → H.264 MP4), `getVideoDuration` (ffprobe), `createThumbnail`.
+- **API:** `processImage` (sharp → PNG), `processVideo(input, outDir, id, format)` (ffmpeg → H.265 MP4: libx265, CRF 28, `hvc1` tag; or H.264: libx264, CRF 23), `videoFormatOf` (ffprobe: `h265`, `h264`, …), `getVideoDuration` (ffprobe), `createThumbnail`.
 - **Used by:** uploadQueue.
+
+**`services/mediaNames.js`**
+- **Purpose:** the media name rule (D38): `cleanName` (trimmed, no control characters), `nameFromUpload` (the file's own name without any path, cut to the limit, or null), `MAX_LENGTH` (`limits.mediaNameMax`).
+- **Used by:** slides.js, sampleSlideshow (its slides are named after the sample files). The audio tracks will use it too.
 
 **`services/mediaTypes.js`**
 - **Purpose:** every media type list, in one place, each the one its caller needs.
@@ -769,7 +810,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/uploadQueue.js`**
 - **Purpose:** p-queue (concurrency 2) for processing and thumbnails.
-- **API:** `enqueueProcessing`, `enqueueThumbnail`, `queueSize`, `updateSlide` (internal: `store.modifySlides`; a slide deleted meanwhile stays deleted).
+- **API:** `enqueueProcessing` (records the video's `format`), `enqueueThumbnail` (also records a missing length, and sends the playlist), `queueSize`, `updateSlide` (internal: `store.modifySlides`; a slide deleted meanwhile stays deleted).
 - **Side effects:** updates `slideshow.json` through the store, deletes the temporary upload, `displayEvents.playlistChanged()` once a slide is ready.
 - **Used by:** slides.js, sampleSlideshow.
 
@@ -789,18 +830,30 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`services/slideshowStore.js`**
 - **Purpose:** the one owner of the slideshow entries (`config.slideshows`) and each `data/slideshows/<folder>/` (its `slideshow.json` and `slides/`).
-- **API:** `list`, `find`, `create` (folder, `slides/`, an empty `slideshow.json`, an unpublished entry with the next priority), `replace`, `remove` (entry, then folder), `commitEntries(entries, other)`, `readSlides` (missing/broken → no slides; other keys kept; no slides list → no slides), `modifySlides(folder, fn)` (locked; written only if fn changed the data), `slideCount`, `slideFileExists`, `removeSlideFiles`.
+- **API:** `list`, `find`, `create` (folder, `slides/`, an empty `slideshow.json`, an unpublished entry with the next priority), `replace`, `removeMany` (the entries in one config write, then their folders), `remove` (entry, then folder), `commitEntries(entries, other)`, `readSlides` (missing/broken → no slides; other keys kept; no slides list → no slides), `modifySlides(folder, fn)` (locked; written only if fn changed the data), `slideCount`, `slideFileExists`, `removeSlideFiles`.
 - **Uses:** configService, configIO, slideshowLock, pathHelpers, slugify.
 - **Used by:** slideshows and slides routes, uploadQueue, sampleSlideshow, schedulerService, playlistService.
 
+**`services/videoConversion.js`**
+- **Purpose:** converting the existing videos (D43): `start()`, `status()` (`running`, `total`, `done`, `converted`, `skipped`, `failed`, `current`, `format`, `finishedAt`), `recover()` (start-up). One video at a time; a video not in the saved format is marked `processing` + `reprocessing` in its turn, converted into `tmp/noticeboard-uploads/convert-*` (update.sh waits for it), moved into place under a new name, its old file deleted, the playlist sent.
+- **Uses:** slideshowStore, mediaService, settingsService (`videoFormat`), displayEvents, pathHelpers, logger. **Used by:** settings/videos.js, server/index.js.
+
 **`services/playlistService.js`**
-- **Purpose:** `buildPlaylist(active)` → `{ slides: [{ type, url, duration, slideshow }] }` (§3.4).
+- **Purpose:** `buildPlaylist(active)` → `{ slides: [{ type, url, duration, slideshow, length? }] }` (§3.4).
 - **Uses:** slideshowStore, configService (the default duration), pathHelpers (`mediaUrl`).
 - **Used by:** realtime/displaySocket.js.
 
 **`services/displayEvents.js`**
 - **Purpose:** the explicit channel to the displays: `playlistChanged()`, `displaySettingsChanged()`, and `onPlaylistChanged(fn)` / `onDisplaySettingsChanged(fn)` for displaySocket.
 - **Used by:** slideshows.js, slides.js, settings/logo.js, uploadQueue; displaySocket listens.
+
+**`services/contentReset.js`**
+- **Purpose:** `deleteAllContent()` → `{ deleted: [names] }`: every slideshow but the sample (`store.removeMany`: one config write, then the folders), then `displayEvents.playlistChanged()`. `requestRestore(by)`: the marker, the status and the `restore-defaults` request (D42). `applyPendingRestore()` (start-up): the reset itself. `KEPT_DATA`: `update-branch.env`, `installer.json`.
+- **Uses:** slideshowStore, slideshowRules (`isSample`), displayEvents, services/updates (`updaterReady`, `updateFiles.saveRestoreRequest`), pathHelpers, logger. **Used by:** settings/maintenance.js, server/index.js.
+
+**`services/actionTokens.js`**
+- **Purpose:** the one-time proof that the admin password was checked (D40): `issue(action, subject)`, `take(token, action, subject)` (5 minutes, one use, that action and subject only). Actions: `switch` (the branch as subject), `delete-all`, `restore-defaults`.
+- **Used by:** services/updates (`issueToken`, `takeToken`), settings/maintenance.js.
 
 **`services/slideshowRules.js`**
 - **Purpose:** `parseSlideSeconds` (1–3600, from the contract), `applyHiddenRule(before, updated)` (409 when hiding a published slideshow or publishing a hidden one; `hidden` stored only when true), `isSample(folder)`, `SAMPLE_DELETE_ERROR`.
@@ -811,12 +864,12 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** settings/general.js.
 
 **`services/updates/`**
-- **`index.js`:** `getInfo`, `versionInfo`, `getNotice`/`dismissNotice`, `installerStatus`, `listBranches`, `checkBranch` (+ `requirementsOf`), `requestSwitch`; re-exports `validBranchName`, `issueToken` and `takeToken`. Errors for the admin carry `expose`. Used by settings/updates.js.
+- **`index.js`:** `getInfo`, `versionInfo`, `getNotice`/`dismissNotice`, `installerStatus`, `listBranches`, `checkBranch` (+ `requirementsOf`), `requestSwitch`, `setSchedule`, `setInstallAt`, `installNow`, `waitingUpdate`, `manualUpdateWaiting`; re-exports `validBranchName`, `issueToken` and `takeToken`. Errors for the admin carry `expose`. Used by settings/updates.js.
 - **`git.js`:** `git(args, timeout)` in ROOT, never prompting.
 - **`branchName.js`:** `validBranchName`, the JS twin of `installers/lib/branch.sh` `valid_branch` (kept in step by `tests/installers/branch-names.sh`).
-- **`updateFiles.js`:** the one owner of the files shared with update.sh: `readBranchSetting`, `readStatus`/`readCheck`/`readNotice`, `deleteNotice`, `requestPending`, `unitsEnabled`, `saveSwitch` (the three writes in order, restored on failure).
+- **`updateFiles.js`:** the one owner of the files shared with update.sh: `readBranchSetting`, `readStatus`/`readCheck`/`readNotice`, `deleteNotice`, `requestPending`, `unitsEnabled`, `readSchedule`/`saveSchedule`/`saveInstallAt` (`update-schedule.env`), `requestRun` (`check` or `install-now`), `saveInstallNow`, `saveSwitch` (the three writes in order, restored on failure).
+- **`schedule.js`:** `EVERY`, `DEFAULT`, `parseSchedule`, `parseInstallAt` (a valid schedule and set time; the rules for when to install are only in lib/schedule.sh, D41).
 - **`installerVersion.js`:** `installedVersion` (record, else the kiosk-script heuristic), `installerNeeds`, `status`. Also used by server/test/installer.test.js.
-- **`switchTokens.js`:** `issue`, `take` (5 minutes, one use, one branch).
 
 ### 12.5 Utilities
 
@@ -871,7 +924,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/CornerButton.vue` | the faint round button in a top corner (`corner`, `opacity`, `hoverOpacity`; icon in the slot) | none | |
 | `components/ScreenDialog.vue` | the dark centred card for pop-ups | none | |
 | `components/DeviceInfo.vue` | pin (top left, 0.3 → 0.8) and pop-up: the server's addresses and port, and the viewer's URL (never the admin panel's); `GET /api/device` | CornerButton, ScreenDialog | its own 90 s auto-close timer |
-| `components/InstallerWarning.vue` | the warning mark (bottom right, 20 px, red) and its one-line message | ScreenDialog | its own 60 s auto-close timer |
+| `components/AdminWarning.vue` | the warning mark (bottom right, 20 px, red) and its one-line message, while the installer needs running again or a manual update waits | ScreenDialog | its own 60 s auto-close timer |
 | `components/ExitKiosk.vue` | exit button (top right, 0.5 → 0.9), confirm; `POST /api/device/kiosk-exit` | CornerButton, ScreenDialog | its own 60 s auto-close timer |
 
 ### 12.7 Admin (`client/admin`)
@@ -879,31 +932,37 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | File | Purpose | Uses | Notes |
 |---|---|---|---|
 | `main.js`, `router/index.js` | imports `styles/base.css`; mount after the router is ready; routes; login check (`api.get('/auth/status', { redirectOn401: false })`, never redirects by itself) | Vue Router, useApi | |
-| `styles/base.css` | the global styles: CSS variables, layout, buttons, cards, fields, messages, badges | none | |
-| `App.vue` | the layout: the sidebar, the warnings and the updater's notices (every page but the login page), then the page | NavBar, DefaultPasswordWarning, UpdateNotice, InstallerNotice, useNav | |
-| `composables/useApi.js` | one `request` core behind `api.get/post/put/del/upload`; a 401 → the login page, unless `redirectOn401: false` (then thrown like any error); errors carry `status` and `serverMessage` | none | |
+| `styles/base.css` | the global styles: CSS variables, layout, buttons, cards, fields, messages, badges, the page warnings' box (`.page-warning`), and the confirmation dialogs' texts (`.danger-dialog`: paragraphs, `.warnings`, `.choices`, `.tone-warn`, `.actions`) | none | |
+| `App.vue` | the layout: the sidebar, the warnings and the updater's notices (every page but the login page), then the page | NavBar, DefaultPasswordWarning, UpdateNotice, InstallerNotice, UpdateAvailableNotice, useNav | |
+| `composables/useApi.js` | one `request` core behind `api.get/post/put/patch/del/upload`; a 401 → the login page, unless `redirectOn401: false` (then thrown like any error); errors carry `status` and `serverMessage` | none | |
 | `composables/useSlideshowActions.js` | `setEnabled`, `setHidden` (errors shown in an alert) with `toggling` / `hiding` busy state | useApi | |
 | `composables/useFlash.js` | a reactive `{ text, tone, ok(text, clearAfterMs), error(text), clear() }` for "Saved." and error messages | none | |
 | `composables/useUpdateInfo.js` | the Software updates data: `GET /settings/updates` and `/branches`, polling every 3 s while an update runs or the server restarts, reloading the page when another version runs; helpers `short`, `when`, `runningName`, `canSwitch`, `missingSoftware` | useApi | |
 | `composables/useBranding.js`, `useSecurity.js`, `useNav.js` | shared singleton state | useApi / localStorage | |
+| `composables/useCollapsed.js` | `useCollapsed(name)` → `{ collapsed }`: which cards are folded, one list shared by every card, in `localStorage` (unreadable → every card open) | localStorage | |
+| `components/ui/CollapsibleCard.vue` | a section card that folds to its title: props `title`, `name`, `attention` (open and not foldable while true); slots: the body (kept mounted while folded) and `actions` (hidden while folded); attributes go to the card | useCollapsed | used by the six Settings cards, SlideshowSettingsCard and SlideList |
 | `views/LoginView.vue` | login form: a wrong password or "too many tries" shown on the page, "Could not reach server" without an answer | useApi | |
 | `views/SlideshowsView.vue` | home: device banner, list, create, publish, hide, delete | useApi, useSlideshowActions, StatusBadge, PublishToggle, TagPill | |
 | `views/SlideshowDetailView.vue` | loads the default duration, the slideshow (404 → the list) and its slides; the header with its tags; the disabled banner | useApi, SlideshowSettingsCard, SlideList, TagPill | |
-| `views/SettingsView.vue` | loads `GET /settings` once for the Display and MAC cards; the cards in order | useApi, the settings and updates cards | |
+| `views/SettingsView.vue` | loads `GET /settings` once for the Display and MAC cards; the cards in order (Display, MAC filtering, Branding, Change password, Software updates, Delete content) | useApi, the settings and updates cards | |
 | `components/slideshow/SlideshowSettingsCard.vue` | the settings facts, publish/disable, hide/unhide, the edit form (name, priority, duration) | useApi, useSlideshowActions, useFlash, ScheduleEditor, StatusBadge, PublishToggle, FlashMessage, `@shared` LIMITS | |
 | `components/slideshow/ScheduleEditor.vue` | always/timed, times, days (v-model; two fields, no wrapper) | none | |
-| `components/slideshow/SlideList.vue` | upload, rows, reorder, delete, missing thumbnails, polling while processing, preview (hover or pinned) | useApi, SlidePreview, `@shared` mediaUrl | |
-| `components/slideshow/SlidePreview.vue` | hover or pinned preview | `@shared` mediaUrl | |
-| `components/settings/DisplaySettingsCard.vue`, `MacFilterCard.vue` (with `MacFilterWarning`), `PasswordCard.vue`, `BrandingSettings.vue` (the logo, and the background colour: a colour picker and a code field kept in step) | one Settings card each | useApi, useFlash, FlashMessage; `@shared` LIMITS (duration, password), DEFAULT_BACKGROUND and isColour (branding); useSecurity (password); useBranding (logo) | |
+| `components/slideshow/SlideList.vue` | upload, rows (name, then type and stored file name), rename (✎: Enter or leaving the field saves, Esc cancels), reorder, delete (the question names the slide), missing thumbnails, polling while processing, preview (hover or pinned) | useApi, SlidePreview, `@shared` mediaUrl, mediaDisplayName, LIMITS | |
+| `components/slideshow/SlidePreview.vue` | hover or pinned preview, titled with the slide's name | `@shared` mediaUrl, mediaDisplayName | |
+| `components/settings/DisplaySettingsCard.vue` (the duration, the pin, the video format explained, with its warning, and converting the existing videos with its warning and progress), `MacFilterCard.vue` (with `MacFilterWarning`), `PasswordCard.vue`, `BrandingSettings.vue` (the logo, and the background colour: a colour picker and a code field kept in step) | one Settings card each | useApi, useFlash, FlashMessage; `@shared` LIMITS (duration, password), VIDEO_FORMATS and DEFAULT_VIDEO_FORMAT (display), DEFAULT_BACKGROUND and isColour (branding); useSecurity (password); useBranding (logo) | |
 | `components/NavBar.vue` | sidebar | useApi, useBranding, useNav, NavIcon, `@shared` PROJECT_URL | |
 | `components/NavIcon.vue` | inline SVG icons | none | |
 | `components/DefaultPasswordWarning.vue` | red banner | useSecurity | |
 | `components/updates/UpdateNotice.vue` | dismissable updater notice (in the layout: every page) | useApi | |
-| `components/updates/InstallerNotice.vue` | run-the-installer box (in the layout: every page) | useApi, `@shared` installerCommand | |
-| `components/updates/SoftwareUpdates.vue` | the card: puts the parts together, shows the outcome of the last attempt | useUpdateInfo, UpdateStatus, BranchSwitcher, SwitchDialogs | |
-| `components/updates/UpdateStatus.vue` | the facts (running, updates, last check, last update) and the progress box | useUpdateInfo helpers | |
+| `components/updates/InstallerNotice.vue` | run-the-installer box (in the layout: every page; the box is `.page-warning`) | useApi, `@shared` installerCommand | |
+| `components/updates/UpdateAvailableNotice.vue` | "Update available" with manual updates (in the layout: every page, nothing to close), linking to `/settings#updates` | useApi | |
+| `components/updates/UpdateSchedule.vue` | in the Software updates card: the waiting version (Update now, Set a time, or the automatic install's time) and the schedule form | useApi, useFlash, FlashMessage, useUpdateInfo helpers | |
+| `components/updates/SoftwareUpdates.vue` | the card (`id="updates"`): puts the parts together, shows the outcome of the last attempt; open while an update runs, went wrong, or (manual) waits | useUpdateInfo, UpdateStatus, UpdateSchedule, BranchSwitcher, SwitchDialogs, CollapsibleCard | |
+| `components/updates/UpdateStatus.vue` | the facts (running, updates and the schedule, last check, last update) and the progress box | useUpdateInfo helpers | |
 | `components/updates/BranchSwitcher.vue` | branch name, Check branch, the result with the software and installer panels, "Switch to …" | useApi, useUpdateInfo helpers | |
-| `components/updates/SwitchDialogs.vue` | Missing software → warnings and password → last chance, each a ModalDialog; focus, Esc, no cancelling while an answer is on its way | useApi, ModalDialog, useUpdateInfo helpers | |
+| `components/updates/SwitchDialogs.vue` | Missing software (its own ModalDialog), then the shared steps with the switch's texts (ids `switch-…`) | useApi, ModalDialog, ConfirmDangerDialogs, useUpdateInfo helpers | |
+| `components/settings/DeleteContentCard.vue` | the "Delete content" card: Delete All… (loads the slideshows; nothing but the sample → says so), the warning listing each slideshow and its slides; Restore Defaults… (needs the updater), the warning listing what is reset and kept with the installer command; the shared steps; then "Restoring defaults…" until the server is back, and the login page | useApi, useFlash, FlashMessage, CollapsibleCard, ConfirmDangerDialogs | |
+| `components/ui/ConfirmDangerDialogs.vue` | the shared confirmation steps (D40): warnings and the admin password (`verify(password)` → token), then the last chance (`confirm(token)`); focus, Esc, no cancelling while an answer is on its way; props `idPrefix`, `title`, `finalTitle`, labels; slots: the first dialog's text, `final` | ModalDialog | used by SwitchDialogs, DeleteContentCard |
 | `components/settings/MacFilterWarning.vue` | warning and how-to pop-ups in one ModalDialog (Esc/outside: back from the how-to, else cancel); `GET /settings/my-device` | useApi, ModalDialog | |
 | `components/ui/StatusBadge.vue`, `PublishToggle.vue` (`small`, `busy`), `TagPill.vue`, `ModalDialog.vue` (`role`, `labelledby`, `tag`; emits `close` on Esc or outside; attributes go to the card), `FlashMessage.vue` (`flash`, `tag`) | shared pieces | none | |
 
@@ -911,8 +970,8 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 **`shared/contract.json`** and **`shared/index.js`**
 - `contract.json`: `socketEvents`, required by the server (realtime/displaySocket.js) and imported by index.js.
-- `contract.json` also has `limits` (`passwordMinLength`, `slideSeconds { min, max }`), read by adminPassword and slideshowRules, and `display` (`defaultBackground`, `colourPattern`), read by settingsService and brandingService.
-- `index.js`: `SOCKET_EVENTS` (the viewer), `LIMITS` (the duration inputs, the password card), `DEFAULT_BACKGROUND` (the viewer, the Branding card), `isColour(value)` (the Branding card), `PROJECT_URL` (NavBar), `installerCommand(branch)` (InstallerNotice), `mediaUrl(folder, file)` (SlideList, SlidePreview; the same as the server's `pathHelpers.mediaUrl`, checked by a unit test).
+- `contract.json` also has `limits` (`passwordMinLength`, `slideSeconds { min, max }`, `mediaNameMax`), read by adminPassword, slideshowRules and mediaNames, and `display` (`defaultBackground`, `colourPattern`, `videoFormats`, `defaultVideoFormat`), read by settingsService and brandingService.
+- `index.js`: `SOCKET_EVENTS` (the viewer), `LIMITS` (the duration inputs, the password card, the slide name field), `DEFAULT_BACKGROUND` (the viewer, the Branding card), `VIDEO_FORMATS`, `DEFAULT_VIDEO_FORMAT` (the Display card), `isColour(value)` (the Branding card), `PROJECT_URL` (NavBar), `installerCommand(branch)` (InstallerNotice), `mediaUrl(folder, file)` (SlideList, SlidePreview; the same as the server's `pathHelpers.mediaUrl`, checked by a unit test), `mediaDisplayName(item)` (SlideList, SlidePreview: what a slide is called, D38).
 - **Rule:** public values only (they are built into the browsers' JavaScript).
 
 ### 12.9 Installers
@@ -924,6 +983,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `lib/ui.sh` | `has_tty`, `ask`, `ask_yes_no`, `ask_choice` (the 1/2 questions), `ask_port`, `ask_yes_in_time`, `banner`; `choose_mode`, `choose_branch`, `offer_reboot` | main, sudo, display, server, firewall |
 | `lib/branch.sh` | `valid_branch` (the full rule), `read_branch_setting`, `read_main_at_switch`, `write_branch_setting` (atomic) | ui, server, **update.sh** |
 | `lib/json.sh` | `write_json`, `json_string` | server (`update-status.json`), **update.sh** |
+| `lib/schedule.sh` | `read_schedule`, `now_epoch`, `iso_time`, `to_epoch`, `install_due`, `next_install`, `set_install_at` (D41) | **update.sh only** (not one of `INSTALLER_MODULES`) |
 | `lib/system.sh` | `update_system`, `chromium_package`, `node_new_enough`, `lock_install_dir`, `slideshow_port` | server, display, firewall |
 | `lib/sudo.sh` | `check_sudo_password` and its helpers, `SUDO_STATUS` | main, the summaries |
 | `lib/server.sh` | `install_server`, `fetch_branch`, `save_branch_setting`, `write_service`, `write_update_units`, `write_installer_record` (its own `printf`: `version` is a number), `summary_server` | main |
@@ -956,9 +1016,9 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `configService.init` | services/configService.js | index.js, **install.sh** | configIO, bcrypt, crypto | config.json | creates `data/`, `data/slideshows/`, and config.json (or regenerates it on a parse error) | install.sh first run; every server start |
 | `configService.set/update` | same | slideshowStore, settingsService, adminPassword | writeConfig | none | writes the whole config; emits `'change'` → scheduler recompute and display settings broadcast | playlists and display settings broadcasts; the persistence format |
 | `schedulerService.computeActive` | services/schedulerService.js | interval, config change, init | `_matchesSchedule` | config.slideshows | emits `'update'` when the folder list changes | which slideshows air; playlist broadcasts |
-| `buildPlaylist` | services/playlistService.js | displaySocket (broadcast, `display:ready`) | slideshowStore, pathHelpers | config, slideshow.json (via the store) | none | **the viewer contract** (`{ slides: [{ type, url, duration, slideshow }] }`); the clock's change detection (JSON signature) |
+| `buildPlaylist` | services/playlistService.js | displaySocket (broadcast, `display:ready`) | slideshowStore, pathHelpers | config, slideshow.json (via the store) | none | **the viewer contract** (`{ slides: [{ type, url, duration, slideshow, length? }] }`: keys may only be added); the clock's change detection (JSON signature) |
 | `broadcastPlaylist` (inside displaySocket) | realtime/displaySocket.js | scheduler `'update'`, `displayEvents.playlistChanged` (slideshows PUT, slide DELETE/reorder, uploadQueue) | buildPlaylist, io.emit | as above | socket emit | every display |
-| `broadcastDisplaySettings` (inside displaySocket) | realtime/displaySocket.js | config `'change'`, `displayEvents.displaySettingsChanged` (logo) | brandingService.displaySettings | config, logo mtime | socket emit (deduplicated) | pin and logo on the displays |
+| `broadcastDisplaySettings` (inside displaySocket) | realtime/displaySocket.js | config `'change'`, `displayEvents.displaySettingsChanged` (logo), the installer and update state (every 5 minutes, and when a display connects) | services/displaySettings (`current`, `refresh`) | config, logo mtime, installer.json, update-check.json, update-schedule.env | socket emit (deduplicated) | pin and logo on the displays |
 | `macService.resolveRequest` | services/macService.js | macFilter, adminAuth | macLookup, isMacApproved | config.macFiltering, ARP | none | who can reach anything; `/settings/my-device` via `req.clientMac` |
 | `store.modifySlides` | services/slideshowStore.js | slides.js (4×), uploadQueue.updateSlide, sampleSlideshow.replaceSlides | withSlideshowLock, readSlides, writeConfig | slideshow.json | writes it only when changed | every change to a slideshow's slides; the lock prevents lost writes |
 | `writeConfig` | utils/configIO.js | configService, slideshowStore | fs | none | atomic JSON write (`.tmp` + rename) | every persisted JSON written by Node |
@@ -977,6 +1037,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `install_server` | installers/lib/server.sh | main | many | several | the whole server set-up | installations |
 | `install_commit` / `restart_server` | update.sh | main | git, npm, kill, curl | config port | the code on disk, restart | every automatic update |
 | `branch_merged` | update.sh | main | git fetch, ls-remote, merge-base, merge-tree | update-branch.env | none | auto-return to main |
+| `install_due` / `next_install` | installers/lib/schedule.sh | update.sh | date | update-schedule.env, update-check.json | none | when every Pi installs updates; what the admin panel says about it |
 
 ---
 
@@ -1022,7 +1083,13 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 | D34 | An update that never finished (60 min) | `services/updates` (`busy`) | UpdateStatus shows "Didn't finish" from the server's `busy`. |
 | D35 | Telling the displays what changed | `services/displayEvents.js` | `configService 'change'` means only that config.json changed. |
 | D36 | Async route handlers and their errors | `middleware/asyncRoute.js` (`route`, `jsonRoute`) | |
-| D37 | The background colour's default and form | `shared/contract.json` `display` (`defaultBackground`, `colourPattern`) | Read by settingsService (checks a new colour), brandingService (sends it) and, through `shared/index.js`, the viewer and the Branding card. |
+| D37 | The background colour's default and form; the video formats and their default | `shared/contract.json` `display` (`defaultBackground`, `colourPattern`, `videoFormats`, `defaultVideoFormat`) | Read by settingsService (checks a new colour or format; `videoFormat()`), brandingService (sends the colour) and, through `shared/index.js`, the viewer, the Branding card and the Display card. |
+| D38 | Media names: the rule, and what the admin panel shows | `services/mediaNames.js` (the rule: trimmed, no control characters, at most `limits.mediaNameMax`); `mediaDisplayName` in `shared/index.js` (`name`, else `originalName`, else the type and date added) | For slides now, and for audio tracks later. Names stay in the admin panel: the playlist doesn't carry them. |
+| D39 | Section cards that fold, and never hide a warning | `components/ui/CollapsibleCard.vue` + `useCollapsed` | Each card says when it needs attention: Change password (the default password), Software updates (an update running, the server restarting, the last attempt failed, rolled back or cancelled, an error message), Slides (a failed slide or upload). The page warnings sit outside the cards. |
+| D40 | Asking for the admin password again before something that can't easily be undone | `services/actionTokens.js` (the one-time token, per action), `middleware/passwordLimiter.js` (wrong tries, counted together), `components/ui/ConfirmDangerDialogs.vue` (the dialogs), `.danger-dialog` in `styles/base.css` (their texts) | Used by the branch switch and Delete All; Restore Defaults will use it too. Each action keeps its own warning texts. |
+| D41 | The update schedule: when an install is due | `installers/lib/schedule.sh` only (update.sh); it writes the next install time into update-check.json for the admin panel | The server only checks and saves the values (`updates/schedule.js`, `updateFiles`); `updateFiles.readSchedule` reads the file with the same defaults as `read_schedule`. |
+| D42 | Restore Defaults: what is reset and what is kept | the server (`contentReset.applyPendingRestore`, `KEPT_DATA`) for data/, tmp/ and logs/; update.sh (`RESTORE_KEEP`, `clean_folder`) for the rest of the folder | Two lists on purpose: each side resets what it owns. A file the installer adds to the folder must go on `RESTORE_KEEP` (`tests/installers/update-restore.sh` checks every file the installer writes). |
+| D43 | A video's format: choosing it, recording it, converting to it | `settingsService.videoFormat` (the choice), `mediaService` (`processVideo`, `videoFormatOf`), the slide's `format`, `videoConversion` (existing videos) | Uploads and conversions encode with the same `processVideo`; a slide without `format` is checked with ffprobe. |
 
 ---
 
@@ -1039,7 +1106,7 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 6. The **new update.sh must still contain the text `update-branch.env`**. Otherwise older Pis refuse to switch to the branch.
 7. **Nothing may be tracked under `data/`, `tmp/`, `logs/` or `.env`.** Otherwise every updater refuses the commit.
 8. The **`tmp/noticeboard-uploads/`** folder must stay the place where uploads wait, because update.sh waits for it.
-9. **`tmp/update-request`** starts an update; the server writes it, and the systemd path unit watches for it.
+9. **`tmp/update-request`** starts update.sh; the server writes it, and the systemd path unit watches for it. An older update.sh treats any text in it as a request to install, which is only what `check` avoids.
 
 **Kiosk scripts** (not updated by sync)
 10. `GET /` answers 200 when the device is allowed and 404 when MAC filtering blocks it.
@@ -1051,7 +1118,8 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 14. The guide anchors the admin panel links to must stay.
 
 **Files in `data/`** (their formats and paths must not change)
-15. `config.json` (JSON5-readable, with every key in §5.1), `slideshows/<folder>/slideshow.json` (slide fields in §5.1 and §6), media names, `branding/logo.png`, `update-branch.env`, `update-status.json`, `update-check.json`, `update-notice.json`, `installer.json` and `backups/`.
+15. `config.json` (JSON5-readable, with every key in §5.1), `slideshows/<folder>/slideshow.json` (slide fields in §5.1 and §6), media names, `branding/logo.png`, `update-branch.env`, `update-status.json`, `update-check.json` (keys may be added), `update-notice.json`, `update-schedule.env`, `restore-defaults`, `installer.json` and `backups/`.
+15a. **Restore Defaults keeps** every file the installer writes into the install folder (`RESTORE_KEEP` in update.sh, `KEPT_DATA` in contentReset).
 
 **Viewer and admin pages already open in browsers**
 16. They keep running old code until they reload, so:
@@ -1064,7 +1132,7 @@ An installed Pi receives new code through the `update.sh` that is **already on d
 18. These URLs must stay: `/`, `/admin`, `/admin/*`, `/admin/help`, `/media/<folder>/slides/<file>`, `/branding/logo?v=`, and every `/api` path in §4.1 (the admin panel is rebuilt with the code, but the kiosk scripts and open tabs are not).
 
 **Browser storage**
-19. The keys `noticeboard:navCollapsed` and `noticeboard:lastRecoveryReload` (merely nice to keep).
+19. The keys `noticeboard:navCollapsed`, `noticeboard:collapsedCards` and `noticeboard:lastRecoveryReload` (merely nice to keep).
 
 **The installer and the kiosk**
 20. What older installers look for when they hand over: `installers/install.sh` must exist at every commit. It must pass `bash -n`, and for non-main branches contain a line starting with `INSTALLER_VERSION=`. **Older installers download only this one file.**
@@ -1087,6 +1155,7 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 9. `configService.update` merges only the top level. `PUT /settings` therefore replaces the whole `macFiltering` object, which is intended (the admin panel sends everything).
 10. **Changing the default image duration doesn't resend the playlist** (`tests/api/socket-events.js` records this). Slideshows without their own duration keep the old one on screen until the playlist is next sent: a publish, upload, reorder or delete, a scheduler change, or a display reconnecting.
 11. **A message's clear timer can clear a later message:** "Saved." clears itself after 2 seconds (3 for "Password changed."), whatever the card shows by then. Saving twice within 2 seconds, the second failing, shows its error only briefly (`useFlash`).
+12. **New videos are H.265 (HEVC) by default from 2026-09-28** (the owner's choice), to make them smaller; Settings → Display → *Video format for new uploads* can choose H.264 instead (`display.videoFormat`), and says why while H.265 is chosen. Videos keep the format they were converted to (earlier ones H.264). A browser plays H.265 only if it can decode it: Chromium on a Pi relies on the Pi's hardware decoder, and a PC's browser on its own (e.g. Firefox can't, so the admin panel's preview of a new video stays blank there). A screen that can't play a video shows nothing for the video's length, then the slideshow carries on (the slide clock, §3.5). Encoding H.265 takes several times longer than H.264 on a Pi. *Convert existing videos* (same card) converts the videos already uploaded to the saved format (D43).
 
 ---
 
@@ -1096,10 +1165,10 @@ Run them with `node tests/run.js <group> [filter]` or the npm scripts. `npm run 
 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|
-| unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (15 tests, including 30 simulated days); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS) (7) | Node 20+ |
-| api (`test:api`) | `tests/api/` | **contract.js**: 78 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
-| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
-| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
+| unit (`npm test`) | `server/test/`, `client/display/test/` | the slide clock (18 tests, including 30 simulated days, and videos with a length keeping to it); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS), the media name rule and mediaDisplayName (9) | Node 20+ |
+| api (`test:api`) | `tests/api/` | **contract.js**: 93 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), the update schedule's routes and the screens' mark (`update-schedule.js`), the video format for new uploads and converting the existing videos (`video-format.js`: H.265 by default, H.264 when chosen, checked with ffprobe; other formats refused; each video's length in the playlist; a conversion showing each video processing in its turn while the screens keep its file, then replacing it; a second run changing nothing; a restart mid-way), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files, default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
+| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), Delete All's card and dialogs (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the video format setting, its explanations and warning, and converting the existing videos (`video-format.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
+| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return, **the schedule** with a fake clock: `update-schedule.sh`; **Restore Defaults**: the clean, the keep list against every file the installer writes, a restart after a failed reinstall: `update-restore.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
 The upgrade rehearsal works like this:
@@ -1127,6 +1196,8 @@ Every planned change starts here, before any code: what changes and why, the par
 |---|---|---|
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again |
 | 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) |
+
+On the branch `QALife-updates`, done: friendly names (D38), folding cards (D39), Delete All (D40), the update schedule (D41) and Restore Defaults (D42). None of them changes the installer: `INSTALLER_VERSION` stays 2.
 
 ### 18.1 The viewer's black screen that only a power cycle cleared
 
@@ -1156,3 +1227,4 @@ cat /proc/device-tree/model; uname -r; chromium --version
 ### 18.2 Remove the unused npm packages
 
 Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Pi's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
+

@@ -1105,6 +1105,7 @@
           <tr><td>Publish or disable</td><td>Click the <strong>Publish</strong> / <strong>Disable</strong> button in the Status field</td></tr>
           <tr><td>Upload slides</td><td>Click <strong>+ Upload</strong> in the Slides card</td></tr>
           <tr><td>See a slide larger</td><td>Hover over its thumbnail, or click or tap it</td></tr>
+          <tr><td>Rename a slide</td><td>Click the ✎ button next to the slide</td></tr>
           <tr><td>Reorder slides</td><td>Use the ↑ ↓ arrow buttons next to each slide</td></tr>
           <tr><td>Delete a slide</td><td>Click the ✕ button next to the slide</td></tr>
         </tbody>
@@ -1151,7 +1152,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
-        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.264 MP4 for reliable playback in Chromium. Images take a few seconds. Videos take longer: a large or long video can take several minutes on a Raspberry Pi. The slide shows <span class="pill amber">processing</span> meanwhile. You don't need to wait: carry on uploading, arranging and setting up your slideshows, and the video appears by itself once it's ready.</div>
+        <div class="callout-body">Images are automatically converted to PNG for consistent display. Videos are re-encoded to H.265 (HEVC) MP4, which keeps them small, or to H.264 if you choose it in <strong>Settings → Display → Video format for new uploads</strong>; videos already uploaded keep their format. A browser that can't play H.265, such as Firefox, shows no preview of a new video in the admin panel, and a screen that can't play one skips it. Images take a few seconds. Videos take longer: a large or long video can take several minutes on a Raspberry Pi. The slide shows <span class="pill amber">processing</span> meanwhile. You don't need to wait: carry on uploading, arranging and setting up your slideshows, and the video appears by itself once it's ready.</div>
       </div>
 
       <h3>Uploading a slide</h3>
@@ -1199,6 +1200,10 @@
       <h3>Previewing a slide</h3>
       <p>Each slide in the list has a thumbnail. To see one larger, hover over it, or click or tap it (on a touchscreen). Hovering shows the preview while the pointer stays on the thumbnail; clicking keeps it open until you close it with ✕, Esc or a click outside it, and lets you play a video. The preview is up to 500 × 500 pixels, keeps the slide's shape, and never enlarges a smaller slide. It opens over the page, so the ↑ ↓ buttons work as usual.</p>
 
+      <h3>Naming a slide</h3>
+      <p>Each slide in the list is shown by its name: at first, the name of the file you uploaded. To give it a clearer name, click the ✎ button next to it, type the new name and press <strong>Enter</strong> (or click elsewhere); <strong>Esc</strong> cancels. Clear the name and save to go back to the file's name. A name can be up to 200 characters. Renaming only changes what the admin panel shows: the file itself isn't changed, and nothing changes on the screens.</p>
+      <p>Slides uploaded before names existed show their type and when they were added (for example <em>Image, added 12 Mar 2026, 14:02</em>) until you rename them.</p>
+
       <h3>Video thumbnails</h3>
       <p>While a video is processed, the noticeboard also makes a thumbnail for it from a typical frame near the start. The video itself isn't changed. Videos uploaded before thumbnails existed have none; the slideshow's page then says so and offers <strong>Create thumbnails</strong>, which makes them the same way.</p>
 
@@ -1207,7 +1212,7 @@
       <p><strong>Videos</strong> play from start to finish at their natural length before moving to the next slide.</p>
       <p>When one slideshow follows another on screen, each slide keeps its own slideshow's duration. And when what's on air changes (a slideshow is published, disabled, scheduled on or off, edited or reordered), the slide on screen still gets its full time before the new running order starts.</p>
 
-      <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If a slide hasn't appeared after 30 seconds (a file that won't download, a video that won't start), the display skips it, and a video that stops playing for 30 seconds is skipped too. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
+      <p><strong>A slide that can't be shown doesn't hold up the others.</strong> If an image hasn't appeared after 30 seconds (a file that won't download), the display skips it. A video that won't play (for example one in a format the screen can't decode), won't start or stops keeps its place for its own length, then the slideshow carries on, so the timing stays as you planned it. The slideshow keeps moving even while the screen is asleep or the page is hidden. See <a href="#unattended" style="color:var(--blue)">Running unattended</a>.</p>
 
       <h3>Reordering slides</h3>
       <p>On the slideshow detail page, each slide has ↑ and ↓ buttons. Click these to move a slide up or down in the running order. The screens pick up the new order within seconds, once the slide they're showing has had its full time.</p>
@@ -1419,6 +1424,36 @@
         <div class="callout-body">MAC filtering is <strong>disabled by default</strong>. You only need to enable it if you want to restrict which screens can show your content — for example, in a public-facing installation.</div>
       </div>
 
+      <h3 id="mac-network" style="scroll-margin-top:80px">MAC address network requirements</h3>
+      <p>Noticeboard uses the server to identify display devices by their MAC address.</p>
+      <p>The MAC address is not supplied by the display's web browser. Instead, the Noticeboard server identifies the device's IP address and uses the local network to determine the corresponding MAC address.</p>
+      <p>Because of this, the Noticeboard server and the display devices must normally be on the same local network for MAC address filtering to work correctly.</p>
+      <p><strong>Example.</strong> A typical setup could look like this:</p>
+      <ul style="margin:0 0 14px 20px;line-height:1.7">
+        <li>Noticeboard Server: <code>192.168.1.10</code></li>
+        <li>Reception Display: <code>192.168.1.20</code></li>
+        <li>Meeting Room Display: <code>192.168.1.21</code></li>
+        <li>Staff Room Display: <code>192.168.1.22</code></li>
+      </ul>
+      <p>All of these devices are connected to the same local network. When one of the displays connects to Noticeboard, the server can identify its IP address and determine its MAC address from the local network. Noticeboard can then use that MAC address for MAC address filtering: deciding which devices can see the slideshows and the admin panel.</p>
+      <div class="callout warning">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body">
+          <strong>Limitations while MAC filtering is on.</strong> MAC filtering is off by default, and none of this applies then.
+          <ul style="margin:8px 0 0 18px;line-height:1.6">
+            <li><strong>A device on another network is blocked.</strong> A device behind another router, on a different VLAN or subnet, or connected over a VPN reaches the server through a router, so the server can't see its MAC address and treats it as not approved: it gets "Not Found" for the slideshow and the admin panel. A remote display Pi stays on its waiting screen. Adding the MAC address the device shows doesn't help, because the server never sees it.</li>
+            <li><strong>Behind a router that shares one address (NAT), every device looks the same.</strong> The server sees only that router's MAC address, so approving it approves every device behind that router, not just one display.</li>
+            <li><strong>Some Wi-Fi range extenders (repeaters) do the same:</strong> they replace each device's MAC address with their own. Mesh Wi-Fi systems normally don't.</li>
+            <li><strong>This includes the devices you manage it from.</strong> MAC filtering also guards the admin panel, so a computer or phone on another network is locked out too. The server Pi itself is always allowed.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body"><strong>Recommended: one network for everything.</strong> When using MAC filtering, put the Noticeboard server, every display and the computers or phones you manage it from on the same local network: the same subnet, or the same VLAN if your network uses VLANs. Devices on different VLANs are routed between them, so they have the same limitations as separate networks. If some displays have to be on another network, leave MAC filtering off.</div>
+      </div>
+
       <h3>Enabling MAC filtering and adding a device</h3>
       <div class="steps">
         <div class="step">
@@ -1452,7 +1487,7 @@
 
       <div class="callout warning">
         <div class="callout-icon">⚠</div>
-        <div class="callout-body"><strong>Add your own device to the approved list before enabling MAC filtering.</strong> If you enable it without adding the browser you're using, you will be locked out of the admin panel. If this happens, SSH into the Pi, edit <code>/opt/noticeboard/data/config.json</code>, and set <code>"enabled": false</code> in the <code>macFiltering</code> section, then restart the service.</div>
+        <div class="callout-body"><strong>Add your own device to the approved list before enabling MAC filtering</strong>, and make sure it's on the same local network as the server (see <a href="#mac-network" style="color:var(--amber)">MAC address network requirements</a>). If you enable it without adding the browser you're using, you will be locked out of the admin panel. If this happens, SSH into the Pi, edit <code>/opt/noticeboard/data/config.json</code>, and set <code>"enabled": false</code> in the <code>macFiltering</code> section, then restart the service.</div>
       </div>
 
       <p>When you tick <strong>Enable MAC filter</strong>, a pop-up reminds you of this before anything changes. If the noticeboard can tell the MAC address of the device you're using, the pop-up shows it with an <strong>Add it to the list</strong> button. <strong>How to find your MAC address</strong> opens simple steps for Windows, Mac and Linux; its <strong>OK</strong> takes you back. <strong>Cancel</strong> unticks the box, and <strong>Turn on MAC filtering</strong> keeps it ticked: filtering starts when you click <strong>Save</strong>. Addresses copied from Windows, with dashes, are fine.</p>
@@ -1467,6 +1502,7 @@
       </div>
 
       <p>The Settings page in the admin panel contains system-wide options. Access it via the navigation bar.</p>
+      <p><strong>Folding the cards away.</strong> Each card on the Settings page and on a slideshow's page can be folded away to its title: click the title (or its ▾) and click again to open it. Your browser remembers which cards you folded. A card that holds a warning, such as <em>Change password</em> while the default password is in use, or <em>Software updates</em> after an update went wrong, stays open until the warning is dealt with. The warnings at the top of the page are never folded away.</p>
 
       <table>
         <thead><tr><th>Setting</th><th>What it controls</th><th>Default</th></tr></thead>
@@ -1475,6 +1511,11 @@
             <td><strong>Default image duration</strong> (Display)</td>
             <td>How many seconds each image shows, in every slideshow that doesn't set its own duration. Videos always play their full length. Updating the software never changes this setting.</td>
             <td>10 seconds</td>
+          </tr>
+          <tr>
+            <td><strong>Video format for new uploads</strong> (Display)</td>
+            <td>What uploaded videos are converted to. <strong>H.265</strong> makes files about half the size, but converting takes longer and a screen can only play it if its browser can decode it (on a Raspberry Pi, with its hardware decoder); a screen that can't shows nothing for the video's length, then carries on, and some browsers (e.g. Firefox) can't preview it. <strong>H.264</strong> plays everywhere. The card explains both and shows this warning while H.265 is chosen. Videos already uploaded keep their format until you convert them (<strong>Convert existing videos…</strong>, below the setting: one video after another, each shown as <em>processing</em> in its slideshow in its turn while the screens keep showing it as it is; it takes a long time and slows the Pi meanwhile, and the card warns about that first).</td>
+            <td>H.265</td>
           </tr>
           <tr>
             <td><strong>Location pin</strong> (Display)</td>
@@ -1506,6 +1547,11 @@
             <td>Shows the version running and how updates went, and switches the GitHub branch updates come from. See <a href="#updates" style="color:var(--blue)">Automatic updates</a> and <a href="#branches" style="color:var(--blue)">Switching branch</a>.</td>
             <td>main</td>
           </tr>
+          <tr>
+            <td><strong>Delete content</strong></td>
+            <td><strong>Delete All</strong>: deletes every slideshow except the sample. <strong>Restore Defaults</strong>: back to a new install. See <a href="#delete-content" style="color:var(--blue)">Deleting your content</a>.</td>
+            <td>—</td>
+          </tr>
         </tbody>
       </table>
 
@@ -1518,6 +1564,12 @@
         <li><strong>Show the logo</strong> turns it on or off, on the screens and in the sidebar together.</li>
       </ul>
       <p>The <strong>background colour</strong> fills the screen around a slide that doesn't fill it, and behind the logo when nothing is published. Pick a colour, or type its code (<code>#</code> and six digits or letters a–f, for example <code>#000000</code> for black or <code>#ffffff</code> for white), then <strong>Save</strong>. Every screen changes within a few seconds; the logo preview shows it on the chosen colour.</p>
+
+      <h3 id="delete-content" style="scroll-margin-top:80px">Deleting your content</h3>
+      <p>The <strong>Delete content</strong> card at the bottom of the Settings page has <strong>Delete All…</strong>. It deletes every slideshow except the sample slideshow, with all their slides and files. The sample slideshow (and whether it's published or hidden), your settings, the logo and the background colour are kept: it isn't a factory reset.</p>
+      <p>Because it can't be undone, it asks three times, like switching branch: first it lists every slideshow it will delete and how many slides each has; then it asks for the admin password; then it gives you a last chance to back out. Cancelling at any step, or a wrong password, changes nothing. Screens stop showing the deleted slideshows straight away.</p>
+      <p><strong>Restore Defaults…</strong>, in the same card, makes the noticeboard as if it had just been installed on the branch it follows. Every slideshow is deleted (the sample slideshow comes back as new); every setting goes back to its default, including the admin password (<code>Admin@12345</code>, and everyone is logged out), MAC filtering (off) and the port (3000; you can set another one again afterwards); the logo, the update schedule, the update history, the settings backups and the logs are deleted; and the software is reinstalled from the latest version of the branch, into a clean folder. What the installer set up on the Pi (the kiosk, the services, sudo and the firewall) and the branch it follows are kept. It asks the same three times as Delete All, and the first warning lists all of this. It takes a few minutes; the page then goes to the login page by itself.</p>
+      <p>Running the installer again after a restore is recommended (the warning shows the command); there are no more reminders about it once the restore is complete. Restore Defaults needs the Pi's automatic updates, which the installer sets up.</p>
 
       <h3>Restarting the server service</h3>
       <p>Some settings changes (e.g. port changes, or manual edits to <code>config.json</code>) require restarting the server. Run this command on the Pi via SSH or a terminal:</p>
@@ -1532,7 +1584,7 @@
       <p>Press <code>Ctrl+C</code> to stop following the log.</p>
 
       <h3 id="updates" style="scroll-margin-top:80px">Automatic updates</h3>
-      <p>The server Pi keeps itself up to date with Noticeboard on GitHub, following one <em>branch</em> of it: <em>main</em>, the stable version, unless you choose another (see <a href="#branches" style="color:var(--blue)">Switching branch</a>). Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it, rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way the Pi starts its display (the kiosk) is set up by the installer, so a change to that needs the installer run again.</p>
+      <p>The server Pi keeps itself up to date with Noticeboard on GitHub, following one <em>branch</em> of it: <em>main</em>, the stable version, unless you choose another (see <a href="#branches" style="color:var(--blue)">Switching branch</a>). Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it when the <a href="#update-schedule" style="color:var(--blue)">update schedule</a> says so (straight away, unless you choose otherwise): it rebuilds the app and restarts the server. The screen goes dark for a few seconds, then every display — including remote display Pis — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way the Pi starts its display (the kiosk) is set up by the installer, so a change to that needs the installer run again.</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
@@ -1541,12 +1593,25 @@
 
       <p><strong>Last updated</strong>, above <strong>Log out</strong> in the admin panel's sidebar, shows when the noticeboard was last updated: when it installed the version it runs, the same time as <strong>Last update</strong> in the Software updates card. It changes only when an update is installed, not every time you open the page. Hover over it to see the version and when that version was made (on a copy that hasn't been updated by the updater or the installer, it shows that date instead). Click it to open the project on GitHub.</p>
 
+      <h3 id="update-schedule" style="scroll-margin-top:80px">When updates are installed</h3>
+      <p>In <strong>Settings → Software updates</strong>, <strong>Update schedule</strong> chooses when a new version is installed. Times are the noticeboard's own clock.</p>
+      <table>
+        <thead><tr><th>Choice</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Every 15 minutes</strong> (the default)</td><td>A new version is installed within 15 minutes of being published.</td></tr>
+          <tr><td><strong>Every 2 hours</strong></td><td>It checks every 15 minutes, and installs at most every 2 hours.</td></tr>
+          <tr><td><strong>Daily</strong>, <strong>Weekly</strong></td><td>It checks every 15 minutes, and installs at the time you choose (00:00 unless you change it), weekly on the day you choose. If the noticeboard is switched off or offline at that time, it installs as soon as it's back.</td></tr>
+          <tr><td><strong>Manual</strong></td><td>It checks once a day and never installs by itself. When a new version is waiting, every admin page says <em>Update available</em> and every screen shows the small red warning mark, until the noticeboard runs the new version.</td></tr>
+        </tbody>
+      </table>
+      <p>While a new version is waiting, the Software updates card shows it with three choices: <strong>Update now</strong>; <strong>Set a time…</strong> (a date and time, the next midnight unless you change it), which takes the place of the automatic install for that version; or simply waiting for the automatic install, whose time the card shows. Switching branch always happens straight away, whatever the schedule.</p>
+
       <p>The <strong>Software updates</strong> card at the bottom of the Settings page shows:</p>
       <table>
         <thead><tr><th>Line</th><th>What it tells you</th></tr></thead>
         <tbody>
           <tr><td><strong>Running</strong></td><td>The branch and version (a short code such as <code>5b6d51f</code>) the noticeboard is running now.</td></tr>
-          <tr><td><strong>Updates</strong></td><td>How often it checks, and when it last checked and what it found: up to date, waiting for an upload, GitHub unreachable, and so on.</td></tr>
+          <tr><td><strong>Updates</strong></td><td>How often it checks and installs (the update schedule), and when it last checked and what it found: up to date, a new version waiting, waiting for an upload, GitHub unreachable, and so on.</td></tr>
           <tr><td><strong>Last update</strong></td><td>The result of the last update or branch switch: <span class="pill green">Done</span>, <span class="pill amber">Rolled back</span>, <span class="pill amber">Cancelled</span> or <span class="pill red">Failed</span>, with what happened in plain words.</td></tr>
         </tbody>
       </table>

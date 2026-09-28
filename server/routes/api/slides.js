@@ -1,24 +1,28 @@
 // server/routes/api/slides.js — /api/slideshows/:folder/slides: a slideshow's slides
 //
 // Responsibilities
-//   Uploading (up to 50 files, 500 MB each), listing, deleting, reordering, and making missing
-//   video thumbnails. Mounted inside the slideshows API (api/index.js), behind its admin check.
+//   Uploading (up to 50 files, 500 MB each), listing, renaming, deleting, reordering, and making
+//   missing video thumbnails. Mounted inside the slideshows API (api/index.js), behind its admin
+//   check. An upload records the file's own name (originalName); renaming sets `name`, which the
+//   admin panel shows instead (SYSTEM_DESIGN §14 D38).
 //
 // Used by
 //   routes/api/index.js; the admin panel (SlideList, SlideshowDetailView)
 //
 // Uses
 //   services/slideshowStore (the data), services/uploadQueue (processing), services/mediaTypes,
-//   middleware/uploads, middleware/asyncRoute, services/displayEvents (playlistChanged)
+//   services/mediaNames (the name rule), middleware/uploads, middleware/asyncRoute,
+//   services/displayEvents (playlistChanged), utils/logger
 //
 // Change impact
 //   The slide fields are read by the viewer's playlist and the admin panel (SYSTEM_DESIGN
-//   §5.1, §6).
+//   §5.1, §6). Names are for the admin panel only: renaming sends no playlist.
 const express = require('express');
 const crypto = require('crypto');
 const multer = require('multer');
 const store = require('../../services/slideshowStore');
 const { typeFromMime, IMAGE_MIME, VIDEO_MIME } = require('../../services/mediaTypes');
+const mediaNames = require('../../services/mediaNames');
 const { enqueueProcessing, enqueueThumbnail, queueSize } = require('../../services/uploadQueue');
 const { createUpload } = require('../../middleware/uploads');
 const { route } = require('../../middleware/asyncRoute');
@@ -56,6 +60,7 @@ router.post('/', upload.array('files', 50), route(async (req, res) => {
     entry: {
       id: crypto.randomUUID(),
       type: typeFromMime(file.mimetype),
+      originalName: mediaNames.nameFromUpload(file.originalname),
       filename: null,
       status: 'processing',
       duration: null,
@@ -73,6 +78,30 @@ router.post('/', upload.array('files', 50), route(async (req, res) => {
 
   logger.info('Slides upload accepted', { folder, count: queued.length, ...queueSize() });
   res.status(202).json(queued.map((q) => q.entry));
+}));
+
+// PATCH /api/slideshows/:folder/slides/:id
+// Body: { name }. An empty name removes the slide's own name, so it goes back to the uploaded
+// file's name. The stored file keeps its name.
+router.patch('/:id', route(async (req, res) => {
+  const { folder, id } = req.params;
+  const { name } = req.body ?? {};
+  if (name !== null && typeof name !== 'string') return res.status(400).json({ error: 'name must be text' });
+  const cleaned = mediaNames.cleanName(name);
+  if ([...cleaned].length > mediaNames.MAX_LENGTH) {
+    return res.status(400).json({ error: `A name can be at most ${mediaNames.MAX_LENGTH} characters` });
+  }
+
+  const slide = await store.modifySlides(folder, (data) => {
+    const found = data.slides.find((s) => s.id === id);
+    if (!found) return null;
+    if (cleaned) found.name = cleaned;
+    else delete found.name;
+    return found;
+  });
+  if (!slide) return res.status(404).json({ error: 'Slide not found' });
+  logger.info('Slide renamed', { folder, id });
+  res.json(slide);
 }));
 
 // DELETE /api/slideshows/:folder/slides/:id

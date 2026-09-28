@@ -16,8 +16,9 @@
 //   MIN_LENGTH                the shortest new password accepted (shared/contract.json)
 //
 // Used by
-//   routes/api/auth.js (login), routes/api/settings.js (password change, default-password
-//   warning, the branch-switch password check)
+//   routes/api/auth.js (login), routes/api/settings/security.js (password change, default-password
+//   warning), routes/api/settings/updates.js (the branch-switch password check),
+//   routes/api/settings/maintenance.js (the Delete All and Restore Defaults password check)
 //
 // Uses
 //   configService (passwordHash), config/passwordDefaults, bcrypt

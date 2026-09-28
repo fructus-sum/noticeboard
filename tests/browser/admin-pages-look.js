@@ -3,10 +3,11 @@
 // the Software updates card with its branch check and switch dialog. Recorded in
 // tests/fixtures/admin-pages-look.json from the code before these pages were split into
 // components; they must look exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
+// The copy runs on a fixed branch name, so its texts are the same whichever branch the tests run from.
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, sleep, git } = require('../helpers/app.js');
 
 const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'admin-pages-look.json');
 const PROPS = ['display', 'position', 'width', 'height', 'margin', 'padding', 'border', 'border-radius', 'outline',
@@ -37,6 +38,7 @@ async function capture(c, map, prefix) {
 
 (async () => {
   const env = makeApp({ port: 3938, keepSample: true });
+  git(env.APP, 'checkout', '-q', '-B', 'feature/look-test');   // the Software updates card shows it
   // The updater's systemd units, so branch switching is available
   const units = path.join(env.T, 'systemd');
   fs.mkdirSync(path.join(units, 'timers.target.wants'), { recursive: true });
@@ -70,7 +72,7 @@ async function capture(c, map, prefix) {
   await sleep(500);
   Object.assign(look, await capture(c, {
     'back button': 'text:button:← Back', 'title': 'h1', 'sample tag': 'text:span:Sample', 'settings card': '.card',
-    'settings facts': '.card > div:nth-child(2)', 'status badge': 'text:span:Disabled', 'publish toggle': 'text:button:Publish',
+    'settings facts': '.card .card-body > div:first-child', 'status badge': 'text:span:Disabled', 'publish toggle': 'text:button:Publish',
     'hide button': 'text:button:Hide', 'disabled banner': 'text:span:This slideshow is', 'slides card title': 'text:h2:Slides',
     'upload button': 'text:label:+ Upload', 'slide row': '.slide-row', 'slide thumb': '.slide-thumb', 'thumb image': '.slide-thumb img',
     'play mark': '.slide-thumb__play', 'status pill': '.badge', 'move up': 'text:button:↑', 'delete slide': 'text:button:✕',
@@ -128,7 +130,7 @@ async function capture(c, map, prefix) {
   texts['switch dialog'] = await c.evaluate(text('.dialog'));
   await c.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
   await sleep(300);
-  texts['after Esc'] = await c.evaluate(`!!document.querySelector('.dialog') ? 'dialog still open' : (document.querySelector('.card:last-of-type p.muted:last-of-type')?.textContent ?? '')`);
+  texts['after Esc'] = await c.evaluate(`!!document.querySelector('.dialog') ? 'dialog still open' : ([...([...document.querySelectorAll('section.card')].find((c) => c.querySelector('.card-toggle')?.textContent.trim() === 'Software updates')?.querySelectorAll('p.muted:last-of-type') ?? [])].find((el) => !el.closest('.schedule, .waiting'))?.textContent ?? '')`);
   c.close();
   await s.stop();
 

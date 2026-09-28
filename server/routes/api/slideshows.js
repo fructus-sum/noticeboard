@@ -9,7 +9,7 @@
 //
 // Uses
 //   services/slideshowStore (the data), services/slideshowRules (duration, hide/publish, the
-//   sample's protection), services/displayEvents, middleware/asyncRoute
+//   sample's protection), services/displayEvents, middleware/asyncRoute, utils/logger
 const express = require('express');
 const store = require('../../services/slideshowStore');
 const rules = require('../../services/slideshowRules');

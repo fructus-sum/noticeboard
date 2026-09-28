@@ -11,6 +11,7 @@
 //   in an alert, as it always has been.
 //
 // Used by: SlideshowsView, slideshow/SlideshowSettingsCard
+// Uses: useApi (PUT /slideshows/:folder)
 import { ref } from 'vue';
 import { api } from './useApi.js';
 

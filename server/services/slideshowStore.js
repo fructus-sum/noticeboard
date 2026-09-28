@@ -13,6 +13,7 @@
 //                                     slides/ and an empty slideshow.json (written atomically)
 //   replace(folder, entry)          → saves a changed entry in its place (null if none)
 //   remove(folder)                  → removes the entry, then deletes the folder (false if none)
+//   removeMany(folders)             → the entries removed: one config write, then their folders
 //   commitEntries(entries, other)   one config write of the entries plus other keys (the sample
 //                                     sync also records sampleSlideshow in the same write)
 //   readSlides(folder)              → the parsed slideshow.json: { slides: [...] }. Missing or
@@ -26,7 +27,8 @@
 //
 // Used by
 //   routes/api/slideshows.js, routes/api/slides.js, services/uploadQueue.js,
-//   services/sampleSlideshow.js, services/playlistService.js, services/schedulerService.js
+//   services/sampleSlideshow.js, services/playlistService.js, services/schedulerService.js,
+//   services/contentReset.js (removeMany: Delete All)
 //
 // Uses
 //   configService (the entries; its 'change' event tells the scheduler and the displays),
@@ -90,6 +92,19 @@ async function remove(folder) {
   return true;
 }
 
+async function removeMany(folders) {
+  const gone = new Set(folders);
+  const all = list();
+  const removed = all.filter((s) => gone.has(s.folder));
+  if (!removed.length) return [];
+  await configService.set('slideshows', all.filter((s) => !gone.has(s.folder)));
+  for (const { folder } of removed) {
+    const dir = slideshowDir(folder);
+    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  }
+  return removed;
+}
+
 function commitEntries(entries, other = {}) {
   return configService.update({ slideshows: entries, ...other });
 }
@@ -134,6 +149,7 @@ module.exports = {
   create,
   replace,
   remove,
+  removeMany,
   commitEntries,
   readSlides,
   modifySlides,

@@ -6,6 +6,9 @@
 //
 // Used by
 //   services/updates/index.js
+//
+// Uses
+//   utils/pathHelpers (ROOT, where git runs)
 const { execFile } = require('child_process');
 const { ROOT } = require('../../utils/pathHelpers');
 

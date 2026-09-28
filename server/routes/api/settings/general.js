@@ -9,7 +9,7 @@
 //   routes/api/settings/index.js; the admin panel (SettingsView, the cards, MacFilterWarning)
 //
 // Uses
-//   services/settingsService, utils/network, middleware/asyncRoute
+//   services/settingsService, utils/network, middleware/asyncRoute, utils/logger
 const express = require('express');
 const settingsService = require('../../../services/settingsService');
 const { route } = require('../../../middleware/asyncRoute');

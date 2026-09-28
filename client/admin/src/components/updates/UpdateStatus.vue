@@ -18,6 +18,19 @@ const props = defineProps({
 
 const running = computed(() => runningName(props.info));
 
+// How updates are installed (the schedule, SYSTEM_DESIGN §14 D41)
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const scheduleText = computed(() => {
+  const s = props.info.schedule ?? { every: '15min' };
+  switch (s.every) {
+    case '2h': return 'Checked every 15 minutes; installed every 2 hours.';
+    case 'daily': return `Checked every 15 minutes; installed daily at ${s.time}.`;
+    case 'weekly': return `Checked every 15 minutes; installed every ${DAYS[s.day]} at ${s.time}.`;
+    case 'manual': return 'Checked once a day; installed only when you choose.';
+    default: return 'Checked every 15 minutes.';
+  }
+});
+
 const STATES = {
   requested:     { label: 'Waiting to start', tone: 'info' },
   updating:      { label: 'In progress',      tone: 'info' },
@@ -27,7 +40,7 @@ const STATES = {
   failed:        { label: 'Failed',           tone: 'bad' },
 };
 const CHECKS = {
-  'up-to-date': 'ok', waiting: 'info', skipped: 'warn', offline: 'warn', error: 'bad',
+  'up-to-date': 'ok', available: 'info', waiting: 'info', skipped: 'warn', offline: 'warn', error: 'bad',
 };
 const statusView = computed(() => {
   const s = props.info.status;
@@ -52,7 +65,7 @@ const statusView = computed(() => {
 
     <dt>Updates</dt>
     <dd>
-      <template v-if="info.autoUpdates">Checked every 15 minutes.</template>
+      <template v-if="info.autoUpdates">{{ scheduleText }}</template>
       <template v-else-if="info.instant">Only when you switch branch (the 15-minute check is turned off).</template>
       <template v-else>Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.</template>
       <div v-if="info.lastCheck" class="muted">

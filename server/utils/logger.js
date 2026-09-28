@@ -10,6 +10,7 @@
 //                                 troubleshooting; anything else, or unset, gives info and above
 //
 // Used by: all server modules (never console.log)
+// Uses: winston, utils/pathHelpers (logsDir)
 const fs = require('fs');
 const path = require('path');
 const winston = require('winston');

@@ -1,6 +1,6 @@
 // The Software updates card in a real browser: check a branch, both confirmations (wrong
 // password, cancelling at the last moment, Escape), a confirmed switch followed through a
-// server restart to the result. Same throwaway setup as test-branch-api.js.
+// server restart to the result. Same throwaway setup as tests/api/branch-switching.js.
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const { copyChanges } = require('../helpers/app.js');

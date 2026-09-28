@@ -21,7 +21,7 @@ export function useSocket() {
   const connected = ref(false);
   const received = ref(false);   // true once the server has sent a playlist
   // This display's look, set in the admin panel: the location pin and the logo
-  const settings = ref({ showDeviceInfo: true, logo: null, background: DEFAULT_BACKGROUND, installerNeeded: false });
+  const settings = ref({ showDeviceInfo: true, logo: null, background: DEFAULT_BACKGROUND, installerNeeded: false, updateAvailable: false });
 
   // Reconnects on its own after any outage, retrying every 2–10 s for as long as it takes
   const socket = io({
@@ -52,6 +52,7 @@ export function useSocket() {
       logo: data?.logo ?? null,
       background: data?.background || DEFAULT_BACKGROUND,
       installerNeeded: data?.installerNeeded === true,
+      updateAvailable: data?.updateAvailable === true,
     };
   });
 

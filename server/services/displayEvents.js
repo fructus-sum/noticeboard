@@ -15,8 +15,8 @@
 //   onPlaylistChanged(fn), onDisplaySettingsChanged(fn)   for realtime/displaySocket.js
 //
 // Used by
-//   routes/api/slideshows.js, routes/api/slides.js, routes/api/settings.js (logo),
-//   services/uploadQueue.js; realtime/displaySocket.js listens
+//   routes/api/slideshows.js, routes/api/slides.js, routes/api/settings/logo.js (logo),
+//   services/uploadQueue.js, services/contentReset.js (Delete All); realtime/displaySocket.js listens
 //
 // Change impact
 //   An announcement before the socket exists (e.g. during start-up) reaches nobody, which is

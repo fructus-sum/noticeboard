@@ -5,6 +5,9 @@
 //
 // Used by
 //   realtime/displaySocket (sent as display:build: an open screen that sees it change reloads)
+//
+// Uses
+//   utils/pathHelpers (displayDistDir)
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

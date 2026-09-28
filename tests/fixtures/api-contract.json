@@ -245,6 +245,30 @@
     "type": "application/json",
     "content": "{\"error\":\"The slide duration must be a whole number of seconds from 1 to 3600\"}"
   },
+  "videos: conversion status": {
+    "method": "GET",
+    "path": "/api/settings/videos/convert",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "converted": "number",
+      "current": "null",
+      "done": "number",
+      "failed": "number",
+      "finishedAt": "null",
+      "format": "null",
+      "running": "boolean",
+      "skipped": "number",
+      "total": "number"
+    }
+  },
+  "settings: bad video format": {
+    "method": "PUT",
+    "path": "/api/settings",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"videoFormat must be one of: h265, h264\"}"
+  },
   "settings: nothing to change": {
     "method": "PUT",
     "path": "/api/settings",
@@ -323,7 +347,14 @@
       "instant": "boolean",
       "lastCheck": "null",
       "pending": "boolean",
-      "status": "null"
+      "schedule": {
+        "at": "null",
+        "day": "number",
+        "every": "string",
+        "time": "string"
+      },
+      "status": "null",
+      "waiting": "null"
     }
   },
   "updates: notice": {
@@ -385,6 +416,34 @@
     "status": 404,
     "type": "application/json",
     "content": "{\"error\":\"There's no branch called \\\"no-such-branch-xyz\\\" on GitHub.\"}"
+  },
+  "updates: schedule, bad": {
+    "method": "PUT",
+    "path": "/api/settings/updates/schedule",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"The schedule must be one of: 15min, 2h, daily, weekly, manual.\"}"
+  },
+  "updates: schedule, updater not set up": {
+    "method": "PUT",
+    "path": "/api/settings/updates/schedule",
+    "status": 409,
+    "type": "application/json",
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
+  },
+  "updates: install at, bad": {
+    "method": "PUT",
+    "path": "/api/settings/updates/install-at",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Choose a date and time for the update.\"}"
+  },
+  "updates: install now, updater not set up": {
+    "method": "POST",
+    "path": "/api/settings/updates/install-now",
+    "status": 409,
+    "type": "application/json",
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
   },
   "updates: verify, wrong password": {
     "method": "POST",
@@ -540,6 +599,7 @@
         "duration": "null",
         "filename": "null",
         "id": "string",
+        "originalName": "string",
         "status": "string",
         "type": "string"
       }
@@ -556,6 +616,7 @@
         "duration": "null",
         "filename": "string",
         "id": "string",
+        "originalName": "string",
         "status": "string",
         "type": "string"
       }
@@ -591,10 +652,41 @@
         "duration": "null",
         "filename": "string",
         "id": "string",
+        "originalName": "string",
         "status": "string",
         "type": "string"
       }
     ]
+  },
+  "slide: rename": {
+    "method": "PATCH",
+    "path": "/api/slideshows/contract-test/slides/:id",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "addedAt": "string",
+      "duration": "null",
+      "filename": "string",
+      "id": "string",
+      "name": "string",
+      "originalName": "string",
+      "status": "string",
+      "type": "string"
+    }
+  },
+  "slide: rename, too long": {
+    "method": "PATCH",
+    "path": "/api/slideshows/contract-test/slides/:id",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"A name can be at most 200 characters\"}"
+  },
+  "slide: rename, missing": {
+    "method": "PATCH",
+    "path": "/api/slideshows/contract-test/slides/no-such-slide",
+    "status": 404,
+    "type": "application/json",
+    "content": "{\"error\":\"Slide not found\"}"
   },
   "slides: thumbnails": {
     "method": "POST",
@@ -620,7 +712,8 @@
       "logo": {
         "url": "string"
       },
-      "showDeviceInfo": "boolean"
+      "showDeviceInfo": "boolean",
+      "updateAvailable": "boolean"
     }
   },
   "socket: playlist:update": {
@@ -718,6 +811,59 @@
     "status": 200,
     "type": "application/json",
     "content": "{\"authenticated\":false}"
+  },
+  "maintenance: verify, unknown action": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/verify-password",
+    "status": 400,
+    "type": "application/json",
+    "content": "{\"error\":\"Unknown action.\"}"
+  },
+  "maintenance: verify, wrong password": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/verify-password",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"Incorrect password. Nothing was changed.\"}"
+  },
+  "maintenance: delete all, no token": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/delete-all",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"The password check has expired. Nothing was changed; start again.\"}"
+  },
+  "maintenance: verify": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/verify-password",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "token": "string"
+    }
+  },
+  "maintenance: delete all": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/delete-all",
+    "status": 200,
+    "type": "application/json",
+    "content": {
+      "deleted": []
+    }
+  },
+  "maintenance: restore defaults, no token": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/restore-defaults",
+    "status": 403,
+    "type": "application/json",
+    "content": "{\"error\":\"The password check has expired. Nothing was changed; start again.\"}"
+  },
+  "maintenance: restore defaults, updater not set up": {
+    "method": "POST",
+    "path": "/api/settings/maintenance/restore-defaults",
+    "status": 409,
+    "type": "application/json",
+    "content": "{\"error\":\"Automatic updates aren't set up on this noticeboard. Run the installer on the Pi to set them up.\"}"
   },
   "logout": {
     "method": "POST",

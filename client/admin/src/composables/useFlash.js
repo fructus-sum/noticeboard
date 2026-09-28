@@ -6,7 +6,8 @@
 //     error    a failure (red); stays until the next message or clear()
 //   FlashMessage.vue shows it.
 //
-// Used by: the Settings cards (display, MAC filtering, logo, password), the slideshow settings card
+// Used by: the Settings cards (display, MAC filtering, branding, password, delete content),
+//   updates/UpdateSchedule, the slideshow settings card
 import { reactive } from 'vue';
 
 export function useFlash() {

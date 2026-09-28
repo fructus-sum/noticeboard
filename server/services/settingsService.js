@@ -4,19 +4,23 @@
 //   What GET /api/settings shows (config.json without its secrets) and what PUT /api/settings may
 //   change. Only port, macFiltering and display can be changed here; the display settings are
 //   merged, so saving one of them never drops the others, and each is checked (the duration's
-//   range, the background colour's form). port and macFiltering are saved as sent (§16 #4).
+//   range, the background colour's form, the video format). port and macFiltering are saved as
+//   sent (§16 #4).
 //
 // Provides
 //   publicSettings()  → config.json without passwordHash, jwtSecret and _comment
 //   applyPatch(body)  → Promise<{ settings, keys } | { status: 400, error }>
 //                       saves the allowed keys in one config write (configService emits 'change':
 //                       the scheduler and the displays hear about it)
+//   videoFormat()     → 'h265' | 'h264': what new videos are converted to (display.videoFormat,
+//                       else the contract's default, H.265)
 //
 // Used by
-//   routes/api/settings/general.js
+//   routes/api/settings/general.js, services/uploadQueue (videoFormat)
 //
 // Uses
-//   configService, slideshowRules (the duration rule), shared/contract.json (the colour's form)
+//   configService, slideshowRules (the duration rule), shared/contract.json (the colour's form, the
+//   video formats)
 const configService = require('./configService');
 const { parseSlideSeconds } = require('./slideshowRules');
 const { display: DISPLAY } = require('../../shared/contract.json');
@@ -52,6 +56,12 @@ function mergeDisplay(current, change) {
     merged.backgroundColor = change.backgroundColor.toLowerCase();
   }
   if (change.logo !== undefined) merged.logo = { ...current.logo, enabled: change.logo?.enabled !== false };
+  if (change.videoFormat !== undefined) {
+    if (!DISPLAY.videoFormats.includes(change.videoFormat)) {
+      return { error: `videoFormat must be one of: ${DISPLAY.videoFormats.join(', ')}` };
+    }
+    merged.videoFormat = change.videoFormat;
+  }
   return { merged };
 }
 
@@ -72,4 +82,10 @@ async function applyPatch(body) {
   return { settings: publicSettings(), keys: Object.keys(patch) };
 }
 
-module.exports = { publicSettings, applyPatch };
+// What new videos are converted to: the saved choice, else the default (H.265)
+function videoFormat() {
+  const saved = configService.get('display')?.videoFormat;
+  return DISPLAY.videoFormats.includes(saved) ? saved : DISPLAY.defaultVideoFormat;
+}
+
+module.exports = { publicSettings, applyPatch, videoFormat };

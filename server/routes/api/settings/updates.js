@@ -7,30 +7,21 @@
 //   routes/api/settings/index.js; the admin panel (components/updates, NavBar's version)
 //
 // Uses
-//   services/updates (every route's work), services/adminPassword, middleware/asyncRoute
+//   services/updates (every route's work), services/adminPassword, middleware/asyncRoute,
+//   middleware/passwordLimiter (wrong passwords, counted with the other password checks),
+//   utils/logger
 //
 // Change impact
 //   The admin panel of the running version reads these; update.sh never calls them (it shares
 //   files with the server instead: SYSTEM_DESIGN §4.2).
 const express = require('express');
-const rateLimit = require('express-rate-limit');
 const updateService = require('../../../services/updates');
 const adminPassword = require('../../../services/adminPassword');
 const { route, jsonRoute } = require('../../../middleware/asyncRoute');
+const { wrongPasswordLimiter } = require('../../../middleware/passwordLimiter');
 const logger = require('../../../utils/logger');
 
 const router = express.Router();
-
-// Wrong passwords only (403s) count: 5 per 15 minutes, like logging in
-const updatePasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true,
-  requestWasSuccessful: (req, res) => res.statusCode !== 403,
-  message: { error: 'Too many wrong passwords. Nothing was changed. Try again in 15 minutes.' },
-});
 
 router.get('/updates', jsonRoute(() => updateService.getInfo()));
 
@@ -54,7 +45,12 @@ router.post('/updates/check', jsonRoute(async (req) => {
   return { ...result, current: info.branch, currentCommit: info.commit };
 }));
 
-router.post('/updates/verify-password', updatePasswordLimiter, route(async (req, res) => {
+// The update schedule, a set time for the waiting version, and Update now
+router.put('/updates/schedule', jsonRoute((req) => updateService.setSchedule(req.body, req.ip)));
+router.put('/updates/install-at', jsonRoute((req) => updateService.setInstallAt(req.body?.at, req.ip)));
+router.post('/updates/install-now', jsonRoute((req) => updateService.installNow(req.ip)));
+
+router.post('/updates/verify-password', wrongPasswordLimiter, route(async (req, res) => {
   const { password, branch } = req.body;
   if (!updateService.validBranchName(branch)) {
     return res.status(400).json({ error: "That isn't a valid branch name." });

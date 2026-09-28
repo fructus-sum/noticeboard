@@ -12,7 +12,7 @@ A self-hosted digital notice board and slideshow system for the Raspberry Pi. It
 - **Several slideshows** — with schedules, priorities, and a default image duration (10 seconds) that each slideshow can override; switching slideshows never cuts a slide short
 - **Hide and unhide** unpublished slideshows to tidy the list without deleting them
 - **A sample slideshow** that updates bring new examples to; it can be hidden but not deleted
-- **Uploads processed for you** — images to PNG, videos to H.264 MP4 (large videos take a while; carry on meanwhile), with automatic video thumbnails and a larger preview of any slide
+- **Uploads processed for you** — images to PNG, videos to H.265 MP4 (large videos take a while; carry on meanwhile), with automatic video thumbnails and a larger preview of any slide
 - **Your logo** above "No slideshow published" and in the admin sidebar, or none
 - **The server's address on every screen** — a faint location pin shows the Noticeboard server's IP address and port; it can be turned off
 - **Admin panel** at `/admin`, usable on a phone, with a sidebar that collapses to icons, a link to open the viewer, a warning until the default password is changed, and the installed version's date
@@ -31,6 +31,31 @@ Everything is on one port, `3000`:
 | `/admin/help` | User guide | MAC filter (optional) |
 
 There's no separate admin port. **Default admin password: `Admin@12345`** — change it after the first login; the admin panel warns you until you do.
+
+## MAC Address Filtering
+
+MAC address filtering requires the Noticeboard server and display devices to be on the same local network.
+
+The server identifies display devices by resolving their IP address to a MAC address using the local network.
+
+For example:
+
+`Noticeboard Server → 192.168.1.10`
+
+`Display 1 → 192.168.1.20`
+
+`Display 2 → 192.168.1.21`
+
+If these devices are on the same local network, the server can identify the displays by their MAC addresses and apply the filtering.
+
+**Limitations while MAC filtering is on** (it's off by default, and none of this applies then):
+
+- **A device on another network is blocked.** A device behind another router, on a different VLAN or subnet, or connected over a VPN reaches the server through a router, so the server can't see its MAC address and treats it as not approved: it gets "Not Found" for the slideshow and the admin panel. Adding the MAC address the device shows doesn't help, because the server never sees it.
+- **Behind a router that shares one address (NAT), every device looks the same.** The server sees only that router's MAC address, so approving it approves every device behind that router.
+- **Some Wi-Fi range extenders (repeaters) do the same:** they replace each device's MAC address with their own. Mesh Wi-Fi systems normally don't.
+- **This includes the devices you manage it from.** Filtering also guards the admin panel, so a computer or phone on another network is locked out too. The server Pi itself is always allowed.
+
+**Recommendation:** when using MAC filtering, put the Noticeboard server, every display and the devices you manage it from on the same local network: the same subnet, or the same VLAN if your network uses VLANs. Devices on different VLANs are routed between them, so they have the same limitations as separate networks.
 
 ## Installation
 
@@ -81,7 +106,7 @@ After the installer's reboot, the kiosk starts automatically.
 
 ## Updates
 
-The server Pi checks GitHub every 15 minutes and installs new versions by itself; every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Pi to another branch (with checks, the admin password and a final confirmation); a Pi whose branch is merged into `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. Before a switch, the Pi checks its software against the branch's list of what it needs (`system-requirements.json`) and warns about anything missing, with an extra confirmation to switch anyway. When a version needs something only the installer sets up (such as the kiosk), the admin panel's Slideshows page says to run the installer again and shows the command. The user guide has the details and the commands.
+The server Pi checks GitHub every 15 minutes and installs new versions by itself, on the schedule you choose in **Settings → Software updates** (straight away, every 2 hours, daily, weekly, or only when you say); every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Pi to another branch (with checks, the admin password and a final confirmation); a Pi whose branch is merged into `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. Before a switch, the Pi checks its software against the branch's list of what it needs (`system-requirements.json`) and warns about anything missing, with an extra confirmation to switch anyway. When a version needs something only the installer sets up (such as the kiosk), the admin panel's Slideshows page says to run the installer again and shows the command. The user guide has the details and the commands.
 
 ## Status
 

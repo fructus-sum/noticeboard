@@ -10,7 +10,8 @@
 //
 // Uses
 //   services/slideshowStore, services/configService (sampleSlideshow), services/uploadQueue (its
-//   video's thumbnail), services/mediaTypes, utils/slugify, utils/pathHelpers
+//   video's thumbnail), services/mediaTypes, services/mediaNames (each slide's name is its sample
+//   file's), utils/slugify, utils/pathHelpers, utils/logger
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -19,6 +20,7 @@ const store = require('./slideshowStore');
 const { sampleDataDir, slidesDir } = require('../utils/pathHelpers');
 const { uniqueSlug } = require('../utils/slugify');
 const { enqueueThumbnail } = require('./uploadQueue');
+const { nameFromUpload } = require('./mediaNames');
 const logger = require('../utils/logger');
 
 const NAME = 'Sample slideshow';
@@ -73,6 +75,7 @@ function copyAsSlides(files, folder) {
     return {
       id,
       type: isVideo ? 'video' : 'image',
+      originalName: nameFromUpload(path.basename(file)),
       filename,
       status: 'ready',
       duration: null,   // the slideshow's own duration (sample.json); videos play to the end

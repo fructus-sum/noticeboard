@@ -13,7 +13,7 @@
 //
 // Used by
 //   routes/api/device.js (the location pin, kiosk-exit requests per device),
-//   routes/api/settings.js (the admin's device banner), utils/macLookup.js, services/macService.js
+//   routes/api/settings/general.js (the admin's device banner), utils/macLookup.js, services/macService.js
 //
 // Change impact
 //   isLoopback decides which kiosk-exit requests count as "the server's own screen". plainAddress

@@ -6,6 +6,9 @@
 //
 // Used by
 //   routes/api/settings/index.js; the admin panel (useSecurity, PasswordCard)
+//
+// Uses
+//   services/adminPassword (usesDefault, change), middleware/asyncRoute, utils/logger
 const express = require('express');
 const adminPassword = require('../../../services/adminPassword');
 const { route } = require('../../../middleware/asyncRoute');

@@ -271,9 +271,9 @@
       "overflow-y": "visible"
     },
     "slideshow: slides card title": {
-      "display": "block",
+      "display": "flex",
       "position": "static",
-      "width": "72.625px",
+      "width": "898.797px",
       "height": "23px",
       "margin": "0px",
       "padding": "0px",
@@ -874,7 +874,7 @@
       "display": "block",
       "position": "relative",
       "width": "524px",
-      "height": "329.391px",
+      "height": "348.391px",
       "margin": "0px",
       "padding": "12px",
       "border": "0px none rgb(17, 24, 39)",
@@ -934,7 +934,7 @@
       "display": "block",
       "position": "static",
       "width": "500px",
-      "height": "16px",
+      "height": "35px",
       "margin": "8px 0px 0px",
       "padding": "0px",
       "border": "0px none rgb(107, 114, 128)",
@@ -994,7 +994,7 @@
       "display": "block",
       "position": "static",
       "width": "1017px",
-      "height": "228px",
+      "height": "712px",
       "margin": "0px 0px 16px",
       "padding": "20px",
       "border": "1px solid rgb(229, 231, 235)",
@@ -1712,10 +1712,10 @@
     }
   },
   "texts": {
-    "slideshow page": "⚠ This noticeboard still uses the default admin password. Anyone on your network who knows it can change what's on your screens. Change the password in Settings. ← Back Sample slideshow SAMPLE Settings Edit Name Sample slideshow Priority 1 Image duration 3 s (this slideshow) Schedule Always active Status DISABLED Publish Hide ⚠ This slideshow is disabled — it will not appear on the display regardless of schedule settings. Click Publish above to make it live. Slides (5) + Upload Hover over a thumbnail, or click or tap it, for a larger view. Large videos take a while to process after uploading: carry on setting up meanwhile, and they appear by themselves when they’re ready. image UUID.png ready ↑ ↓ ✕ image UUID.png ready ↑ ↓ ✕ ▶ video UUID.mp4 ready ↑ ↓ ✕ image UUID.png ready ↑ ↓ ✕ image UUID.png ready ↑ ↓ ✕",
+    "slideshow page": "⚠ This noticeboard still uses the default admin password. Anyone on your network who knows it can change what's on your screens. Change the password in Settings. ← Back Sample slideshow SAMPLE Settings Edit Name Sample slideshow Priority 1 Image duration 3 s (this slideshow) Schedule Always active Status DISABLED Publish Hide ⚠ This slideshow is disabled — it will not appear on the display regardless of schedule settings. Click Publish above to make it live. Slides (5) + Upload Hover over a thumbnail, or click or tap it, for a larger view. Large videos take a while to process after uploading: carry on setting up meanwhile, and they appear by themselves when they’re ready. 01-welcome.png image · UUID.png ready ✎ ↑ ↓ ✕ 02-photo.png image · UUID.png ready ✎ ↑ ↓ ✕ ▶ 03-video.mp4 video · UUID.mp4 ready ✎ ↑ ↓ ✕ 04-event.png image · UUID.png ready ✎ ↑ ↓ ✕ 05-help.png image · UUID.png ready ✎ ↑ ↓ ✕",
     "slideshow edit form": "Name Priority (lower = higher priority) Image duration Use the default (10 s, set in Settings) Use its own: seconds How long each image shows. Videos always play to the end. Schedule Always active Timed Start time End time Active days Sun Mon Tue Wed Thu Fri Sat Save",
     "settings: saved message": "Saved.",
-    "settings page": "⚠ This noticeboard still uses the default admin password. Anyone on your network who knows it can change what's on your screens. Change the password in Settings. Settings Display Default image duration (seconds) Used by every slideshow that doesn't set its own duration. Videos always play to the end. Show the location pin in the viewer's top-left corner. It shows the Noticeboard server's address, so people can find the noticeboard from another device. Save Saved. MAC filtering Enable MAC filter (only approved devices can connect) No approved devices. Add Save Branding Logo Shown above No slideshow published on the displays when nothing is on, and above the title in this sidebar. A logo you upload is scaled down to fit 500 × 500 pixels if it's bigger; it's never stretched or enlarged. Show the logo The default logo Upload a logo… Background colour Fills the screen around a slide that doesn't fill it (for example, a landscape picture on a portrait screen), and behind the logo when nothing is published. Slides are never cut off or stretched. Pick a colour, or type its code (e.g. #000000 for black). Save Change password Current password New password Confirm new password Change password Software updates Running refactor/architecture SHA · updates now come from main Updates Checked every 15 minutes. Last update Done TIME Updated to SHA from main. Branch Updates come from the main branch on GitHub. main is the stable version; other branches hold work in progress. Nothing changes until you've checked the branch and confirmed twice. Check branch",
+    "settings page": "⚠ This noticeboard still uses the default admin password. Anyone on your network who knows it can change what's on your screens. Change the password in Settings. Settings Display Default image duration (seconds) Used by every slideshow that doesn't set its own duration. Videos always play to the end. Show the location pin in the viewer's top-left corner. It shows the Noticeboard server's address, so people can find the noticeboard from another device. Video format for new uploads H.265 (HEVC): smaller files H.264: plays everywhere Every uploaded video is converted before it's shown, so it plays the same way on every screen. The format decides the balance between file size and how widely it plays: H.265 (HEVC): about half the file size of H.264 for the same picture, so more videos fit on the Pi and the screens download them faster. Converting takes longer (a few times as long as H.264 on a Pi), and only screens whose browser can decode H.265 can play it. H.264: plays on every screen and in every browser, and converts faster; the files are about twice as large. H.265 may not play everywhere. A screen can only show an H.265 video if its browser can decode it: on a Raspberry Pi that depends on Chromium using the Pi's hardware video decoder, and on a PC on its graphics card. A screen that can't play a video shows nothing for the video's length, then the slideshow carries on as usual. Some browsers (e.g. Firefox) can't show H.265 in the preview here either. If a video doesn't show on a screen, choose H.264, save, and convert the existing videos below. Saving changes only the videos uploaded from now on; the existing ones keep their format until you convert them. Save Saved. Existing videos Convert the videos already uploaded to H.265, the saved format. Videos already in that format are left as they are. Each video shows processing in its slideshow while it's its turn, then ready again; the screens keep showing it as it is until the new version is ready. This takes a long time and slows the Pi down. Videos are converted one after another, and on a Raspberry Pi each minute of video takes several minutes. Meanwhile the screens, uploads and this admin panel may be slower. It carries on if you leave this page; an update waits for it to finish. Convert existing videos to H.265… MAC filtering Enable MAC filter (only approved devices can connect) No approved devices. Add Save Branding Logo Shown above No slideshow published on the displays when nothing is on, and above the title in this sidebar. A logo you upload is scaled down to fit 500 × 500 pixels if it's bigger; it's never stretched or enlarged. Show the logo The default logo Upload a logo… Background colour Fills the screen around a slide that doesn't fill it (for example, a landscape picture on a portrait screen), and behind the logo when nothing is published. Slides are never cut off or stretched. Pick a colour, or type its code (e.g. #000000 for black). Save Change password Current password New password Confirm new password Change password Software updates Running feature/look-test SHA · updates now come from main Updates Checked every 15 minutes. Last update Done TIME Updated to SHA from main. Update schedule Install updates Every 15 minutes Every 2 hours Daily Weekly Manual A new version is installed within 15 minutes of being published. Times are the noticeboard's own clock. Save Branch Updates come from the main branch on GitHub. main is the stable version; other branches hold work in progress. Nothing changes until you've checked the branch and confirmed twice. Check branch Delete content Delete All deletes every slideshow except the sample, with all their slides and files. The sample slideshow, your settings, logo and background colour are kept. It can't be undone. Restore Defaults makes this noticeboard as if it had just been installed: every slideshow, setting, the logo and the update history are deleted, and the software is reinstalled. It can't be undone. Delete All… Restore Defaults…",
     "switch dialog": "Missing software main needs software this noticeboard doesn’t have, or has in a version that’s too old. Install it yourself before switching: until you do, the branch may not work. FFmpeg 4.0.0 or newer (this noticeboard has none). Processing uploaded videos. To install: sudo apt install ffmpeg FFprobe 4.0.0 or newer (this noticeboard has none). Reading the length of uploaded videos. To install: sudo apt install ffmpeg (FFprobe comes with it) Chromium any version (this noticeboard has none). Showing the slideshow full screen on this Pi's own screen. To install: sudo apt install chromium (on older Raspberry Pi OS: chromium-browser) I’ve installed it myself, or I accept that main may not work until I do. Cancel Continue",
     "after Esc": " Updates come from the main branch on GitHub. main is the stable version; other branches hold work in progress. Nothing changes until you've checked the branch and confirmed twice. "
   }

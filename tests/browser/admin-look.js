@@ -40,7 +40,7 @@ const LIST = {
 };
 const SETTINGS = {
   'settings card': '.card', 'card title': 'h2', 'field label': 'label', 'text input': 'input[type=number]',
-  'checkbox row': '.field', 'primary button': '.btn-primary', 'ghost button': '.btn-ghost',
+  'checkbox row': '.field', 'primary button': '.btn-primary', 'ghost button': 'text:button:Add',
 };
 const MAC_WARNING = {
   'overlay': '.overlay', 'dialog': '.dialog', 'dialog title': '.dialog h2', 'important box': '.important',

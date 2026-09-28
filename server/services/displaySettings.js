@@ -3,21 +3,23 @@
 // Responsibilities
 //   The one place that puts the display:settings payload together: the location pin (config), the
 //   logo and the background colour (brandingService), and whether the installer needs running
-//   again on this Pi (services/updates/installerVersion), which the viewer shows as a warning mark.
-//   The installer state is read from files, so it's kept here and checked again with refresh():
-//   the installer writes its record after it has restarted the server, and an update can raise the
-//   version needed.
+//   again on this Pi (services/updates/installerVersion) or, with manual updates, a new version is
+//   waiting (services/updates): the viewer shows either as its warning mark. Both are read from
+//   files, so they're kept here and checked again with refresh(): the installer writes its record
+//   after it has restarted the server, an update can raise the version needed, and update.sh
+//   records a waiting version.
 //
 // Provides
-//   current() → { showDeviceInfo, logo: { url } | null, background, installerNeeded }
-//   refresh() → Promise: reads the installer state again (on an error, keeps the last one)
+//   current() → { showDeviceInfo, logo: { url } | null, background, installerNeeded, updateAvailable }
+//   refresh() → Promise: reads the installer and update states again (on an error, keeps the last)
 //
 // Used by
 //   realtime/displaySocket (sends current() on connect and broadcasts it when it changes)
 //
 // Uses
 //   services/configService (display.showDeviceInfo), services/brandingService (the logo URL and
-//   the background colour), services/updates/installerVersion (status)
+//   the background colour), services/updates/installerVersion (status), services/updates
+//   (manualUpdateWaiting), utils/logger
 //
 // Change impact
 //   The payload is a contract with open screens (SYSTEM_DESIGN §3.4, §15): keys may be added,
@@ -25,9 +27,11 @@
 const configService = require('./configService');
 const brandingService = require('./brandingService');
 const installerVersion = require('./updates/installerVersion');
+const updates = require('./updates');
 const logger = require('../utils/logger');
 
 let installerNeeded = false;
+let updateAvailable = false;   // manual updates, and a new version waiting (SYSTEM_DESIGN §14 D41)
 
 function current() {
   return {
@@ -35,6 +39,7 @@ function current() {
     logo: brandingService.logoEnabled() ? { url: `/branding/logo?v=${brandingService.logoVersion()}` } : null,
     background: brandingService.backgroundColour(),
     installerNeeded,
+    updateAvailable,
   };
 }
 
@@ -43,6 +48,11 @@ async function refresh() {
     installerNeeded = (await installerVersion.status()).needed === true;
   } catch (err) {
     logger.warn('Display settings: could not read the installer state', { err: err.message });
+  }
+  try {
+    updateAvailable = await updates.manualUpdateWaiting();
+  } catch (err) {
+    logger.warn('Display settings: could not read the update state', { err: err.message });
   }
 }
 

@@ -1,12 +1,14 @@
 // server/services/playlistService.js — what the displays play
 //
 // Provides
-//   buildPlaylist(active) → { slides: [{ type, url, duration, slideshow }] }
+//   buildPlaylist(active) → { slides: [{ type, url, duration, slideshow, length? }] }
 //     For each active slideshow (the scheduler's list, in priority order), its ready slides.
 //     The slideshow's settings come from config.json as it is now (the scheduler's copy may be
 //     older). An image's duration: its own, else its slideshow's, else the default from Settings
 //     (else 10 s); each slide carries its own, so a slideshow's last slide keeps its time.
-//     A video's duration is null: it plays to the end.
+//     A video's duration is null: it plays to the end; its length (seconds, null if unknown) is when
+//     a screen that can't play it moves on (SYSTEM_DESIGN §3.5). A video being converted to another
+//     format (reprocessing) stays in, with its current file.
 //
 // Used by
 //   realtime/displaySocket.js
@@ -28,12 +30,15 @@ function buildPlaylist(activeSlideshows) {
 
   for (const active of activeSlideshows) {
     const ss = store.find(active.folder) || active;
-    for (const slide of store.readSlides(ss.folder).slides.filter((s) => s.status === 'ready')) {
+    // Ready slides, and videos being converted to another format (their current file still plays)
+    for (const slide of store.readSlides(ss.folder).slides.filter((s) => s.status === 'ready' || (s.reprocessing && s.filename))) {
       slides.push({
         type: slide.type,
         url: mediaUrl(ss.folder, slide.filename),
         duration: slide.type === 'image' ? (slide.duration ?? ss.slideDurationSeconds ?? defaultDuration) : null,
         slideshow: ss.folder,
+        // A video's length: a screen that can't play it still moves on at that time
+        ...(slide.type === 'video' ? { length: slide.duration ?? null } : {}),
       });
     }
   }

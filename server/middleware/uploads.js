@@ -8,10 +8,12 @@
 // Provides
 //   createUpload({ prefix, maxFileBytes, allowed, rejectMessage }) → a multer instance (then
 //     .array(field, n) or .single(field)). Files are saved as <prefix>-<time>-<random><ext>;
-//     a type not in `allowed` is refused with an Error carrying status 400 and rejectMessage
+//     a type not in `allowed` is refused with an Error carrying status 400 and rejectMessage.
+//     Each file's own name (originalname) is read as UTF-8, as browsers send it, so names with
+//     accents or other scripts arrive intact (multer's default reads them as Latin-1)
 //
 // Used by
-//   routes/api/slides.js (slide uploads), routes/api/settings.js (the logo)
+//   routes/api/slides.js (slide uploads), routes/api/settings/logo.js (the logo)
 //
 // Uses
 //   multer, utils/pathHelpers (tmpDir)
@@ -35,6 +37,7 @@ function createUpload({ prefix, maxFileBytes, allowed, rejectMessage }) {
       },
     }),
     limits: { fileSize: maxFileBytes },
+    defParamCharset: 'utf8',
     fileFilter: (req, file, cb) => {
       if (allowed.has ? allowed.has(file.mimetype) : allowed.includes(file.mimetype)) return cb(null, true);
       cb(Object.assign(new Error(rejectMessage), { status: 400 }));
