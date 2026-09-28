@@ -1303,6 +1303,7 @@ Run them with `node tests/run.js <group> [filter]` or the npm scripts. A file th
 - **GitHub Actions** (`.github/workflows/tests.yml`) runs `npm ci`, `npm run build` and `npm run test:all` on Linux with Node.js 20 for every push and pull request; a newer push to the branch cancels the run still going. `npm ci` also proves `package-lock.json` installs on Linux (the Pi's packages, §11).
 - **`node tests/snapshot.js [<commit>] [<group>] [filter]`** runs the tests on a snapshot of a commit (a git worktree in the temporary folder, with this checkout's `node_modules` linked in and removed link first), so the working tree can change meanwhile. Its log is `<temporary folder>/noticeboard-snapshot-<commit>.log`.
 - **One run at a time in the api, browser and upgrade groups** (fixed ports, one Chrome): `run.js` holds a lock in the temporary folder only while it's in one of them, so unit and installer tests can run beside a background run.
+- **The look snapshots are per system** (`lookFixture` in tests/helpers/app.js): fonts, and so sizes, differ, so Windows's are in `tests/fixtures/` and Linux's in `tests/fixtures/linux/`. Actions records Linux's when missing and keeps them as the `linux-look-snapshots` artifact, to commit. A deliberate change of look is re-recorded on both. Actions uses Google Chrome (`CHROME_PATH`): the runner's Chromium can't play AAC or H.264/H.265, which a Pi's can; the browser tests get Node.js 20's `--experimental-websocket`.
 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|

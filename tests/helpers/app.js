@@ -13,6 +13,9 @@
 //   page(connect, size)        → a Chrome tab (cdp.js) with until/go/login/click/mouse helpers
 //   ffmpegEnv()                → { FFMPEG_PATH, FFPROBE_PATH } when ffmpeg is found, else {} (see hasFfmpeg)
 //   shot(name)                 → a path for a screenshot, outside the repository
+//   lookFixture(name)          → the look snapshot for this system: tests/fixtures/<name> on Windows,
+//                                tests/fixtures/<platform>/<name> elsewhere (fonts, and so sizes, differ;
+//                                GitHub Actions records Linux's when it's missing and keeps it as an artifact)
 //   copyChanges(dest)          copies this working tree's uncommitted changes onto a clone of it,
 //                                never node_modules or the built apps
 //                                (changed and new files; deleted ones removed)
@@ -62,6 +65,10 @@ function hasFfmpeg() {
 }
 
 const SHOTS = path.join(os.tmpdir(), 'noticeboard-test-shots');
+function lookFixture(name) {
+  const dir = path.join(REPO, 'tests', 'fixtures');
+  return process.platform === 'win32' ? path.join(dir, name) : path.join(dir, process.platform, name);
+}
 function shot(name) {
   fs.mkdirSync(SHOTS, { recursive: true });
   return path.join(SHOTS, name);
@@ -191,6 +198,6 @@ function done(env) {
 }
 
 module.exports = {
-  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, copyWorkingTree, copyChanges, untilSlideEnds,
+  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, lookFixture, copyWorkingTree, copyChanges, untilSlideEnds,
   isOk: () => ok,
 };

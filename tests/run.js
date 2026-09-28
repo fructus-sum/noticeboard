@@ -78,7 +78,8 @@ async function startChrome() {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nb-chrome-'));
   const proc = spawn(bin, ['--headless=new', '--remote-debugging-port=9222', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
-  for (let i = 0; i < 40 && !(await chromeUp()); i++) await new Promise((r) => setTimeout(r, 250));
+  // Up to 30 s: a first start on a fresh machine (e.g. a CI runner) takes a while
+  for (let i = 0; i < 120 && !(await chromeUp()); i++) await new Promise((r) => setTimeout(r, 250));
   return {
     stop: async () => {
       proc.kill();

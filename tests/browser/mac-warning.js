@@ -20,6 +20,8 @@ const { sleep, check, makeApp, server, page, done } = require('../helpers/app.js
 
   await toggle();
   await c.until(`${dialogTitle} === 'Turn on MAC filtering?'`, 3000);
+  // What the Server says about this device arrives after the dialog opens (slower on a CI runner)
+  await c.until(`/on the Server itself/.test(document.querySelector('.dialog')?.innerText ?? '')`, 5000);
   let text = await c.evaluate(`document.querySelector('.dialog').innerText`);
   check('ticking the box: a warning to add your own MAC address first', /add its MAC address to the\s+approved list first/.test(text) && /lock yourself out/.test(text), text.slice(0, 120).replace(/\n/g, ' '));
   check('opened on the Server itself (localhost): says this device stays allowed', /on the Server itself/.test(text));

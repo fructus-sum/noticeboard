@@ -49,3 +49,16 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run test:all
+        env:
+          # Google Chrome, not the runner's Chromium: that one can't play AAC or H.264/H.265,
+          # which a Pi's Chromium can
+          CHROME_PATH: /usr/bin/google-chrome
+
+      # The look snapshots are per system (fonts differ): Linux's, recorded here when missing, to
+      # download and commit (tests/fixtures/linux/)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-look-snapshots
+          path: tests/fixtures/linux/
+          if-no-files-found: ignore

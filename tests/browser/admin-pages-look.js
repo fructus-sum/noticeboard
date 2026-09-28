@@ -7,10 +7,10 @@
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep, git, REPO } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, sleep, git, REPO, lookFixture } = require('../helpers/app.js');
 const { startFakeGitHub } = require('../helpers/github.js');
 
-const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'admin-pages-look.json');
+const SNAPSHOT = lookFixture('admin-pages-look.json');   // per system: fonts, and so sizes, differ
 const PROPS = ['display', 'position', 'width', 'height', 'margin', 'padding', 'border', 'border-radius', 'outline',
   'background-color', 'color', 'opacity', 'font-family', 'font-size', 'font-weight', 'line-height', 'cursor', 'gap',
   'flex-wrap', 'justify-content', 'align-items', 'grid-template-columns', 'box-shadow', 'z-index', 'max-width',
@@ -150,9 +150,10 @@ async function capture(c, map, prefix) {
 
   const record = { look, texts };
   if (!fs.existsSync(SNAPSHOT) || process.env.NB_UPDATE_SNAPSHOT === '1') {
+    fs.mkdirSync(path.dirname(SNAPSHOT), { recursive: true });
     fs.writeFileSync(SNAPSHOT, `${JSON.stringify(record, null, 2)}\n`);
     const missing = Object.keys(look).filter((k) => !look[k]);
-    check(`recorded ${Object.keys(look).length} elements and ${Object.keys(texts).length} texts in tests/fixtures/admin-pages-look.json`, missing.length === 0, missing.join(', '));
+    check(`recorded ${Object.keys(look).length} elements and ${Object.keys(texts).length} texts in ${path.relative(path.join(__dirname, '..', '..'), SNAPSHOT)}`, missing.length === 0, missing.join(', '));
   } else {
     const want = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
     let same = 0;

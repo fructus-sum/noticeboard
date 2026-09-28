@@ -5,9 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, sleep, lookFixture } = require('../helpers/app.js');
 
-const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'viewer-look.json');
+const SNAPSHOT = lookFixture('viewer-look.json');   // per system: fonts, and so sizes, differ
 const PROPS = ['position', 'top', 'left', 'right', 'width', 'height', 'min-width', 'max-width', 'padding', 'border',
   'border-radius', 'background-color', 'color', 'opacity', 'cursor', 'display', 'align-items', 'justify-content',
   'z-index', 'transform', 'box-shadow', 'font-family', 'font-size', 'line-height', 'transition'];
@@ -53,8 +53,9 @@ const styles = (selector) => `(() => {
   await s.stop();
 
   if (!fs.existsSync(SNAPSHOT) || process.env.NB_UPDATE_SNAPSHOT === '1') {
+    fs.mkdirSync(path.dirname(SNAPSHOT), { recursive: true });
     fs.writeFileSync(SNAPSHOT, `${JSON.stringify(look, null, 2)}\n`);
-    check(`recorded the look of ${Object.keys(look).length} viewer controls in tests/fixtures/viewer-look.json`, Object.values(look).every(Boolean));
+    check(`recorded the look of ${Object.keys(look).length} viewer controls in ${path.relative(path.join(__dirname, '..', '..'), SNAPSHOT)}`, Object.values(look).every(Boolean));
   } else {
     const want = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
     for (const name of Object.keys(want)) {
