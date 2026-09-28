@@ -23,6 +23,9 @@ function slideshowDir(folderName) { return path.join(slideshowsDir(), folderName
 function slidesDir(folderName) { return path.join(slideshowDir(folderName), 'slides'); }
 function slideshowJsonPath(folderName) { return path.join(slideshowDir(folderName), 'slideshow.json'); }
 function configPath() { return path.join(dataDir(), 'config.json'); }
+// The last config.json that loaded or was saved, and the note left when one couldn't be read (§18.5 item 8)
+function lastGoodConfigPath() { return path.join(dataDir(), 'config.last-good.json'); }
+function configRecoveryPath() { return path.join(dataDir(), 'config-recovery.json'); }
 function logsDir() { return path.join(ROOT, 'logs'); }
 function displayDistDir() { return path.join(ROOT, 'client', 'display', 'dist'); }
 function adminDistDir() { return path.join(ROOT, 'client', 'admin', 'dist'); }
@@ -62,6 +65,8 @@ module.exports = {
   slidesDir,
   slideshowJsonPath,
   configPath,
+  lastGoodConfigPath,
+  configRecoveryPath,
   logsDir,
   displayDistDir,
   adminDistDir,

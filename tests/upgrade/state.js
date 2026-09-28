@@ -98,7 +98,8 @@ async function snapshot() {
   await waitQuiet(cookie);
   const data = filesUnder(path.join(dir, 'data'));
   for (const k of Object.keys(data)) {
-    if (/^update-.*\.json$|^installer\.json$|^backups\//.test(k)) delete data[k];   // the updater's own records
+    // The updater's own records, and the Server's own copy of its config (config.last-good.json, 0.6.9)
+    if (/^update-.*\.json$|^installer\.json$|^backups\/|^config\.last-good\.json$/.test(k)) delete data[k];
   }
   const slideshows = (await api('GET', '/api/slideshows', null, cookie)).json;
   const slides = {};

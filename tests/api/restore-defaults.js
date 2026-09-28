@@ -69,7 +69,7 @@ const sharp = require(path.join(MODULES, 'sharp'));
   env.base = 'http://localhost:3000';
   await s.start({ NOTICEBOARD_SYSTEMD_DIR: units });
   const dataLeft = fs.readdirSync(at('data')).sort().join(' ');
-  check('data/ holds only the kept files and a new install\'s', dataLeft === 'config.json installer.json slideshows update-branch.env', dataLeft);
+  check('data/ holds only the kept files and a new install\'s', dataLeft === 'config.json config.last-good.json installer.json slideshows update-branch.env', dataLeft);
   check('  … the kept files unchanged', fs.readFileSync(at('data', 'update-branch.env'), 'utf8') === 'NOTICEBOARD_BRANCH=main\n'
     && JSON.parse(fs.readFileSync(at('data', 'installer.json'), 'utf8')).version === 2);
   check('tmp/ keeps only the updater\'s lock', fs.readdirSync(at('tmp')).join(' ') === 'update.lock', fs.readdirSync(at('tmp')).join(' '));

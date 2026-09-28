@@ -5,8 +5,8 @@
 // notices ("back on main", "Run the installer again on the Server"). The frame stays while moving
 // between pages, so a notice is the same on every page, and closing one closes it everywhere.
 // Used by: main.js
-// Uses: NavBar, DefaultPasswordWarning, updates/UpdateNotice, updates/InstallerNotice, settings/RestartNotice,
-//   updates/UpdateAvailableNotice, useNav (the
+// Uses: NavBar, DefaultPasswordWarning, updates/UpdateNotice, updates/InstallerNotice,
+//   settings/RestartNotice, settings/ConfigRecoveryNotice, updates/UpdateAvailableNotice, useNav (the
 //   collapsed sidebar), the router's page
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
@@ -15,6 +15,7 @@ import DefaultPasswordWarning from './components/DefaultPasswordWarning.vue';
 import UpdateNotice from './components/updates/UpdateNotice.vue';
 import InstallerNotice from './components/updates/InstallerNotice.vue';
 import RestartNotice from './components/settings/RestartNotice.vue';
+import ConfigRecoveryNotice from './components/settings/ConfigRecoveryNotice.vue';
 import UpdateAvailableNotice from './components/updates/UpdateAvailableNotice.vue';
 import { useNav } from './composables/useNav.js';
 
@@ -32,6 +33,7 @@ const showNav = computed(() => route.path !== '/login');
         <UpdateNotice />
         <InstallerNotice />
         <RestartNotice />
+        <ConfigRecoveryNotice />
         <UpdateAvailableNotice />
       </div>
       <RouterView />
