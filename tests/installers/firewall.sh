@@ -100,7 +100,7 @@ done_ok && [ -z "$(changes)" ] && grep -q "left exactly as they are" "$OUT" && o
 
 # ── No firewall ──
 run setupno server '' y n
-done_ok && [ -z "$(changes)" ] && grep -q "dedicated slideshow machine running Raspberry Pi OS" "$OUT" && grep -q "allow TCP port 3000" "$OUT" \
+done_ok && [ -z "$(changes)" ] && grep -q "just for the noticeboard, running Raspberry Pi OS" "$OUT" && grep -q "allow TCP port 3000" "$OUT" \
   && ok "no firewall, setup declined: nothing changed, recommendation explained" || { bad "setupno"; show setupno; }
 run setup server 'MOCK_ACTIVE="ssh"' y y y "" ""
 expected=$'apt-get install -y -qq ufw\nufw allow 22/tcp\nufw allow 3000/tcp\nufw allow 5353/udp\nufw default deny incoming\nufw default allow outgoing\nufw --force enable'
