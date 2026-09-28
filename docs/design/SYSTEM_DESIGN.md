@@ -675,9 +675,9 @@ noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
 | socket.io / socket.io-client | realtime/displaySocket.js / useSocket.js | real-time channel |
 | winston | logger | logging |
 | vue, vue-router | client apps | UI |
-| **cors** | **nothing** | unused (to be removed: §18.2) |
+| **cors** | **nothing** | unused (left in on purpose: the owner, 2026-09-28) |
 
-Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the build): `vite`, `@vitejs/plugin-vue` (the client builds). **Unused:** `nodemon` (server) and `concurrently` (root), to be removed (§18.2).
+Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the build): `vite`, `@vitejs/plugin-vue` (the client builds). **Unused:** `nodemon` (server) and `concurrently` (root), left in on purpose (the owner, 2026-09-28: removing them means regenerating the lockfile on Linux, for no change to what runs).
 
 ### 11.2 System programs
 
@@ -1246,7 +1246,6 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 2. ~~The server kiosk URL is hard-coded to port 3000~~ **Fixed in 0.6.3** (§18.5 item 2): the Server's kiosk reads the port from its settings whenever it starts the browser (installer version 4). A Client still has the Server's address, port included, from its installer run.
 3. ~~An empty client IP counts as the Server itself~~ **Fixed in 0.6.4** (§18.5 item 3): with MAC filtering on, a request without an address is refused (D6).
 4. ~~`PUT /api/settings` does not validate `port`~~ **Fixed in 0.6.5** (§18.5 item 4): the port is checked; a change needs a restart, which the admin panel asks for (and does) like the installer warning. (The `macFiltering` shape: item 9 below.)
-5. **Unused npm packages:** `cors`, `concurrently` and `nodemon` (their removal is planned: §18.2).
 6. The media route allows audio extensions (`.mp3 .wav .ogg`) that nothing produces there (audio shows' tracks are served at `/audio`).
 7. The admin panel ignores reorder errors (`.catch(() => {})`), so the order shown can differ from what was saved.
 8. `configService.init` **regenerates the defaults when `config.json` doesn't parse**. The admin password, the MAC list and the slideshow list are then lost from the config, although their folders remain.
@@ -1293,7 +1292,6 @@ Every planned change starts here, before any code: what changes and why, the par
 | # | Change | Status | Version (§19) |
 |---|---|---|---|
 | 18.1 | The viewer's black screen that only a power cycle cleared | On hold: the owner reports it if it happens again | a patch release when fixed |
-| 18.2 | Remove the unused npm packages `cors`, `concurrently` and `nodemon` (§16 #5) | Left for later (needs a Linux machine) | a patch release when done |
 | 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); to check on a real Pi, then merge into main with the owner's OK | 0.6.0 |
 | 18.4 | The words Server and Client everywhere; the supported devices | Done (the kiosk scripts' text with §18.5 item 2, installer version 4); on `feature/audio-support`, to merge with it | 0.6.1 |
 | 18.5 | The Known Issues cleared for a stable base (§16) | Planned, after 18.4 | 0.6.2 to 0.6.13 (one per item) |
@@ -1325,10 +1323,6 @@ cat /proc/device-tree/model; uname -r; chromium --version
 - This changes the kiosk scripts and adds a unit, so `INSTALLER_VERSION` goes to 3 and the admin panel and every screen will ask for the installer to be run again (§3.5, §3.6).
 
 **Step 3, prevention:** chosen from what the logs show (e.g. Chromium's graphics or video-decoding flags, or a driver setting). The exact design of steps 2 and 3 is written here, and reviewed, before any code.
-
-### 18.2 Remove the unused npm packages
-
-Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and regenerate `package-lock.json` on Linux (on Windows, npm drops the Pi's linux-arm64 packages from it). Nothing else in the lockfile may change. Risk: an installed Server's next update runs `npm install` against the new lockfile, so every test group, and the upgrade rehearsal in particular, must pass.
 
 ### 18.3 Audio
 
@@ -1419,7 +1413,7 @@ Remove `cors`, `concurrently` and `nodemon` from the `package.json` files and re
 2. (0.6.3, **done**) **The Server's kiosk follows the port.** `installers/kiosk/server.sh` reads the port from `data/config.json` each time it waits for the Server before starting the browser (as update.sh does, through `configIO.readConfig`), falling back to 3000. The kiosk scripts' texts take §18.4's words at the same time. `INSTALLER_VERSION` 4 with a changes line; golden files re-recorded on purpose; `kiosk-scripts.sh` checks a port from the settings and the fallback.
 3. (0.6.4, **done**) **An empty client address is refused** when MAC filtering is on: `macLookup.isLocalhost` no longer counts `''` as this device (D6 updated); a request without an address is blocked.
 4. (0.6.5, **done**) **The port is checked, and a restart is asked for when needed.** `PUT /api/settings` checks `port` (a whole number from 1024 to 65535, `limits.port` in the contract; whether another program uses it can't be told reliably, so that isn't checked). A **Port** card in Settings. `services/restartState` knows the port the Server is running on; while the saved one differs, `GET /api/settings/maintenance/restart` says `restartNeeded` and so does `display:settings` (the screens' warning mark). Like the installer box, an amber **Restart the Server** box on every admin page says what changes and that each Client's installer must be run again with the new address, and the firewall rule changed; its **Restart the Server now…** asks for the admin password and a last chance (D40), then the Server ends gracefully and systemd starts it again (`Restart=always`; no new rights). The page waits for the Server on the new port (`/api/auth/status` may be read from the same site for this) and moves there. The Delete content card's "set a custom port again in Settings" is now true. Tests: `api/restart.js`, `browser/restart.js`.
-5. (0.6.6) **Unused npm packages:** the item and §18.2 are removed (the owner, 2026-09-28); the packages are left as they are.
+5. (0.6.6, **done**) **Unused npm packages:** the Known Issue and §18.2 are removed (the owner, 2026-09-28); the packages are left as they are (§11 says so).
 6. (0.6.7) **The media route's audio extensions:** reviewed after audio support. Still an issue, and reported only (not fixed here): `/media` still allows `.mp3 .wav .ogg`, which nothing puts there (tracks are `.m4a`, served at `/audio`). Harmless, but a wider allowlist than needed. It stays on the list.
 7. (0.6.8) **Reorder errors shown:** `useItemList.move` shows the error ("Couldn't save the new order: …") and reloads the list from the Server, so what's shown is what's saved.
 8. (0.6.9) **An unreadable config.json is never overwritten.** configService keeps `data/config.last-good.json`, a copy written after every config.json that loads (and every save). On a file that can't be read: it is moved aside as `config.json.broken-<time>` (kept, never deleted), the last good copy is restored and loaded, and an admin warning says what happened and where the broken file is. With no good copy: the Server runs on the defaults **in memory only**, never writing over anything, with an admin warning until the file is fixed or the admin chooses to start from the defaults. A missing file on a first start still creates the defaults, as now (§15: the installer's `init()` call is unchanged).
