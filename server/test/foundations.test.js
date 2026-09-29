@@ -33,6 +33,32 @@ test('an empty address has no MAC, so MAC filtering refuses it (0.6.4)', async (
   assert.equal(await lookupMac(undefined), null);
 });
 
+test('lookupMac reads the kernel\'s ARP table itself, so a Server without arp never crashes (§18.7)', async () => {
+  const os = require('os');
+  const path = require('path');
+  const fs = require('fs');
+  const table = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'nb-arp-')), 'arp');
+  fs.writeFileSync(table, [
+    'IP address       HW type     Flags       HW address            Mask     Device',
+    '192.168.1.20     0x1         0x2         B8:27:EB:12:34:56     *        eth0',
+    '192.168.1.21     0x1         0x0         00:00:00:00:00:00     *        eth0',
+    '192.168.1.200    0x1         0x2         dc:a6:32:00:00:01     *        wlan0',
+    '',
+  ].join('\n'));
+  process.env.NOTICEBOARD_ARP_TABLE = table;
+  try {
+    assert.equal(await lookupMac('192.168.1.20'), 'b8:27:eb:12:34:56');
+    assert.equal(await lookupMac('::ffff:192.168.1.200'), 'dc:a6:32:00:00:01');
+    assert.equal(await lookupMac('192.168.1.2'), null, 'not a prefix match');
+    assert.equal(await lookupMac('192.168.1.21'), null, 'an entry still waiting for an answer');
+    assert.equal(await lookupMac('127.0.0.1'), 'localhost');
+    process.env.NOTICEBOARD_ARP_TABLE = table + '-missing';
+    assert.equal(await lookupMac('192.168.1.20'), null, 'no table: unknown, nothing thrown');
+  } finally {
+    delete process.env.NOTICEBOARD_ARP_TABLE;
+  }
+});
+
 test('lanInterfaces lists IPv4, non-internal interfaces with name, ip and mac', () => {
   for (const i of lanInterfaces()) {
     assert.deepEqual(Object.keys(i).sort(), ['ip', 'mac', 'name']);

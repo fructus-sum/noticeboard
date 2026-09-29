@@ -4,7 +4,8 @@
 //   ROOT; data/ (config, slideshows, branding, the update files and schedule, the Restore Defaults
 //   marker); logs/; tmp/ (tmpRootDir, and tmpDir: the uploads; the system step's answer; the Client bundle); the Client signing key; the built
 //   apps; the guide; sample-data/; what the installer set up (installer.json, the server kiosk
-//   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); mediaUrl(folder, file)
+//   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); the kernel's ARP table
+//   (NOTICEBOARD_ARP_TABLE for tests); mediaUrl(folder, file)
 //
 // Used by
 //   most server modules (never a hard-coded path elsewhere)
@@ -48,6 +49,8 @@ function serverKioskPath() { return path.join(ROOT, 'start-kiosk.sh'); }
 function requirementsPath() { return path.join(ROOT, 'system-requirements.json'); }
 // Where install.sh puts the systemd units; NOTICEBOARD_SYSTEMD_DIR points elsewhere for tests
 function systemdDir() { return process.env.NOTICEBOARD_SYSTEMD_DIR || '/etc/systemd/system'; }
+// The kernel's ARP table on Linux (the MAC filter); NOTICEBOARD_ARP_TABLE points elsewhere for tests
+function arpTablePath() { return process.env.NOTICEBOARD_ARP_TABLE || '/proc/net/arp'; }
 function tmpDir() { return path.join(ROOT, 'tmp', 'noticeboard-uploads'); }
 function tmpRootDir() { return path.join(ROOT, 'tmp'); }
 function sampleDataDir() { return path.join(ROOT, 'sample-data'); }
@@ -89,6 +92,7 @@ module.exports = {
   serverKioskPath,
   requirementsPath,
   systemdDir,
+  arpTablePath,
   tmpDir,
   tmpRootDir,
   sampleDataDir,

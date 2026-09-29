@@ -703,7 +703,7 @@ noticeboard-client-update.timer    OnBootSec=5min, OnUnitActiveSec=15min, Random
 
 **Other integration:**
 - **Logging:** the Client's kiosk uses `logger -t noticeboard-kiosk` and its updater `logger -t noticeboard-client` (the journal).
-- **ARP:** the server's MAC filter reads the ARP table through `node-arp` (which runs `arp`).
+- **ARP:** the server's MAC filter reads the kernel's ARP table, `/proc/net/arp`, on Linux (no program to run); elsewhere (a PC running the tests) through `node-arp` (which runs `arp`).
 
 ---
 
@@ -724,7 +724,7 @@ noticeboard-client-update.timer    OnBootSec=5min, OnUnitActiveSec=15min, Random
 | sharp (native) | mediaService, brandingService | images and the logo |
 | fluent-ffmpeg | mediaService | video transcoding, duration, thumbnails (needs the `ffmpeg` and `ffprobe` binaries) |
 | p-queue 7 (ESM only) | uploadQueue (`require('p-queue').default`) | processing queue. Needs Node's `require(esm)`, available from **Node 20.19** or **22.12** |
-| node-arp | macLookup | MAC lookup |
+| node-arp | macLookup | MAC lookup off Linux (a PC running the tests); on Linux the server reads `/proc/net/arp` itself |
 | socket.io / socket.io-client | realtime/displaySocket.js / useSocket.js | real-time channel |
 | winston | logger | logging |
 | vue, vue-router | client apps | UI |
@@ -743,7 +743,6 @@ Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the b
 | `chromium` / `chromium-browser` | the Client's kiosk | display |
 | `cage` | `noticeboard-kiosk.service` (a headless Client) | the kiosk full screen without a desktop |
 | `openssl` (1.1.1+, for `pkeyutl -rawin`), `tar`, `sha256sum` | `noticeboard-client` (a Client only) | verifying the Server's signed bundle, unpacking it, the key's fingerprint |
-| `arp` (net-tools) | node-arp | MAC filter |
 | `date` (GNU: `-d`, used by lib/schedule.sh), `systemctl`, `systemd-run`, `flock`, `runuser`, `logger`, `xset`, `xdg-user-dir`, `getent`, `visudo`, `passwd`, `ss`, `ps`, `sshd`, `ufw`, `firewall-cmd`, `nft`, `iptables`, `apt-get`, `apt-cache`, `hostname`, `stat` | installers | OS set-up |
 
 `system-requirements.json` lists Node.js, npm, Git, FFmpeg, FFprobe, curl and Chromium, with version ranges and install hints. It also holds `installer.version` and `installer.changes`.
@@ -1036,8 +1035,8 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Purpose:** the winston logger. Creates `logs/` when first required. JSON lines to the console (the journal on an installed Server) and to `logs/app.log`; info and above, or debug too with `NOTICEBOARD_LOG_LEVEL=debug`.
 
 **`utils/macLookup.js`**
-- **Purpose:** `isLocalhost` ("the Server itself" for MAC filtering: the set `127.0.0.1`, `::1`, `::ffff:127.0.0.1`, `localhost`, **empty string**, kept on purpose: §14 D6) and `lookupMac` (node-arp, lower-cased).
-- **Uses:** `network.plainAddress`.
+- **Purpose:** `isLocalhost` ("the Server itself" for MAC filtering: the set `127.0.0.1`, `::1`, `::ffff:127.0.0.1`, `localhost`; not an empty address, §18.5 item 3) and `lookupMac` (lower-cased; on Linux from the kernel's ARP table, `/proc/net/arp`, read directly; elsewhere node-arp).
+- **Uses:** `network.plainAddress`, `pathHelpers.arpTablePath`, node-arp (off Linux).
 
 **`utils/network.js`**
 - **Purpose:** `plainAddress` (strips `::ffff:`), `isLoopback` (127.0.0.0/8, `::1`, `::ffff:127.x`: the kiosk-exit rule), `lanInterfaces()` (non-internal IPv4 interfaces with their MACs).
@@ -1649,6 +1648,9 @@ cat /proc/device-tree/model; uname -r; chromium --version
 - **Installing a branch from GitHub**, for any role: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/<branch>/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=<branch> bash`. `NOTICEBOARD_INSTALL_BRANCH` is the answer the hand-over already passes (`choose_branch`); `use_latest_installer` now takes it before the followed branch, so the branch's own installer runs even on a device with no branch setting (a new device, or any Client), and `choose_branch` takes it for every role (a Client only's installer then doesn't hand back to main's). Without it, nothing changes: a device follows main's installer as before.
 - **The admin panel's installer command** on a branch (`installerCommand(ref)` in `shared/index.js`, for a ref that is neither main nor a Release's tag) carries `NOTICEBOARD_INSTALL_BRANCH=<branch>`, so running it on a Client installs that branch's Client, as on the Server.
 - **Tests:** installers (`install-flow.sh`: the first check after the key is pinned; `installer-handover.sh`: `NOTICEBOARD_INSTALL_BRANCH` choosing the branch's installer on a new device; `client-update.sh`: nothing to put back → no GitHub), unit (`installerCommand` for main, a tag and a branch).
+
+**Found by the test in Debian VMs (WSL2, Debian 13, 2026-09-29):**
+- **A Server without `arp` crashed on every request from another device.** `node-arp` runs `ping` and `arp` without listening for their errors, so a missing program (`arp` is in net-tools, which generic Debian doesn't install) threw an unhandled error and ended the server; systemd restarted it, and the next request from a Client or browser ended it again. A Raspberry Pi with net-tools never saw it. **Fix:** on Linux, `macLookup` reads the kernel's ARP table itself (`/proc/net/arp`, `pathHelpers.arpTablePath()`, `NOTICEBOARD_ARP_TABLE` for tests): no program to run, nothing to crash, and a device that has just sent a request is already in it (the ping node-arp did first isn't needed). Elsewhere (a PC running the tests) node-arp as before. No installer change. **Tests:** unit (`lookupMac` from a table: the address found, an incomplete entry, an address not there, no table), and the VMs again.
 
 **Tests:** installers (every role and platform, the saved answers, `--apply` asking nothing, golden files re-recorded on purpose with installer 5; the system step needed, not needed, failing and skipping the target, a request for a commit that isn't the Release or the branch tip refused; the Client updater against a stand-in Server: same version, different and older versions, a hash-only change, a bad signature refused, rollback after a kiosk failure, `reinstall-stable` against the stand-in GitHub); api and browser (the client endpoints and the signature, Full update with the password, the warnings on any schedule); the upgrade rehearsal from 0.7.1 and 0.8.0; on real hardware before merging: a Raspberry Pi as Client + Server with a desktop, a Debian VM as Server only, a minimal Debian (or an Orange Pi Zero 2W) as Client only, a Client following a branch switch and back, and a rollback.
 
