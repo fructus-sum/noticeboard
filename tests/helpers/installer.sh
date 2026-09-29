@@ -3,7 +3,7 @@
 #
 # Provides
 #   load_installer   install.sh (all but its last line, which would run main()) and its parts from
-#                    this checkout (installers/lib, installers/kiosk), loaded the way a real run
+#                    this checkout (installers/lib, installers/client), loaded the way a real run
 #                    loads them (load_modules_from). install.sh's own set -euo pipefail applies.
 #                    Stand-ins a test defines afterwards replace the real functions.
 #

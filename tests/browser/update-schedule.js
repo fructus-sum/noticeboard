@@ -1,11 +1,12 @@
 // The update schedule in the admin panel and on the screens (SYSTEM_DESIGN §14 D41): the schedule
 // form in Software updates; a waiting version with its three choices (Update now, Set a time, or
-// waiting for the automatic install); with manual updates, the "Update available" notice on every
-// page (no close button) and the viewer's warning mark, both staying until the new version runs.
+// waiting for the automatic install); the "Update available" notice on every page (no close
+// button) and the viewer's warning mark, on any schedule (with manual updates, saying it waits for
+// the admin), both staying until the new version runs.
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep, shot } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, shot } = require('../helpers/app.js');
 
 (async () => {
   const env = makeApp({ port: 3947 });
@@ -46,11 +47,12 @@ const { makeApp, server, page, check, done, sleep, shot } = require('../helpers/
   const box = await c.evaluate(`document.querySelector('.waiting').innerText`);
   check('the waiting version, with its three choices', box.includes('Update available') && box.includes('Better slides') && box.includes('installed automatically at')
     && box.includes('Update now') && box.includes('Set a time'), box.replace(/\s+/g, ' '));
-  check('automatic updates: no page notice', !(await c.evaluate(`!!document.querySelector('.page-notices .page-warning')`)));
+  // A newer version waiting shows on every page and screen, on any schedule (SYSTEM_DESIGN §18.7 phase 2)
+  const notice = await c.until(`(document.querySelector('.page-notices .page-warning')?.innerText ?? '').includes('installed by itself at')`, 8000);
+  check('automatic updates: "Update available" on every page, with when it installs', notice, await c.evaluate(`document.querySelector('.page-notices .page-warning')?.innerText ?? ''`));
   const v = await page(connect, { width: 1280, height: 720 });
   await v.go(env.base + '/?kiosk=off');
-  await sleep(2000);
-  check('automatic updates: no mark on the screens', !(await v.evaluate(`!!document.querySelector('.installer-warning')`)));
+  check('automatic updates: the warning mark on the screens', await v.until(`!!document.querySelector('.installer-warning')`, 8000));
 
   // Manual updates
   await c.evaluate(`(() => { const e = document.querySelector('#update-every'); e.value = 'manual'; e.dispatchEvent(new Event('change')); })()`);

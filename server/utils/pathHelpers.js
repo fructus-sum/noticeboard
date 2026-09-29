@@ -2,15 +2,16 @@
 //
 // Provides
 //   ROOT; data/ (config, slideshows, branding, the update files and schedule, the Restore Defaults
-//   marker); logs/; tmp/ (tmpRootDir, and tmpDir: the uploads); the built
+//   marker); logs/; tmp/ (tmpRootDir, and tmpDir: the uploads; the system step's answer; the Client bundle); the Client signing key; the built
 //   apps; the guide; sample-data/; what the installer set up (installer.json, the server kiosk
-//   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); mediaUrl(folder, file)
+//   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); the kernel's ARP table
+//   (NOTICEBOARD_ARP_TABLE for tests); mediaUrl(folder, file)
 //
 // Used by
 //   most server modules (never a hard-coded path elsewhere)
 //
 // Change impact
-//   Installed Servers, update.sh and the kiosk scripts rely on these names (SYSTEM_DESIGN §6,
+//   Installed Servers, update.sh, root's system step and the Client rely on these names (SYSTEM_DESIGN §6,
 //   §15). mediaUrl must match shared/index.js (a unit test checks).
 const path = require('path');
 
@@ -40,10 +41,16 @@ function updateSchedulePath() { return path.join(dataDir(), 'update-schedule.env
 function restoreMarkerPath() { return path.join(dataDir(), 'restore-defaults'); }
 // What install.sh set up: the version of its last run, and the Server's kiosk script
 function installerRecordPath() { return path.join(dataDir(), 'installer.json'); }
+function systemResultPath() { return path.join(ROOT, 'tmp', 'system-result'); }
+// The key a Client only's updates are signed with, and the bundle it downloads (SYSTEM_DESIGN §18.7 phase 3)
+function clientKeyPath() { return path.join(dataDir(), 'client-signing.key'); }
+function clientBundlePath(commit) { return path.join(ROOT, 'tmp', `client-bundle-${commit}.tar.gz`); }
 function serverKioskPath() { return path.join(ROOT, 'start-kiosk.sh'); }
 function requirementsPath() { return path.join(ROOT, 'system-requirements.json'); }
 // Where install.sh puts the systemd units; NOTICEBOARD_SYSTEMD_DIR points elsewhere for tests
 function systemdDir() { return process.env.NOTICEBOARD_SYSTEMD_DIR || '/etc/systemd/system'; }
+// The kernel's ARP table on Linux (the MAC filter); NOTICEBOARD_ARP_TABLE points elsewhere for tests
+function arpTablePath() { return process.env.NOTICEBOARD_ARP_TABLE || '/proc/net/arp'; }
 function tmpDir() { return path.join(ROOT, 'tmp', 'noticeboard-uploads'); }
 function tmpRootDir() { return path.join(ROOT, 'tmp'); }
 function sampleDataDir() { return path.join(ROOT, 'sample-data'); }
@@ -79,9 +86,13 @@ module.exports = {
   updateSchedulePath,
   restoreMarkerPath,
   installerRecordPath,
+  systemResultPath,
+  clientKeyPath,
+  clientBundlePath,
   serverKioskPath,
   requirementsPath,
   systemdDir,
+  arpTablePath,
   tmpDir,
   tmpRootDir,
   sampleDataDir,

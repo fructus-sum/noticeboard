@@ -1,0 +1,9 @@
+[Unit]
+Description=Noticeboard system step (the installer of main's latest Release, when it needs it)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/noticeboard-system
+TimeoutStartSec=45min

@@ -21,8 +21,8 @@
 //                            read: the marker is deleted first (a failing reset can't repeat), then
 //                            everything in data/ but KEPT_DATA, the files in tmp/ but the updater's
 //                            lock, and the logs (app.log emptied in place: the logger has it open)
-//   KEPT_DATA              the files in data/ a restore keeps: the branch followed, and how the
-//                            installer set the Server up
+//   KEPT_DATA              the files in data/ a restore keeps: the branch followed, how the
+//                            installer set the Server up, and the key its Clients trust
 //
 // Used by
 //   routes/api/settings/maintenance.js; server/index.js (applyPendingRestore)
@@ -48,7 +48,7 @@ const updates = require('./updates');
 const files = require('./updates/updateFiles');
 const { dataDir, logsDir, tmpRootDir, restoreMarkerPath } = require('../utils/pathHelpers');
 
-const KEPT_DATA = ['update-branch.env', 'installer.json'];
+const KEPT_DATA = ['update-branch.env', 'installer.json', 'client-signing.key'];
 const KEPT_TMP = ['update.lock'];   // update.sh holds it while it restarts this server
 
 async function deleteAllContent() {

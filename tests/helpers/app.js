@@ -13,7 +13,11 @@
 //   page(connect, size)        → a Chrome tab (cdp.js) with until/go/login/click/mouse helpers
 //   ffmpegEnv()                → { FFMPEG_PATH, FFPROBE_PATH } when ffmpeg is found, else {} (see hasFfmpeg)
 //   shot(name)                 → a path for a screenshot, outside the repository
-//   copyChanges(dest)          copies this working tree's uncommitted changes onto a clone of it
+//   lookFixture(name)          → the look snapshot for this system: tests/fixtures/<name> on Windows,
+//                                tests/fixtures/<platform>/<name> elsewhere (fonts, and so sizes, differ;
+//                                GitHub Actions records Linux's when it's missing and keeps it as an artifact)
+//   copyChanges(dest)          copies this working tree's uncommitted changes onto a clone of it,
+//                                never node_modules or the built apps
 //                                (changed and new files; deleted ones removed)
 //   check(name, pass, detail), done(env), sleep, git
 //   untilSlideEnds(playlist)   waits until the slide on air in that playlist ends (+400 ms): when a
@@ -61,6 +65,10 @@ function hasFfmpeg() {
 }
 
 const SHOTS = path.join(os.tmpdir(), 'noticeboard-test-shots');
+function lookFixture(name) {
+  const dir = path.join(REPO, 'tests', 'fixtures');
+  return process.platform === 'win32' ? path.join(dir, name) : path.join(dir, process.platform, name);
+}
 function shot(name) {
   fs.mkdirSync(SHOTS, { recursive: true });
   return path.join(SHOTS, name);
@@ -72,7 +80,8 @@ function copyChanges(dest) {
   const list = (args) => execFileSync('git', args, { cwd: REPO, encoding: 'utf8' }).split('\n').filter(Boolean);
   const deleted = new Set(list(['ls-files', '--deleted']));
   for (const f of list(['ls-files', '--modified', '--others', '--exclude-standard'])) {
-    if (deleted.has(f)) continue;
+    // Never packages or built apps, whatever the ignore rules say (a clone without them, e.g. on CI)
+    if (deleted.has(f) || /^node_modules\/|^client\/[^/]+\/dist\//.test(f)) continue;
     fs.mkdirSync(path.dirname(path.join(dest, f)), { recursive: true });
     fs.copyFileSync(path.join(REPO, f), path.join(dest, f));
   }
@@ -189,6 +198,6 @@ function done(env) {
 }
 
 module.exports = {
-  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, copyWorkingTree, copyChanges, untilSlideEnds,
+  REPO, MODULES, sleep, git, check, makeApp, server, page, done, ffmpegEnv, hasFfmpeg, shot, lookFixture, copyWorkingTree, copyChanges, untilSlideEnds,
   isOk: () => ok,
 };

@@ -8,7 +8,8 @@
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T=$(mktemp -d); BIN="$T/bin"; export MOCK="$T/mock"; mkdir -p "$BIN" "$MOCK"
-export MOCK_INSTALL="$T/install"
+export MOCK_INSTALL="$T/install" GITHUB_STANDIN="$REPO/tests/helpers/github.sh"
+source "$GITHUB_STANDIN"   # main follows Releases: each commit to main is published as one
 
 cat > "$BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
@@ -17,7 +18,7 @@ case "$1" in
   show)
     pid=$(cat "$MOCK/pid" 2>/dev/null || echo 0)
     if [ "$pid" -gt 0 ] && kill -0 "$pid" 2>/dev/null; then echo "$pid"; exit 0; fi
-    /usr/bin/sleep 1000 >/dev/null 2>&1 &
+    /usr/bin/sleep 1000 >/dev/null 2>&1 9>&- &
     echo $! > "$MOCK/pid"; echo "server restarted" >> "$MOCK/log"; echo $! ;;
 esac
 EOF
@@ -27,7 +28,11 @@ echo "npm $1" >> "$MOCK/log"
 [ "$1" = run ] && [ -f BUILD_FAILS ] && exit 1
 exit 0
 EOF
-printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/curl"
+cat > "$BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac
+exit 0
+EOF
 printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/sleep"
 command -v flock >/dev/null || printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/flock"
 chmod +x "$BIN"/*
@@ -38,7 +43,7 @@ git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 cd "$T/work" && git checkout -q -b main
 mkdir -p installers server client/admin && cp -r "$REPO/installers/update.sh" "$REPO/installers/lib" installers/
 echo "tracked" > server/app.js && echo "tracked" > client/admin/main.js
-echo v1 > VERSION && git add -A && git -c commit.gpgsign=false commit -qm v1 && git push -q origin main
+echo v1 > VERSION && git add -A && git -c commit.gpgsign=false commit -qm v1 && git push -q origin main && publish_release v1
 git clone -q "$T/origin.git" "$T/install"
 /usr/bin/sleep 1000 >/dev/null 2>&1 & echo $! > "$MOCK/pid"
 I="$T/install"
@@ -76,7 +81,7 @@ rm -f "$I/data/restore-defaults"   # the server deletes it at start-up
 # 2. A failed reinstall still restarts the server, so the reset happens
 seed; : > "$MOCK/log"
 touch "$I/BUILD_FAILS_MARK"
-( cd "$T/work" && touch BUILD_FAILS && echo v2 > VERSION && git add -A && git -c commit.gpgsign=false commit -qm v2 && git push -q origin main )
+( cd "$T/work" && touch BUILD_FAILS && echo v2 > VERSION && git add -A && git -c commit.gpgsign=false commit -qm v2 && git push -q origin main && publish_release v2 )
 out=$(bash "$I/installers/update.sh" 2>&1); rc=$?
 [ $rc -eq 1 ] && [ "$(cat "$I/VERSION")" = v1 ] && ok "a failed reinstall puts the previous version back" || bad "rollback" "$out"
 grep -q "server restarted" "$MOCK/log" && ok "  … and still restarts the server (it resets its data at start-up)" || bad "no restart" "$(cat "$MOCK/log")"

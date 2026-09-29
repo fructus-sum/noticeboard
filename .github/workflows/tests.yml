@@ -1,0 +1,64 @@
+# .github/workflows/tests.yml — the full test run on GitHub Actions, for every push and pull request
+#
+# Runs on Linux, as a Raspberry Pi does, with Node.js 20 (what the installer sets up): npm ci (which
+# also proves package-lock.json installs on Linux), npm run build, npm run test:all. Nobody has to
+# wait for it: the result shows on the branch and the pull request (DEVELOPMENT step 4,
+# SYSTEM_DESIGN §17). A newer push to the same branch cancels the run still going.
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # the upgrade rehearsal and the module loader test start from older commits
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: FFmpeg, for the video tests
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Let Chrome use its sandbox (Ubuntu 24.04 restricts it by default)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      # The repository doesn't track .gitignore (the owner keeps it local): the same rules, so the
+      # tests' copies of "uncommitted changes" don't take node_modules, the built apps or data/
+      - name: The local ignore rules
+        run: printf '%s\n' 'node_modules/' 'data/' 'tmp/' 'logs/' 'client/display/dist/' 'client/admin/dist/' '.env' '*.log' '*.tmp' >> .git/info/exclude
+
+      - name: A git identity for the tests' throwaway commits
+        run: |
+          git config --global user.name "Noticeboard tests"
+          git config --global user.email "tests@localhost"
+          git config --global init.defaultBranch main
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:all
+        env:
+          # Google Chrome, not the runner's Chromium: that one can't play AAC or H.264/H.265,
+          # which a Pi's Chromium can
+          CHROME_PATH: /usr/bin/google-chrome
+
+      # The look snapshots are per system (fonts differ): Linux's, recorded here when missing, to
+      # download and commit (tests/fixtures/linux/)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-look-snapshots
+          path: tests/fixtures/linux/
+          if-no-files-found: ignore

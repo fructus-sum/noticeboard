@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# installers/client/noticeboard-client — the Noticeboard Client's command
+#
+#   noticeboard-client kiosk                  show the slideshow full screen (kiosk.sh, next to this file)
+#   noticeboard-client version                the version of the Client files installed here
+#   noticeboard-client status                 the version, the Server, the pinned key, a version skipped
+#   sudo noticeboard-client check             follow the Server: install the Client files it runs, if
+#                                             they changed (run every 15 minutes by
+#                                             noticeboard-client-update.timer, on a Client only)
+#   sudo noticeboard-client trust-server      show the Server's key and pin it (a rebuilt Server)
+#   sudo noticeboard-client reinstall-stable  reinstall from main's latest Release on GitHub
+#
+# Responsibilities
+#   The one way into the Client's files: /usr/local/bin/noticeboard-client (written by the
+#   installer) runs /opt/noticeboard-client/current/noticeboard-client, so the files in current/
+#   can be replaced as a whole while the autostart entry and noticeboard-kiosk.service keep calling
+#   the same command. And a Client only following its Server (SYSTEM_DESIGN §18.7 phase 3): it asks
+#   the Server which Client files it runs, downloads them as a bundle signed with the key pinned at
+#   install, verifies it before root runs anything from it, runs that installer with --apply, and
+#   puts the files it had from the Server back if the kiosk doesn't come back within 3 minutes. It
+#   follows only its Server: it never goes to GitHub by itself (reinstall-stable is run by hand).
+#   A Client + Server's own screen doesn't follow this way: root there would run what the app's own
+#   user signed (the system step keeps it up to date instead, §18.7 phase 2).
+#
+# Uses
+#   kiosk.sh (the same folder); /etc/noticeboard/install.env (the role and the Server's address);
+#   /etc/noticeboard/server.pub (the pinned key); /opt/noticeboard-client/ (version, hash,
+#   installed.tar.gz, previous.tar.gz, skip); /tmp/noticeboard-kiosk-up (the kiosk's "I'm up with
+#   version …"); GET /api/client/{version,bundle,bundle.sig,key} on the Server; curl, openssl, tar;
+#   /usr/local/lib/noticeboard/{branch,json,release}.sh (reinstall-stable). NOTICEBOARD_* variables
+#   replace the paths in the tests.
+#
+# Change impact
+#   The Server's answers (server/services/clientBundle.js) and this must agree: the version's fields,
+#   the bundle's layout, the raw ed25519 signature (§15).
+set -u
+HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+CLIENT_DIR=${NOTICEBOARD_CLIENT_DIR:-/opt/noticeboard-client}
+CONFIG=${NOTICEBOARD_CONFIG:-/etc/noticeboard/install.env}
+SERVER_KEY=${NOTICEBOARD_SERVER_KEY:-/etc/noticeboard/server.pub}
+ROOT_LIB=${NOTICEBOARD_ROOT_LIB:-/usr/local/lib/noticeboard}
+KIOSK_UP=${NOTICEBOARD_KIOSK_UP:-/tmp/noticeboard-kiosk-up}
+ROLLBACK_SECONDS=${NOTICEBOARD_ROLLBACK_SECONDS:-180}
+GITHUB_REPO="fructus-sum/noticeboard"
+
+setting() { sed -n "s/^NOTICEBOARD_$1=//p" "$CONFIG" 2>/dev/null | head -n 1; }
+log() { echo "$*"; logger -t noticeboard-client "$*" 2>/dev/null || true; }
+# The Client's files are root's: anyone else is told to use sudo
+need_root() {   # need_root <command>
+  if [ ! -w "$CLIENT_DIR" ] || { [ -e "$SERVER_KEY" ] && [ ! -w "$SERVER_KEY" ]; }; then
+    echo "Run it with sudo: sudo noticeboard-client $1" >&2
+    exit 1
+  fi
+}
+server_base() { local url; url=$(setting SERVER_URL); echo "${url%/}"; }
+# A value from the Server's flat JSON answer (no quotes in the values)
+field() { sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p" <<<"$1" | head -n 1; }
+record() {   # record <version> <hash>
+  printf '%s\n' "$1" > "$CLIENT_DIR/version"
+  printf '%s\n' "$2" > "$CLIENT_DIR/hash"
+}
+fingerprint() {   # fingerprint <PEM file>: SHA-256 of the key
+  openssl pkey -pubin -in "$1" -outform DER 2>/dev/null | sha256sum | cut -c1-64
+}
+
+# Unpack a bundle into a root-owned folder and run its installer with --apply (its own parts)
+apply_bundle() {   # apply_bundle <tar.gz>
+  local dir rc=0
+  dir=$(mktemp -d /tmp/noticeboard-client.XXXXXX) || return 1
+  chmod 700 "$dir"
+  if ! tar -xzf "$1" -C "$dir"; then rm -rf "$dir"; return 1; fi
+  NOTICEBOARD_INSTALLER_SHA=local bash "$dir/installers/install.sh" --apply > "$dir/log" 2>&1 || rc=$?
+  logger -t noticeboard-client < "$dir/log" 2>/dev/null || true
+  if [ "$rc" -ne 0 ]; then tail -n 3 "$dir/log"; fi
+  rm -rf "$dir"
+  return "$rc"
+}
+
+# Did the kiosk come back with <version>? (It writes it once its viewer is up.)
+kiosk_up() {   # kiosk_up <version>
+  local waited=0
+  while [ "$waited" -lt "$ROLLBACK_SECONDS" ]; do
+    if [ "$(cat "$KIOSK_UP" 2>/dev/null)" = "$1" ]; then return 0; fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+  return 1
+}
+
+check() {
+  need_root check
+  if [ "$(setting ROLE)" != client ]; then
+    echo "Only a Client only follows its Server; this device's Client is updated with its Server."
+    exit 0
+  fi
+  local base answer version commit hash current current_hash dir kiosk_was_up=""
+  base=$(server_base)
+  if [ -z "$base" ]; then log "No Server address saved: run the installer again."; exit 1; fi
+  if [ ! -s "$SERVER_KEY" ]; then log "No Server key pinned, so this Client can't update itself: run sudo noticeboard-client trust-server"; exit 1; fi
+  if ! answer=$(curl -fsS --max-time 20 "$base/api/client/version" 2>/dev/null); then
+    echo "Couldn't reach the Server at $base (or it's older than 0.9.0); trying again at the next check."
+    exit 0
+  fi
+  version=$(field "$answer" version); commit=$(field "$answer" commit); hash=$(field "$answer" clientHash)
+  if [ -z "$version" ] || ! [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
+    log "The Server's answer couldn't be read: $answer"
+    exit 1
+  fi
+  current=$(cat "$CLIENT_DIR/version" 2>/dev/null); current_hash=$(cat "$CLIENT_DIR/hash" 2>/dev/null)
+  if [ "$version" = "$current" ]; then echo "Up to date: $version."; exit 0; fi
+  if [ "$hash" = "$current_hash" ]; then
+    record "$version" "$hash"
+    log "The Server runs $version; the Client's files are the same, so nothing changed on screen."
+    exit 0
+  fi
+  if [ "$(cat "$CLIENT_DIR/skip" 2>/dev/null)" = "$commit" ]; then
+    echo "$version was put back before; waiting for the Server to offer another."
+    exit 0
+  fi
+
+  dir=$(mktemp -d /tmp/noticeboard-bundle.XXXXXX) || exit 1
+  chmod 700 "$dir"
+  if ! curl -fsS --max-time 120 -o "$dir/bundle.tar.gz" "$base/api/client/bundle" \
+     || ! curl -fsS --max-time 20 -o "$dir/bundle.sig" "$base/api/client/bundle.sig"; then
+    rm -rf "$dir"
+    echo "Couldn't download $version from the Server; trying again at the next check."
+    exit 0
+  fi
+  if ! openssl pkeyutl -verify -pubin -inkey "$SERVER_KEY" -rawin -in "$dir/bundle.tar.gz" -sigfile "$dir/bundle.sig" >/dev/null 2>&1; then
+    rm -rf "$dir"
+    log "The Server's files for $version aren't signed with the key this Client trusts, so nothing was installed. If the Server was set up again, run: sudo noticeboard-client trust-server"
+    exit 1
+  fi
+  if [ -f "$KIOSK_UP" ]; then kiosk_was_up=1; fi
+  log "Installing the Client's files of $version from the Server (was ${current:-unknown})."
+  if ! apply_bundle "$dir/bundle.tar.gz"; then
+    rm -rf "$dir"
+    printf '%s\n' "$commit" > "$CLIENT_DIR/skip"
+    log "Installing $version failed; it's skipped until the Server offers another."
+    put_back "$current" "$current_hash"
+    exit 1
+  fi
+  if [ -f "$CLIENT_DIR/installed.tar.gz" ]; then mv "$CLIENT_DIR/installed.tar.gz" "$CLIENT_DIR/previous.tar.gz"; fi
+  mv "$dir/bundle.tar.gz" "$CLIENT_DIR/installed.tar.gz"
+  rm -rf "$dir"
+  record "$version" "$hash"
+  # The kiosk sees the new version and starts again; if it was running and doesn't come back, the
+  # previous files go back
+  if [ -z "$kiosk_was_up" ] || kiosk_up "$version"; then
+    rm -f "$CLIENT_DIR/skip"
+    log "Now running the Client's files of $version."
+    exit 0
+  fi
+  printf '%s\n' "$commit" > "$CLIENT_DIR/skip"
+  log "The kiosk didn't come back with $version within $((ROLLBACK_SECONDS / 60)) minutes: putting the previous Client back, and skipping $version until the Server offers another."
+  if [ -f "$CLIENT_DIR/previous.tar.gz" ]; then
+    mv "$CLIENT_DIR/previous.tar.gz" "$CLIENT_DIR/installed.tar.gz"
+  else
+    rm -f "$CLIENT_DIR/installed.tar.gz"
+  fi
+  put_back "$current" "$current_hash"
+  exit 1
+}
+
+# After a failed update: the files installed before it, from the Server. A Client follows only its
+# Server: it never goes to GitHub by itself (reinstall-stable is run by hand)
+put_back() {   # put_back <version> <hash>
+  if [ -f "$CLIENT_DIR/installed.tar.gz" ] && apply_bundle "$CLIENT_DIR/installed.tar.gz"; then
+    record "$1" "$2"
+    log "Put back the Client's files of $1."
+  else
+    log "No earlier Client files from the Server to put back, so the Client stays as it is. If the screen doesn't work, run: sudo noticeboard-client reinstall-stable"
+  fi
+}
+
+trust_server() {
+  need_root trust-server
+  local base pem fp answer=""
+  base=$(server_base)
+  if [ -z "$base" ]; then echo "No Server address saved: run the installer again." >&2; exit 1; fi
+  pem=$(mktemp) || exit 1
+  if ! curl -fsS --max-time 20 -o "$pem" "$base/api/client/key" 2>/dev/null || ! fp=$(fingerprint "$pem") || [ -z "$fp" ] \
+     || [ "$fp" = "$(printf '' | sha256sum | cut -c1-64)" ]; then
+    rm -f "$pem"
+    echo "Couldn't get a key from the Server at $base (is it reachable, and on 0.9.0 or newer?). Nothing was changed."
+    exit 1
+  fi
+  echo "The Server at $base signs its updates with the key SHA256:$fp"
+  if [ "${1:-}" = --yes ]; then
+    answer=y
+  else
+    read -rp "Trust it, so this Client installs what it offers? (y/n): " answer </dev/tty || answer=n
+  fi
+  case "$answer" in
+    [Yy]*)
+      mkdir -p "$(dirname "$SERVER_KEY")"
+      install -m 644 "$pem" "$SERVER_KEY"
+      rm -f "$pem"
+      log "Trusting the Server's key SHA256:$fp."
+      ;;
+    *)
+      rm -f "$pem"
+      echo "Not trusted; nothing was changed."
+      exit 1
+      ;;
+  esac
+}
+
+reinstall_stable() {
+  need_root reinstall-stable
+  local lib tag code=0 dir sha
+  for lib in branch json release; do
+    # shellcheck source=/dev/null
+    source "$ROOT_LIB/$lib.sh" || { echo "Can't load $ROOT_LIB/$lib.sh: run the installer again." >&2; exit 1; }
+  done
+  tag=$(latest_release) || code=$?
+  if [ "$code" -ne 0 ]; then echo "Couldn't find main's latest Release on GitHub; nothing was changed." >&2; exit 1; fi
+  dir=$(mktemp -d /tmp/noticeboard-stable.XXXXXX) || exit 1
+  chmod 700 "$dir"
+  if ! curl -fsSL --max-time 60 -o "$dir/install.sh" "https://raw.githubusercontent.com/$GITHUB_REPO/$tag/installers/install.sh" \
+     || ! bash -n "$dir/install.sh"; then
+    rm -rf "$dir"
+    echo "Couldn't download the installer of Release $tag; nothing was changed." >&2
+    exit 1
+  fi
+  log "Reinstalling the Client from Release $tag (GitHub)."
+  if ! NOTICEBOARD_INSTALLER_SHA=$tag NOTICEBOARD_INSTALLER_BRANCH=main NOTICEBOARD_INSTALLER_RELEASE=$tag \
+       bash "$dir/install.sh" --apply; then
+    rm -rf "$dir"
+    log "Reinstalling from Release $tag failed."
+    exit 1
+  fi
+  rm -rf "$dir"
+  rm -f "$CLIENT_DIR/installed.tar.gz" "$CLIENT_DIR/previous.tar.gz" "$CLIENT_DIR/skip"
+  record "$tag (stable)" ""
+  log "Reinstalled from Release $tag; the next check follows the Server again."
+}
+
+status() {
+  echo "Client files : $(cat "$CLIENT_DIR/version" 2>/dev/null || echo unknown)"
+  echo "Role         : $(setting ROLE)"
+  echo "Server       : $(server_base)"
+  if [ -s "$SERVER_KEY" ]; then
+    echo "Server key   : SHA256:$(fingerprint "$SERVER_KEY")"
+  else
+    echo "Server key   : none pinned (sudo noticeboard-client trust-server)"
+  fi
+  if [ -f "$CLIENT_DIR/skip" ]; then echo "Skipped      : $(cat "$CLIENT_DIR/skip") (it didn't work; waiting for another)"; fi
+}
+
+case "${1:-}" in
+  kiosk) exec bash "$HERE/kiosk.sh" ;;
+  version) cat "$CLIENT_DIR/version" 2>/dev/null || { echo "unknown"; exit 1; } ;;
+  status) status ;;
+  check) check ;;
+  trust-server) trust_server "${2:-}" ;;
+  reinstall-stable) reinstall_stable ;;
+  *)
+    echo "Usage: noticeboard-client kiosk | version | status | check | trust-server [--yes] | reinstall-stable"
+    [ "${1:-}" = "" ] || [ "$1" = help ] || [ "$1" = --help ] || exit 2
+    ;;
+esac

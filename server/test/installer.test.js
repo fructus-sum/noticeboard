@@ -34,8 +34,20 @@ const sample = {
 };
 
 test('an older installer run: needed, with only the changes it missed', () => {
-  assert.deepEqual(installerNeeds(sample, 1), { required: 3, installed: 1, needed: true, changes: ['two', 'three'], displays: false });
+  assert.deepEqual(installerNeeds(sample, 1), { required: 3, installed: 1, needed: true, changes: ['two', 'three'], displays: false, clientsFollow: false });
   assert.deepEqual(installerNeeds(sample, 0).displays, true);
+});
+
+test('a change for the Clients: a run on each by hand before installer 7, by themselves from 7 on', () => {
+  const list = { installer: { version: 8, changes: [
+    { version: 6, change: 'six' }, { version: 7, change: 'seven', displays: true }, { version: 8, change: 'eight', displays: true },
+  ] } };
+  const before = installerNeeds(list, 5);
+  assert.deepEqual([before.displays, before.clientsFollow], [true, false]);
+  const after = installerNeeds(list, 7);
+  assert.deepEqual([after.needed, after.displays, after.clientsFollow], [true, false, true]);
+  const serverOnly = installerNeeds({ installer: { version: 8, changes: [{ version: 8, change: 'eight' }] } }, 7);
+  assert.deepEqual([serverOnly.displays, serverOnly.clientsFollow], [false, false]);
 });
 
 test('an up-to-date or newer installer run: not needed', () => {
@@ -46,7 +58,7 @@ test('an up-to-date or newer installer run: not needed', () => {
 
 test('not set up by the installer, or a version without an installer list: nothing to say', () => {
   assert.equal(installerNeeds(sample, null).needed, false);
-  assert.deepEqual(installerNeeds({ software: [] }, 0), { required: 0, installed: 0, needed: false, changes: [], displays: false });
+  assert.deepEqual(installerNeeds({ software: [] }, 0), { required: 0, installed: 0, needed: false, changes: [], displays: false, clientsFollow: false });
   assert.equal(installerNeeds(null, 0).needed, false);
   assert.equal(installerNeeds({ installer: { version: '9' } }, 0).needed, false);
 });

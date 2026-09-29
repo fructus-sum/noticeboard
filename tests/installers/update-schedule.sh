@@ -8,7 +8,8 @@
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T=$(mktemp -d); BIN="$T/bin"; export MOCK="$T/mock"; mkdir -p "$BIN" "$MOCK"
-export MOCK_INSTALL="$T/install" TZ=UTC
+export MOCK_INSTALL="$T/install" TZ=UTC GITHUB_STANDIN="$REPO/tests/helpers/github.sh"
+source "$GITHUB_STANDIN"   # main follows Releases: each commit to main is published as one
 
 cat > "$BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
@@ -17,12 +18,16 @@ case "$1" in
   show)
     pid=$(cat "$MOCK/pid" 2>/dev/null || echo 0)
     if [ "$pid" -gt 0 ] && kill -0 "$pid" 2>/dev/null; then echo "$pid"; exit 0; fi
-    /usr/bin/sleep 1000 >/dev/null 2>&1 &
+    /usr/bin/sleep 1000 >/dev/null 2>&1 9>&- &
     echo $! > "$MOCK/pid"; echo $! ;;
 esac
 EOF
 printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/npm"
-printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/curl"
+cat > "$BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac
+exit 0
+EOF
 printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/sleep"
 command -v flock >/dev/null || printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/flock"
 chmod +x "$BIN"/*
@@ -33,8 +38,8 @@ git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 cd "$T/work" && git checkout -q -b main
 mkdir -p installers && cp -r "$REPO/installers/update.sh" "$REPO/installers/lib" installers/
 n=1
-release() { n=$((n+1)); echo "v$n" > VERSION; git add -A; git -c commit.gpgsign=false commit -qm "v$n: release"; git push -q origin main; }
-echo v1 > VERSION && git add -A && git -c commit.gpgsign=false commit -qm v1 && git push -q origin main
+release() { n=$((n+1)); echo "v$n" > VERSION; git add -A; git -c commit.gpgsign=false commit -qm "v$n: release"; git push -q origin main; publish_release "v$n"; }
+echo v1 > VERSION && git add -A && git -c commit.gpgsign=false commit -qm v1 && git push -q origin main && publish_release v1
 git clone -q "$T/origin.git" "$T/install"
 /usr/bin/sleep 1000 >/dev/null 2>&1 & echo $! > "$MOCK/pid"
 D="$T/install/data"; mkdir -p "$D" "$T/install/tmp"

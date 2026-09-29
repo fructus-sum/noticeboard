@@ -16,6 +16,9 @@ run() {
   (
     load_installer
     set -euo pipefail
+    # This machine's own firewall programs (ufw, nft, iptables in the sbin folders, e.g. on a CI
+    # runner) are out of reach: each case says which exist, with stand-ins
+    PATH=$(tr ':' '\n' <<<"$PATH" | grep -vE '/sbin/?$' | paste -sd: -)
     MODE=$mode; INSTALL_DIR="$T/opt"
     MOCK_UFW_STATE=""; MOCK_ACTIVE=""; MOCK_SSHD_PORT=22; MOCK_SOCKET_PORT=""; MOCK_SSH_ANCESTOR=""; MOCK_SSH_CONN=""; MOCK_VNC=""; MOCK_PORT=3000
     log() { echo "$*" >> "$T/calls.log"; }
@@ -142,7 +145,21 @@ grep -q "You're connected over SSH right now" "$OUT" && [ "$(grep -c "Do you nee
 run sshblock server 'MOCK_ACTIVE="ssh"; MOCK_SSH_ANCESTOR=1' y y n y ""
 done_ok && ! grep -q "allow 22/tcp" "$CALLS" && ! grep -q "^systemd-run" "$CALLS" && grep -q "^ufw --force enable" "$CALLS" \
   && ok "over SSH, blocking confirmed: no SSH rule" || { bad "sshblock"; show sshblock; }
-run nosysrun server 'MOCK_ACTIVE="ssh"; MOCK_SSH_ANCESTOR=1; unset -f systemd-run' y y y "" ""
+# A machine without systemd-run: this one's own (e.g. a CI runner's, in /usr/bin) is left out of a
+# PATH made of links to everything else. Nothing to do where there's none (Windows).
+without_program() {   # without_program <name>: PATH without it
+  local real dir file name
+  real=$(command -v "$1") || return 0
+  mkdir -p "$T/without-$1"
+  while IFS= read -r dir; do
+    for file in "$dir"/*; do
+      name=$(basename "$file")
+      if [ "$name" != "$1" ] && [ ! -e "$T/without-$1/$name" ] && [ -x "$file" ]; then ln -s "$file" "$T/without-$1/$name"; fi
+    done
+  done < <(tr ':' '\n' <<<"$PATH")
+  PATH="$T/without-$1"
+}
+run nosysrun server 'MOCK_ACTIVE="ssh"; MOCK_SSH_ANCESTOR=1; unset -f systemd-run; without_program systemd-run' y y y "" ""
 done_ok && [ -z "$(changes)" ] && grep -q "Can't set up the automatic undo" "$OUT" && ok "over SSH without systemd-run: nothing changed rather than risk a lockout" || { bad "nosysrun"; show nosysrun; }
 
 grep -h "reset" "$T"/*.out > /dev/null 2>&1; ! grep -q "^ufw reset" "$T"/calls.log && ok "ufw reset is never used (existing rules are kept)" || bad "reset"

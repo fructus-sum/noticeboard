@@ -9,7 +9,8 @@
 //   again; the background audio of the slideshow on screen (none while the waiting screen shows),
 //   lowered or paused while a video plays its own sound;
 //   the nightly reload. ?kiosk=off (a screen that left
-//   kiosk mode) makes it an ordinary page: no exit button, no nightly reload.
+//   kiosk mode) makes it an ordinary page: no exit button, no nightly reload; ?kiosk=headless (a
+//   Client without a desktop) keeps kiosk mode without the exit button.
 //
 // Used by
 //   main.js
@@ -42,8 +43,12 @@ const videoSound = computed(() => {
 });
 
 // ?kiosk=off: this screen left kiosk mode (the kiosk script reopens the viewer like this in a
-// normal window), so it's an ordinary web page now: no exit button, no nightly reload
-const kiosk = new URLSearchParams(window.location.search).get('kiosk') !== 'off';
+// normal window), so it's an ordinary web page now: no exit button, no nightly reload.
+// ?kiosk=headless: a Client without a desktop (cage, SYSTEM_DESIGN §18.7): kiosk mode, but no exit
+// button, as there's no desktop to go to
+const kioskParam = new URLSearchParams(window.location.search).get('kiosk');
+const kiosk = kioskParam !== 'off';
+const exitButton = kiosk && kioskParam !== 'headless';
 // ?debug=audio: what the audio is doing, on screen (AudioDebug)
 const audioDebug = new URLSearchParams(window.location.search).get('debug') === 'audio';
 if (kiosk) startDailyReload(() => connected.value);
@@ -54,7 +59,7 @@ if (kiosk) startDailyReload(() => connected.value);
     <SlideShow v-if="hasSlides" :slides="playlist.slides" :started-at="playlist.startedAt ?? null" :server-now="serverNow" :connected="connected" @on-air="(slide) => { onAir = slide; }" />
     <WaitingScreen v-else :connected="connected" :received="received" :logo="settings.logo" />
     <DeviceInfo v-if="settings.showDeviceInfo" />
-    <ExitKiosk v-if="kiosk" :visible="active" />
+    <ExitKiosk v-if="exitButton" :visible="active" />
     <AdminWarning v-if="settings.installerNeeded || settings.updateAvailable || settings.restartNeeded" />
     <BackgroundAudio :audio="audio" :on-air="audioFor" :video-sound="videoSound" :server-now="serverNow" />
     <AudioDebug v-if="audioDebug" />

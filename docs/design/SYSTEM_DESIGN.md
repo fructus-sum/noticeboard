@@ -4,7 +4,7 @@
 
 **Keeping it up to date:** every planned change starts in §18, before any code. Then change this document in the same commit as the code it describes, so it is always a live view of the software and of the work in progress. Code comments refer to it as `SYSTEM_DESIGN §<n>`, and to the entries of §14 by their D-number: when a number changes, update those comments too (search the code for `SYSTEM_DESIGN`).
 
-**Version:** main is **0.7.1** (since the merge of `feature/audio-support`, 2026-09-28: audio, the words Server and Client, the Known Issues, the fix from the Pi test, every screen in step, and Branding first on the Settings page). Next: **0.8.0** (Releases) and **0.9.0** (the installer and update redesign), on `feature/releases-installer`. 1.0.0 is the version with Display Groups. The rules and the history are in §19.
+**Version:** main is **0.9.0** (since the merge of `feature/releases-installer`, 2026-09-29: Releases (0.8.0) and the installer and update redesign (0.9.0), published together as Release v0.9.0, the first Release). 1.0.0 is the version with Display Groups. The rules and the history are in §19.
 
 **Module headers:** every module starts with a header in this form (`//` comments in JavaScript and inside a Vue file's `<script setup>`, `#` in bash). Comments inside a module explain intent, compatibility constraints and anything non-obvious, not what each line does.
 
@@ -73,23 +73,23 @@ Noticeboard is a self-hosted slideshow system for Raspberry Pis on a local netwo
 │             Express: /  /admin  /admin/help  /api/*  /media  /branding│
 │             socket.io: /socket.io  (playlist + settings push)         │
 │  systemd: noticeboard-update.timer/.path ── bash installers/update.sh │
-│  desktop autostart ── /opt/noticeboard/start-kiosk.sh ── chromium     │
-│                        --kiosk http://localhost:3000/                 │
+│  Client + Server: noticeboard-client kiosk ── chromium                │
+│    --kiosk http://localhost:<port>/   (desktop autostart, or cage)    │
 └──────────────▲───────────────────────────────────▲────────────────────┘
                │ HTTP + socket.io                  │ HTTP (admin panel)
 ┌──────────────┴──────────────┐           ┌────────┴───────────────┐
 │ Client (0..n)               │           │ Any browser on the LAN │
-│ /usr/local/bin/             │           │ /admin (password)      │
-│   noticeboard-kiosk.sh      │           │ / (viewer)             │
-│   ── chromium --kiosk URL   │           └────────────────────────┘
+│ noticeboard-client kiosk    │           │ /admin (password)      │
+│   ── chromium --kiosk URL   │           │ / (viewer)             │
+│ (autostart, or cage)        │           └────────────────────────┘
 │ (no repo, no Node.js)       │
 └─────────────────────────────┘
 ```
 
-Two roles, set up by the same installer (the owner's words, §18.4: hardware is named only where it matters):
+Set up by one installer, on Raspberry Pi OS or Debian, with a desktop or headless (the owner's words, §18.4: hardware is named only where it matters). A device is a **Client + Server**, a **Client only** or a **Server only** (§8, §18.7):
 
-- **Server:** the device running the Noticeboard server. It runs Node.js, stores all content, hosts the admin panel, updates itself from GitHub, and shows the slideshow full screen on its own monitor.
-- **Client:** a device showing the Noticeboard viewer. It only runs Chromium full screen, pointed at the Server's URL. It has no copy of the repository and does not update itself: the viewer it shows is served by the Server, so it gets new viewer code when the Server updates.
+- **Server:** the device running the Noticeboard server. It runs Node.js, stores all content, hosts the admin panel, and updates itself from GitHub. As a Client + Server it also shows the slideshow full screen on its own screen, through its Client; a Server only has no screen of its own.
+- **Client:** what shows the Noticeboard viewer full screen: the Client's files in `/opt/noticeboard-client/` (`noticeboard-client kiosk`), started by the desktop's autostart, or headless by `noticeboard-kiosk.service` (cage). A Client only runs Chromium pointed at its Server's URL. It has no copy of the repository: the viewer it shows is served by the Server, so it gets new viewer code when the Server updates, and its own files follow the Server's version by themselves (`noticeboard-client check`, a bundle the Server signs, §18.7 phase 3).
 
 **Supported devices:**
 
@@ -98,7 +98,8 @@ Two roles, set up by the same installer (the owner's words, §18.4: hardware is 
 | Raspberry Pi 3 | yes | yes | H.264 only, 1080p only | Supported (H.264 chosen in Settings) |
 | Raspberry Pi 4 | yes | yes | H.264 and H.265 | Supported |
 | Raspberry Pi 5 | yes | yes | H.264 and H.265 | Supported |
-| Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | Planned: needs a headless Client installer (today's Client installer needs a desktop) |
+| Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | The installer can set it up as a headless Client (0.9.0, §18.7); not yet checked on the device |
+| A PC or virtual machine with Debian | yes | yes, with a desktop or headless | depends on the hardware | The installer can set it up (0.9.0); not yet checked on real hardware |
 
 New videos are H.265 (HEVC) by default; H.264 is the fallback for older hardware (`display.videoFormat`, D43). The viewer plays one format, the one selected; a video in the other format is left to fail on a screen that can't play it.
 
@@ -108,6 +109,7 @@ New videos are H.265 (HEVC) by default; H.264 is the fallback for older hardware
 
 ```
 noticeboard/
+├── .github/workflows/tests.yml  the full test run on GitHub Actions for every push (§17)
 ├── package.json               npm workspaces root (server, client/display, client/admin); build, start and test scripts
 ├── package-lock.json          lockfile for all three workspaces (contains linux-arm64 optional deps: never regenerate on Windows)
 ├── system-requirements.json   system software each branch needs, and the installer version (read by the server and tests)
@@ -119,9 +121,9 @@ noticeboard/
 │   └── sample-slideshow/      01-welcome.png … 05-help.png, 03-video.mp4, sample.json (settings)
 ├── installers/
 │   ├── install.sh             the one installer: configuration, latest-installer switch, loading its parts, main()
-│   ├── lib/                   its steps: ui, branch, json, system, sudo, server, display, kiosk, desktop, firewall
+│   ├── lib/                   its steps: ui, branch, json, release, answers, system, sudo, server, client, desktop, firewall
 │   │                          (branch.sh and json.sh are also loaded by update.sh; schedule.sh only by update.sh)
-│   ├── kiosk/                 server.sh, display.sh: the kiosk scripts it installs, as they are installed
+│   ├── client/                kiosk.sh, noticeboard-client: the Client's files, installed as they are
 │   └── update.sh              the self-updater run by systemd on the Server
 ├── server/                    CommonJS, Express 4, socket.io 4
 │   ├── index.js, app.js       the entry point (systemd runs server/index.js) and the Express app
@@ -130,13 +132,13 @@ noticeboard/
 │   │                          asyncRoute.js, uploads.js, passwordLimiter.js, errorHandler.js
 │   ├── realtime/              displaySocket.js (socket.io: the live connection to the displays)
 │   ├── routes/                index.js (mounting), spa.js (the apps' catch-all and "not built" page)
-│   │   └── api/               index.js, auth.js, device.js, slideshows.js, slides.js, audioshows.js, tracks.js, mediaItems.js (the items' routes)
+│   │   └── api/               index.js, auth.js, device.js, client.js, slideshows.js, slides.js, audioshows.js, tracks.js, mediaItems.js (the items' routes)
 │   │       └── settings/      index.js, general.js, security.js, logo.js, updates.js, maintenance.js (the Settings page)
 │   ├── services/              configService, showStore, slideshowStore, audioShowStore, slideshowRules, audioShowRules,
 │   │                          playlistService, audioPlaylist, audioEvents, audioEventClock, displayEvents,
 │   │                          schedulerService, settingsService, adminPassword, adminSession, macService,
 │   │                          mediaService, mediaTypes, mediaNames, uploadQueue, brandingService, sampleSlideshow,
-│   │                          contentReset, actionTokens
+│   │                          contentReset, actionTokens, clientBundle
 │   │   └── updates/           index.js, git.js, branchName.js, updateFiles.js, installerVersion.js, schedule.js
 │   ├── utils/                 pathHelpers, configIO, logger, macLookup, network, slugify, folderLock,
 │   │                          displayBuildId, systemCheck, weeklyTimes
@@ -153,7 +155,8 @@ noticeboard/
 │   │                          test/musicTimeline.test.mjs
 │   └── admin/                 the admin panel: src/ (views, components/{ui,slideshow,settings,updates},
 │                              composables, router, styles/base.css)
-└── tests/                     run.js (the runner: unit, api, browser, installers, upgrade, all), helpers/,
+└── tests/                     run.js (the runner: unit, api, browser, installers, upgrade, all), snapshot.js (a run on
+                               a snapshot of a commit), helpers/,
                                fixtures/, api/, browser/, installers/, upgrade/ (§17)
 ```
 
@@ -171,14 +174,15 @@ Git ignores the runtime folders `data/`, `tmp/` and `logs/`, the built apps in `
 |---|---|---|---|
 | `node server/index.js` | `noticeboard.service` (`Restart=always`, `RestartSec=5`) | desktop user | The whole server: HTTP, socket.io, scheduler, upload queue |
 | `bash installers/update.sh` | `noticeboard-update.timer` (boot+5 min, then every 15 min) or `noticeboard-update.path` (when `tmp/update-request` exists) | desktop user (`User=` in the unit; it re-execs itself as the owner if started as root) | Self-updater (oneshot): checks every run, installs when the update schedule says so or the admin asks (§9.1) |
-| `/opt/noticeboard/start-kiosk.sh` | XDG autostart `/etc/xdg/autostart/noticeboard-kiosk.desktop` at desktop login | desktop user | Bash loop that keeps Chromium in kiosk mode on `http://localhost:3000/` |
-| Chromium | the kiosk script | desktop user | Shows the viewer (`/`) |
+| `/usr/local/sbin/noticeboard-system` | `noticeboard-system.path` (when `tmp/system-request` exists) | root | The system step (oneshot, at most 45 min): runs main's latest Release's installer with `--apply` when update.sh asks (§9.1, §18.7 phase 2) |
+| `noticeboard-client kiosk` (a Client + Server) | XDG autostart `/etc/xdg/autostart/noticeboard-kiosk.desktop` at desktop login, or headless `noticeboard-kiosk.service` (cage on tty1) | desktop user | The Client's kiosk (`installers/client/kiosk.sh`): keeps Chromium in kiosk mode on `http://localhost:<port>/` |
+| Chromium | the kiosk | desktop user | Shows the viewer (`/`) |
 
-On a Client, `/usr/local/bin/noticeboard-kiosk.sh` is started by the same autostart entry. It shows a local waiting page until the server answers, then runs Chromium in kiosk mode on the server's URL.
+On a Client only, the same kiosk is started the same way; it shows a local waiting page (with the device's MAC addresses) until its Server answers, then runs Chromium in kiosk mode on the Server's URL. A Client only also runs `noticeboard-client check` as root (`noticeboard-client-update.timer`: 5 minutes after start-up, then every 15 minutes; oneshot): it follows the Client files its Server runs (§18.7 phase 3), and the kiosk starts again from the new files by itself when the version changes. A Server only runs neither.
 
 ### 3.2 Server start-up (`server/index.js`)
 
-0. `contentReset.applyPendingRestore()`: when Restore Defaults left its marker (`data/restore-defaults`), it deletes the marker, everything in `data/` but `update-branch.env` and `installer.json`, the files in `tmp/` but `update.lock`, and the logs (`app.log` emptied in place), so the server starts as a new install (D42).
+0. `contentReset.applyPendingRestore()`: when Restore Defaults left its marker (`data/restore-defaults`), it deletes the marker, everything in `data/` but `update-branch.env`, `installer.json` and `client-signing.key`, the files in `tmp/` but `update.lock`, and the logs (`app.log` emptied in place), so the server starts as a new install (D42).
 1. `configService.init()` creates `data/` and `data/slideshows/`, and reads `data/config.json` with JSON5.
 1a. `videoConversion.recover()`: a video left marked by a conversion the server didn't finish is ready again with its old file, and the unfinished outputs are deleted (D43).
    - If the file is missing, it writes defaults with a bcrypt hash of `Admin@12345` and a random `jwtSecret`.
@@ -239,7 +243,7 @@ The event names are defined once, in `shared/contract.json`. `realtime/displaySo
 - `useActivity()` tracks mouse, keyboard and touch activity.
 - It shows `SlideShow` when there are slides, otherwise `WaitingScreen`.
 - `DeviceInfo` (the location pin) appears if `showDeviceInfo` is on.
-- `ExitKiosk` appears unless `?kiosk=off`.
+- `ExitKiosk` appears unless `?kiosk=off` or `?kiosk=headless` (a Client without a desktop).
 - `AdminWarning` (a small red triangle, bottom right) appears on every screen while `installerNeeded` or `updateAvailable` (manual updates, a new version waiting) is true; tapping it shows only "Please check the Admin panel for details."
 - The cursor is hidden while idle (`.app--idle`).
 - `startDailyReload` runs unless `?kiosk=off`.
@@ -300,7 +304,11 @@ A Vue Router SPA under `/admin/`:
 | `GET /api/auth/status` | macFilter | `{ authenticated }` by verifying the JWT | the router's login check (useApi); **update.sh's health check**; test harnesses |
 | `GET /api/device` | macFilter | server IPs (the one used first) and port | `DeviceInfo.vue` |
 | `POST /api/device/kiosk-exit` | macFilter | stores an exit request for the caller's IP | `ExitKiosk.vue` |
-| `POST /api/device/kiosk-exit/claim` | macFilter | `{"exit":true\|false}`, consuming the request | **kiosk scripts** (curl, exact string compare) |
+| `POST /api/device/kiosk-exit/claim` | macFilter | `{"exit":true\|false}`, consuming the request | **the Client's kiosk** (curl, exact string compare) |
+| `GET /api/client/version` | macFilter | `{ version, commit, clientHash }` (services/clientBundle; §18.7 phase 3) | **`noticeboard-client check`** on a Client only |
+| `GET /api/client/bundle` | macFilter | the installer at the running commit (tar.gz, made once per commit in `tmp/`) | **`noticeboard-client check`** |
+| `GET /api/client/bundle.sig` | macFilter | its ed25519 signature (64 bytes, raw) | **`noticeboard-client check`** |
+| `GET /api/client/key` | macFilter | the public key (PEM); the key pair made on first need | **the installer's Client step, `noticeboard-client trust-server`** |
 | `GET/PUT /api/settings` | adminAuth | sanitised config / partial update of `port`, `macFiltering`, `display` | SettingsView (for DisplaySettingsCard and MacFilterCard), BrandingSettings, SlideshowDetailView (the default duration) |
 | `GET /api/settings/device` | adminAuth | LAN interfaces with MACs | SlideshowsView banner |
 | `GET /api/settings/my-device` | adminAuth | `{ local, mac }` of the caller | MacFilterWarning |
@@ -312,13 +320,14 @@ A Vue Router SPA under `/admin/`:
 | `PUT /api/settings/updates/install-at` | adminAuth | `{ at }` → a set time for the waiting version, then a check | UpdateSchedule |
 | `POST /api/settings/updates/install-now` | adminAuth | status `requested`, request `install-now` (409 while an update runs) | UpdateSchedule |
 | `GET/DELETE /api/settings/updates/notice` | adminAuth | read or dismiss `update-notice.json` | UpdateNotice |
-| `GET /api/settings/updates/installer` | adminAuth | whether the installer needs running again | InstallerNotice |
+| `GET /api/settings/updates/installer` | adminAuth | whether the installer needs running again: `{ required, installed, needed, changes, displays, clientsFollow, branch, ref, returning, automatic, systemFailed, lastByHand }` | InstallerNotice |
 | `GET /api/settings/version` | adminAuth | `{ commit, date, installedAt, branch }` | NavBar |
 | `GET /api/settings/updates/branches` | adminAuth | `git ls-remote --heads` | useUpdateInfo |
 | `POST /api/settings/updates/check` | adminAuth | fetch the branch, validate it, requirements and installer needs | BranchSwitcher |
 | `POST /api/settings/updates/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | one-time token for the switch (5 min) | SwitchDialogs |
 | `POST /api/settings/updates/switch` | adminAuth + token | writes the branch file, status and request | SwitchDialogs |
-| `POST /api/settings/maintenance/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | `{ password, action: 'delete-all' | 'restore-defaults' }` → one-time token for that action (5 min) | DeleteContentCard |
+| `POST /api/settings/maintenance/verify-password` | adminAuth, 5 wrong per 15 min (shared, D40) | `{ password, action: 'delete-all' | 'restore-defaults' | 'restart' | 'full-update' }` → one-time token for that action (5 min) | DeleteContentCard, RestartNotice, FullUpdate |
+| `POST /api/settings/maintenance/full-update` | adminAuth + token (action `full-update`) | `updates.fullUpdate`: main only, with the system step set up (else 409 and why); status `requested`, request `full` → the updates info | FullUpdate |
 | `POST /api/settings/maintenance/delete-all` | adminAuth + token | every slideshow but the sample deleted → `{ deleted: [names] }`; the playlist sent | DeleteContentCard |
 | `GET /api/settings/config-recovery`, `DELETE …` | adminAuth | `{ recovery }`: the note about an unreadable config.json (null when all is well); DELETE removes it | ConfigRecoveryNotice |
 | `GET /api/settings/maintenance/restart` | adminAuth | `{ restartNeeded, port: { running, saved } }` (services/restartState) | RestartNotice, ServerPortCard |
@@ -342,29 +351,32 @@ A Vue Router SPA under `/admin/`:
 Error conventions:
 - `/api` errors are JSON `{ error }`.
 - MAC denial is a **404 plain-text `Not Found`** everywhere, on purpose, so that denied devices learn nothing.
-- The display kiosk script relies on it: a 404 on `/` means "waiting for approval".
+- The Client's kiosk relies on it: a 404 on `/` means "waiting for approval".
 - A wrong password inside the admin panel gives **403**, not 401, because a 401 makes the panel jump to the login page.
 
 ### 4.2 Files used as a channel between the server and `update.sh`
 
 | File | Server side | update.sh side |
 |---|---|---|
-| `data/update-branch.env` | `updateFiles.saveSwitch` writes `NOTICEBOARD_BRANCH=<b>`; `updateFiles.readBranchSetting` reads it | reads `NOTICEBOARD_BRANCH` and `NOTICEBOARD_MAIN_AT_SWITCH`; `write_branch_setting` (lib/branch.sh) writes both |
-| `tmp/update-request` | `requestSwitch` (`<time> <branch>`), `installNow` (`install-now`), `setSchedule` and `setInstallAt` (`check`) write it | the systemd `.path` unit starts `update.sh`, which deletes the file at once; `check` only checks, anything else may install |
+| `data/update-branch.env` | `updateFiles.saveSwitch` writes `NOTICEBOARD_BRANCH=<b>`; `updateFiles.readBranchSetting` reads it | reads `NOTICEBOARD_BRANCH` and `NOTICEBOARD_MAIN_AT_SWITCH` (the latest Release's commit at the switch; main's commit when an older update.sh switched); `write_branch_setting` (lib/branch.sh) writes both |
+| `tmp/update-request` | `requestSwitch` (`<time> <branch>`), `installNow` (`install-now`), `fullUpdate` (`full`), `setSchedule` and `setInstallAt` (`check`) write it; so does the `noticeboard` command (`install-now`, `full`) | the systemd `.path` unit starts `update.sh`, which deletes the file at once; `check` only checks, anything else may install; `full` also runs the system step |
+| `tmp/system-request` | none | `run_system_step` writes the Release's commit; `noticeboard-system.path` starts root's system step, which deletes it |
+| `tmp/system-result` | `readSystemResult` (the updates info, the installer notice: `systemFailed`) | root's system step writes `{ commit, release, result: done | failed | refused, message, time }`; `run_system_step` waits for it (and the `noticeboard` command shows it) |
 | `data/update-schedule.env` | `updateFiles.saveSchedule` (`EVERY`, `TIME`, `DAY`, `SINCE`), `saveInstallAt` (`AT`); `readSchedule` | `lib/schedule.sh` reads it; `set_install_at` removes `AT` once its time has come (or sets it, when Update now finds the lock busy) |
 | `data/restore-defaults` | `contentReset.requestRestore` writes it; `applyPendingRestore` deletes it at start-up | update.sh: while it exists, a run is a restore (reinstall into a clean folder, restart even after a failure) |
 | `data/update-status.json` | `requestSwitch` writes `state: requested`; `getInfo` and `versionInfo` read it | `write_status` for every other state |
-| `data/update-check.json` | `getInfo` reads it (the waiting version: `waitingUpdate`) | `write_check`, with `installCheckedAt`, `fetchedAt`, `nextInstall`, `available`, `availableSubject`, `availableDate` |
-| `data/update-notice.json` | `getNotice` reads it; `dismissNotice` deletes it | `returned_to_main` writes it |
+| `data/update-check.json` | `getInfo` reads it (the waiting version: `waitingUpdate`); `installerVersion.status` reads `installerFor` | `write_check`, with `installCheckedAt`, `fetchedAt`, `nextInstall`, `available`, `availableSubject`, `availableDate`, `availableRelease` (on main, the waiting Release's tag) and `installerFor` (the tag of a Release with the followed branch's work that waits for the installer; kept by runs that don't look again) |
+| `data/update-notice.json` | `getNotice` reads it; `dismissNotice` deletes it | `returned_to_main` writes it (with the Release's tag, `release`) |
 | `tmp/noticeboard-uploads/*` | multer puts uploads here; the queue deletes them | a file younger than 60 min means "upload in progress, wait" |
 | `tmp/update.lock` | none | `flock`, also held by `install.sh` |
-| `data/installer.json` | `installerVersion.installedVersion` reads it | written by `install.sh` |
+| `data/installer.json` | `installerVersion.installedVersion` reads it | written by `install.sh`; `installer_behind` reads its `version` |
+| the Releases' tags (`refs/tags/vX.Y.Z` in the install folder's git) | `releases.releaseAt` names the running Release from them (the version shown); `releases.latestRelease` fetches the tag it checks | `fetch_release`, `branch_merged` and `remember_main` fetch each tag they use (and `install.sh`'s `main_ref`) |
 
 ### 4.3 Kiosk scripts ↔ server
 
-- **Readiness.** `curl -sf http://localhost:3000/` (server kiosk) or `curl … $SERVER_URL` (display kiosk; 200 = show the viewer, 404 = MAC not approved, anything else = server unreachable).
-- **Exit.** `curl -s -X POST --max-time 3 <url>api/device/kiosk-exit/claim` every 3 s, compared with the exact string `{"exit":true}`.
-- **Leaving kiosk mode.** Kill the kiosk browser, then run `<browser> --no-first-run <url>?kiosk=off`.
+- **Readiness.** `curl … <base>/`, the base being `http://localhost:<port>` on a Client + Server and the saved Server address on a Client only: 200 = show the viewer, 404 = MAC not approved, anything else = Server unreachable.
+- **Exit** (with a desktop only). `curl -s -X POST --max-time 3 <base>/api/device/kiosk-exit/claim` every 3 s, compared with the exact string `{"exit":true}`. Headless, the viewer opens with `?kiosk=headless` and nothing is asked.
+- **Leaving kiosk mode.** Kill the kiosk browser, then run `<browser> --no-first-run <base>/?kiosk=off`.
 
 ### 4.4 Server-internal events
 
@@ -385,7 +397,7 @@ Read with JSON5, so comments and `_comment` keys are allowed. Written as plain J
 | Key | Type | Default | Read by | Written by |
 |---|---|---|---|---|
 | `_comment` | string | yes | nobody | defaults |
-| `port` | number | 3000 | index.js; update.sh, install.sh and the Server's kiosk via `configIO.readConfig` | `PUT /settings` (a whole number from 1024 to 65535, the contract's `limits.port`; takes effect after a restart: services/restartState) |
+| `port` | number | 3000 | index.js; update.sh, install.sh and a Client + Server's kiosk via `configIO.readConfig` | `PUT /settings` (a whole number from 1024 to 65535, the contract's `limits.port`; takes effect after a restart: services/restartState) |
 | `passwordHash` | bcrypt | hash of `Admin@12345` | adminPassword (login, password change, branch-switch check, usesDefault) | configService defaults, `PUT /settings/password` |
 | `jwtSecret` | hex (96 characters) | random | adminSession | defaults only |
 | `macFiltering.enabled` | bool | false | macService | `PUT /settings` |
@@ -416,7 +428,9 @@ A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'alway
 | `NOTICEBOARD_LOG_LEVEL` | `.env` or the shell, for troubleshooting only | logger: `debug` adds the debug lines |
 | `NOTICEBOARD_SYSTEMD_DIR` | tests only | pathHelpers.systemdDir |
 | `NOTICEBOARD_BRANCH` | the user (a one-off) | update.sh |
-| `NOTICEBOARD_INSTALLER_SHA`, `NOTICEBOARD_INSTALLER_BRANCH`, `NOTICEBOARD_MODE`, `NOTICEBOARD_INSTALL_BRANCH` | install.sh, set when it re-runs itself | install.sh |
+| `NOTICEBOARD_INSTALLER_SHA`, `NOTICEBOARD_INSTALLER_BRANCH`, `NOTICEBOARD_INSTALLER_RELEASE`, `NOTICEBOARD_MODE`, `NOTICEBOARD_INSTALL_BRANCH` | install.sh, set when it re-runs itself | install.sh |
+| `NOTICEBOARD_GITHUB_API` | tests only (a stand-in for https://api.github.com) | lib/release.sh, updates/releases.js |
+| `NOTICEBOARD_API_RATE_LIMIT` | tests only (a test that clicks faster than a person) | routes/api/index.js, the API rate limit (120 a minute per address) |
 
 ### 5.3 Hard-coded settings (not configurable)
 
@@ -425,7 +439,7 @@ A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'alway
 - **Uploads:** 500 MB per file, 50 files; logo upload 20 MB; logo fits within 500×500.
 - **Scheduler and viewer:** at most 5 active slideshows; scheduler interval 60 s; display clock constants in `slideshowClock.js`.
 - **Updates:** a stale update counts after 60 min; a password-check token lasts 5 min; timer every 15 min (the schedule decides when a run installs; manual mode checks once a day); kiosk exit request expires after 60 s.
-- **Kiosk:** the server kiosk URL is `http://localhost:3000/` regardless of `config.port` (see §16).
+- **Kiosk:** a Client + Server's kiosk reads the port from `config.json` each time it waits for its Server.
 
 ### 5.4 Browser storage
 
@@ -457,14 +471,17 @@ Under `/opt/noticeboard` on a Server.
 | `data/restore-defaults` | text (the time asked, and by whom) | contentReset.requestRestore | update.sh, contentReset | deleted by the server at start-up | Restore Defaults |
 | `data/update-notice.json` | flat JSON | update.sh (branch merged) | updates/updateFiles | dismissNotice (deletes) | home page notice |
 | `data/installer.json` | `{ version (number), branch, commit, time }` | install.sh (last step of a server install) | updates/installerVersion (`installedVersion`) | install.sh | home page installer box, switch check |
+| `data/client-signing.key` | PEM (PKCS#8 ed25519 private key), mode 600 | services/clientBundle (on first need) | services/clientBundle (signing the Client bundle, the public key) | nobody | **every Client only** (their pinned `server.pub`); kept by Restore Defaults (`KEPT_DATA`), never touched by updates or branch switches (0.9.0) |
 | `data/backups/<time>-from-<branch>/…` | copies of the `.json`/`.env` files in `data/` | update.sh before a branch switch | the admin (manually) | none | recovery |
 | `tmp/noticeboard-uploads/upload-*`, `logo-*` | uploaded files | multer (slides, logo) | uploadQueue, brandingService | deleted after processing | **update.sh** (upload-in-progress check) |
 | `tmp/update-request` | text | requestSwitch | the systemd path unit, update.sh | update.sh deletes it; install.sh deletes it | instant switches |
+| `tmp/client-bundle-<commit>.tar.gz`, `….sig` | the installer at that commit (`git archive`) and its signature | services/clientBundle (on the first request for that commit) | GET /api/client/bundle, bundle.sig | nobody (deleted by Restore Defaults) | Clients only updating (0.9.0) |
+| `tmp/system-request`, `tmp/system-result` | a commit; flat JSON `{ commit, release, result, message, time }` | update.sh; `noticeboard-system` (root) | `noticeboard-system.path`; update.sh, updates/updateFiles | `noticeboard-system` deletes the request | root's system step (0.9.0) |
 | `tmp/update.lock` | empty | update.sh / install.sh | flock | none | mutual exclusion |
 | `tmp/update-failed-commit` | a SHA | update.sh | update.sh | update.sh | skipping a bad commit |
 | `logs/app.log` (+ rotated `app1.log`, …) | winston JSON lines, 5 MB × 3 | logger | people | logger | troubleshooting |
 | `/opt/noticeboard/.env` | env file (must exist: the unit's `EnvironmentFile=`) | install.sh (only if missing) | systemd | nobody | `SECURE_COOKIES` |
-| `/opt/noticeboard/start-kiosk.sh` (untracked in git) | bash | install.sh | autostart; **updates/installerVersion** (installer version heuristic) | install.sh | server kiosk |
+| `/opt/noticeboard/start-kiosk.sh` (untracked in git; only on a Server installed before 0.9.0) | bash | installers before 0.9.0 | their autostart; **updates/installerVersion** (installer version heuristic, without `installer.json`) | the installer removes it (0.9.0) | the old Server kiosk |
 | `client/admin/dist/`, `client/display/dist/` | built SPAs | `npm run build` (install.sh, update.sh) | Express static; displayBuildId | every build | viewer and admin |
 
 Outside the install folder:
@@ -472,11 +489,21 @@ Outside the install folder:
 | Item | Created by | Purpose |
 |---|---|---|
 | `/etc/systemd/system/noticeboard.service`, `noticeboard-update.{service,timer,path}` | install.sh | server and updater |
-| `/etc/xdg/autostart/noticeboard-kiosk.desktop` | install.sh | starts the kiosk script at login |
-| `/usr/local/bin/noticeboard-kiosk.sh` | install.sh (Client) | Client kiosk |
-| `~/Desktop/noticeboard-help.desktop` (or the XDG desktop directory) | install.sh | Help shortcut (`file:///opt/noticeboard/noticeboard-guide.html` on a server, `<SERVER_URL>/admin/help` on a display) |
+| `/etc/systemd/system/noticeboard-system.{service,path}` | install.sh (a Server, installer version 6) | root's system step |
+| `/usr/local/sbin/noticeboard-system`, `/usr/local/bin/noticeboard`, `/usr/local/lib/noticeboard/{branch,json,release}.sh` | install.sh (`write_root_files`) | root's own files: the system step, the command, the installer's parts they load |
+| `/etc/xdg/autostart/noticeboard-kiosk.desktop` | install.sh (a Client with a desktop) | runs `noticeboard-client kiosk` at login |
+| `/etc/systemd/system/noticeboard-kiosk.service` | install.sh (a headless Client) | cage on tty1 running `noticeboard-client kiosk` |
+| `/etc/noticeboard/install.env` | install.sh (`save_answers`) | the saved answers: role, platform, Server address, user (the kiosk reads them) |
+| `/opt/noticeboard-client/current/`, `version` | install.sh (`write_client_files`) | the Client's files and their version (on a Client only: the Server's version it follows) |
+| `/opt/noticeboard-client/hash`, `installed.tar.gz`, `previous.tar.gz`, `skip` | `noticeboard-client check` (a Client only) | the Server's `clientHash`; the bundle installed and the one before it (rollback); a commit that didn't work, skipped until the Server offers another |
+| `/etc/noticeboard/server.pub` | install.sh (`follow_server`), `noticeboard-client trust-server` | the Server's public key a Client only pinned; every bundle is verified with it |
+| `/etc/systemd/system/noticeboard-client-update.{service,timer}` | install.sh (a Client only, installer version 7) | `noticeboard-client check` every 15 minutes, as root |
+| `/tmp/noticeboard-kiosk-up` | the Client's kiosk | the version its viewer is up with (the rollback waits for it) |
+| `/usr/local/bin/noticeboard-client` | install.sh (`write_client_launcher`) | the Client's command (runs `current/noticeboard-client`) |
+| `/usr/local/bin/noticeboard-kiosk.sh` | installers before 0.9.0 (Client) | the old Client kiosk; the installer removes it |
+| `~/Desktop/noticeboard-help.desktop` (or the XDG desktop directory) | install.sh | Help shortcut (`file:///opt/noticeboard/noticeboard-guide.html` on a server, `<SERVER_URL>/admin/help` on a Client only) |
 | `~/.config/noticeboard-kiosk/` | Chromium | kiosk browser profile |
-| `/tmp/noticeboard-waiting.html`, `/tmp/noticeboard-waiting-profile/` | display kiosk | waiting page |
+| `/tmp/noticeboard-waiting.html`, `/tmp/noticeboard-waiting-profile/` | the Client's kiosk | waiting page |
 | `/root/noticeboard-sudoers-backup/` | install.sh (sudo step) | backup of the sudoers rule |
 | `/etc/sudoers.d/010_pi-nopasswd` (modified) | install.sh (sudo step, if chosen) | makes sudo ask for a password |
 | ufw rules, `noticeboard-firewall-undo` transient unit | install.sh (firewall step, if chosen) | firewall |
@@ -492,9 +519,11 @@ Outside the install folder:
 | A playlist change waits for the current slide to finish, then every screen switches together | `services/playlistTimeline.js` (the Server) |
 | "No slideshow published" with the logo; a pulsing dot while disconnected | `WaitingScreen.vue`, `services/displaySettings` |
 | Location pin with the server's address | `DeviceInfo.vue` → `GET /api/device` (`network.lanInterfaces`) |
-| The updater's notices on every admin page; the warning mark on every screen while the installer needs running again, or (manual updates) a new version waits | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`, `UpdateAvailableNotice`; `AdminWarning.vue`, `services/displaySettings` (`installerNeeded`, `updateAvailable`), `updates/installerVersion`, `services/updates` |
+| The updater's notices on every admin page; the warning mark on every screen while the installer needs running again (by hand, or after a failed system step), or a newer version waits (any schedule) | `App.vue` (admin), `UpdateNotice`, `InstallerNotice`, `UpdateAvailableNotice`; `AdminWarning.vue`, `services/displaySettings` (`installerNeeded`, `updateAvailable`), `updates/installerVersion`, `services/updates` |
+| Full update (main, the system step set up): the installer's system step, then the Release again (password, last chance) | `FullUpdate`, `ConfirmDangerDialogs`, `settings/maintenance.js`, `updates.fullUpdate`, update.sh (`full`), `noticeboard-system` |
+| The `noticeboard` command on a Server: `update [--full]`, `status` | `installers/root/noticeboard` |
 | Update schedule: every 15 minutes, every 2 hours, daily or weekly at a time, or manual; a waiting version with Update now, Set a time, or the automatic install | `UpdateSchedule`, `UpdateStatus`, `settings/updates.js`, `services/updates` (`schedule.js`, `updateFiles`), `installers/lib/schedule.sh`, update.sh |
-| Exit button (kiosk only), cursor hides when idle | `ExitKiosk.vue`, `useActivity.js`, device.js exit requests, kiosk scripts |
+| Exit button (kiosk with a desktop only), cursor hides when idle | `ExitKiosk.vue`, `useActivity.js`, device.js exit requests, the Client's kiosk |
 | Screens reload after an update; nightly reload; recovery reload | `useSocket.js` (`display:build`), `recovery.js`, `displayBuildId.js` |
 | Login, 7-day session, logout | `LoginView`, `auth.js`, `adminAuth.js`, router guard |
 | Default-password warning on every page | `DefaultPasswordWarning`, `useSecurity`, `adminPassword.usesDefault` |
@@ -513,8 +542,8 @@ Outside the install folder:
 | Delete All: every slideshow but the sample, and every audio show, after a warning listing them, the password and a last chance | `DeleteContentCard`, `ConfirmDangerDialogs`, `settings/maintenance.js`, `contentReset`, `actionTokens` |
 | Restore Defaults: as if newly installed on the followed branch (warning, password, last chance; the installer recommended afterwards) | `DeleteContentCard`, `ConfirmDangerDialogs`, `settings/maintenance.js`, `contentReset` (`requestRestore`, `applyPendingRestore`), update.sh (restore mode) |
 | The port (Settings → Port) and "Restart the Server" (a box on every admin page and the screens' mark while a saved port isn't in use yet; password and last chance; the page moves to the new port) | `ServerPortCard`, `RestartNotice`, `useRestartState`, `settingsService.parsePort`, `restartState`, `settings/maintenance.js`, `AdminWarning` |
-| Software updates: status, branch switch with two confirmations, software check, merged-branch notice, installer-needed box | `components/updates/` (SoftwareUpdates, UpdateStatus, BranchSwitcher, SwitchDialogs, UpdateNotice, InstallerNotice), `useUpdateInfo`, `services/updates`, `systemCheck`, update.sh |
-| Sidebar: logo, By Fructus Sum, links, Last updated, collapse | `NavBar`, `NavIcon`, `useNav`, `useBranding` |
+| Software updates: status (on main the Release's version), branch switch with two confirmations (main: its latest Release, with a warning when that's older), software check, merged-branch notice, installer-needed box | `components/updates/` (SoftwareUpdates, UpdateStatus, BranchSwitcher, SwitchDialogs, UpdateNotice, InstallerNotice), `useUpdateInfo`, `services/updates`, `systemCheck`, update.sh |
+| Sidebar: logo, By Fructus Sum, links, the version (on main, the Release's) and Last updated, collapse | `NavBar`, `NavIcon`, `useNav`, `useBranding` |
 | Section cards fold away to their title (remembered; a card with a warning stays open) | `CollapsibleCard`, `useCollapsed`, and the eight cards that use it |
 | User guide | `noticeboard-guide.html`, served at `/admin/help` |
 
@@ -524,11 +553,11 @@ Outside the install folder:
 
 Entry point: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash`, or `sudo bash installers/install.sh`.
 
-`install.sh` holds the configuration, the switch to the latest installer, the loading of its parts and `main()`, which is called on the last line, so a half-downloaded script runs nothing. `set -euo pipefail`. The steps are in `installers/lib/*.sh` and the kiosk scripts in `installers/kiosk/` (§12.9).
+`install.sh` holds the configuration, the switch to the latest installer, the loading of its parts and `main()` (the root check, the switch, the loading, then `run_installer`: the questions and steps in order), which is called on the last line, so a half-downloaded script runs nothing. `set -euo pipefail`. The steps are in `installers/lib/*.sh` and the Client's files in `installers/client/` (§12.9).
 
 1. **Root check** (`EUID`).
 2. **`use_latest_installer`**. Unless `NOTICEBOARD_INSTALLER_SHA` is set:
-   - Find the branch this Server follows from `data/update-branch.env` (`followed_branch`), else `main`.
+   - The branch asked for with `NOTICEBOARD_INSTALL_BRANCH=<branch>` (any device, e.g. a new one or a Client installing a development branch, §18.7), else the branch this Server follows from `data/update-branch.env` (`followed_branch`), else `main`.
    - `run_installer_from <branch>`:
      - `GET api.github.com/repos/…/commits/<branch>` with the `vnd.github.sha` header, to get the SHA.
      - Download `raw.githubusercontent.com/…/<sha>/installers/install.sh` to `/tmp`.
@@ -536,32 +565,32 @@ Entry point: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboa
      - `exec` it with `NOTICEBOARD_INSTALLER_SHA` and `NOTICEBOARD_INSTALLER_BRANCH` exported.
    - If that fails, fall back to main's installer. If that fails too, carry on with this copy.
    - Only `install.sh` is downloaded here (older installers do the same when they hand over).
-3. **`load_modules`**: the parts from the same commit as the script. `NOTICEBOARD_INSTALLER_SHA=local`: next to the script. A commit: each file downloaded from `raw.githubusercontent.com/…/<sha>/installers/{lib,kiosk}/…` into `mktemp -d`. Not set (the latest installer couldn't be fetched): next to the script if it's in a checkout, else downloaded at the followed branch. Each module is checked with `bash -n` and loaded, the kiosk templates are read into `KIOSK_TEMPLATE_server` / `KIOSK_TEMPLATE_display`, the functions `main()` calls are checked, and the download is deleted. Anything missing or broken: an error and exit 1, before any change.
-4. `DESKTOP_USER=${SUDO_USER:-pi}`, banner, `/dev/tty` check (questions are read from `/dev/tty`, because stdin is the script under `curl | bash`).
-5. `choose_mode` (1 server / 2 display; the default is guessed from `/opt/noticeboard/.git` or the display kiosk script). `NOTICEBOARD_MODE` skips the question.
-6. Server: `choose_branch`. If `update-branch.env` names a non-main branch, ask whether to keep it or go back to main.
-7. `use_branch_installer`. If the chosen branch differs from the branch the installer came from, hand over to that branch's installer, passing `NOTICEBOARD_MODE` and `NOTICEBOARD_INSTALL_BRANCH`.
-8. Display: `ask_server_url` (the default is taken from the existing kiosk script's `SERVER_URL=` line).
+3. **`load_modules`**: the parts from the same commit as the script. `NOTICEBOARD_INSTALLER_SHA=local`: next to the script. A commit: each file downloaded from `raw.githubusercontent.com/…/<sha>/installers/{lib,client}/…` into `mktemp -d`. Not set (the latest installer couldn't be fetched): next to the script if it's in a checkout, else downloaded at the followed branch. Each module is checked with `bash -n` and loaded, the Client's files (`CLIENT_FILES`: `kiosk.sh`, `noticeboard-client`) are checked with `bash -n` and read into `CLIENT_FILE_<name>`, the functions `main()` calls are checked, and the download is deleted. Anything missing or broken: an error and exit 1, before any change.
+4. `run_installer`: `DESKTOP_USER=${SUDO_USER:-pi}` (the user the Noticeboard runs as, whose screen the Client uses), banner, `/dev/tty` check (questions are read from `/dev/tty`, because stdin is the script under `curl | bash`).
+5. `load_answers` (`lib/answers.sh`: `/etc/noticeboard/install.env`, the saved answers), `choose_role` (1 Client + Server / 2 Client only / 3 Server only → `ROLE` both/client/server, and `MODE` server/display for what reads it; the default is the saved role, else a Server folder → 1, else an older Client's kiosk script → 2; `NOTICEBOARD_ROLE`, or an older installer's `NOTICEBOARD_MODE`, skips the question), `refuse_role_change` (a saved role and another chosen: an error before any change), the user check.
+6. `choose_branch`: a branch passed in `NOTICEBOARD_INSTALL_BRANCH` (by a hand-over, or asked for) is taken as it is, for every role. Otherwise, with a Server: if `update-branch.env` names a non-main branch, ask whether to keep it or go back to main.
+   With a Client: `choose_platform` (1 Raspberry Pi with its desktop / 2 Debian with a desktop / 3 minimal or headless → `PLATFORM` pi/desktop/headless; the default is the saved one, else `detect_platform` in `lib/system.sh`: a display manager means a desktop, `/proc/device-tree/model` a Raspberry Pi). Client only: `ask_server_url` (the default is the saved one, else an older kiosk script's `SERVER_URL=` line; `NOTICEBOARD_SERVER_URL` skips it).
+7. `use_branch_installer`. Hand over to the installer of what will be installed, passing the answers (`NOTICEBOARD_ROLE`, `NOTICEBOARD_PLATFORM`, `NOTICEBOARD_SERVER_URL`, `NOTICEBOARD_INSTALL_BRANCH`, and `NOTICEBOARD_MODE` for an installer before 0.9.0): the chosen branch's if it differs from the branch the installer came from; on main, the latest Release's (`latest_release`, lib/release.sh), exporting `NOTICEBOARD_INSTALLER_RELEASE` so that installer doesn't hand over again. No Release published, or GitHub can't be asked: main's installer carries on (§18.6).
+8. On a Raspberry Pi only (`is_raspberry_pi`): the sudo check below.
 9. **`check_sudo_password`** (optional hardening):
    - Find the `NOPASSWD: ALL` rule for the user in `/etc/sudoers.d/*` and back it up to `/root/noticeboard-sudoers-backup`.
    - Comment the rule out in a copy and install the copy only if it passes `visudo -cf`.
    - Prove the user's password works through `sudo -S`, and restore the backup on any failure.
-10. **Server install (`install_server`):**
+10. **Server install (`install_server` = `install_server_packages` (1–3), `install_server_code` (4–8), `install_server_services` (9–11)):**
    1. `update_system`: `apt-get update`, then `dist-upgrade` with `force-confold` and a 300 s lock wait.
-   2. `apt-get install git ffmpeg chromium|chromium-browser curl`.
+   2. `apt-get install git ffmpeg curl` (Chromium is the Client's).
    3. `node_new_enough` (20.19+, 22.12+, or 23+), else NodeSource `setup_20.x` and `apt-get install nodejs`. Abort if still too old.
-   4. Get the code: an existing `.git` gets `lock_install_dir` (flock on `tmp/update.lock`), removal of `tmp/update-request`, `fetch_branch` as the owner (falling back to main), then `checkout --force -B`. Otherwise `git clone` as root, then the lock.
+   4. Get the code: an existing `.git` gets `lock_install_dir` (flock on `tmp/update.lock`), removal of `tmp/update-request`, `fetch_branch` as the owner (falling back to main). Otherwise `git clone` as root, then the lock. Then `checkout --force -B <branch>` as the owner: a branch's latest commit, or on main `main_ref`: the latest Release's tag, fetched on its own (main's latest commit when none is published or GitHub can't be asked; it says so). The status message and the summary name the Release.
    5. `npm install`, `npm run build`, `npm prune --omit=dev`.
    6. If `data/config.json` is missing: `node -e "require('./server/services/configService').init()"`.
    7. `.env` if missing (`SECURE_COOKIES=false`).
    8. `save_branch_setting`: writes `update-branch.env` only if the branch changed, and always writes `update-status.json` (`state: updated`).
    9. `write_service`, `daemon-reload`, `enable`, `restart noticeboard`.
-   10. `write_server_kiosk` (`installers/kiosk/server.sh` as it is → `/opt/noticeboard/start-kiosk.sh`), `write_autostart`, `write_help_shortcut file://…/noticeboard-guide.html`.
-   11. `chown -R <user> /opt/noticeboard`.
-   12. `write_update_units` (service, path, timer), enable the timer and path units.
-   13. `write_installer_record` → `data/installer.json` (`INSTALLER_VERSION=4`).
-11. **Display install (`install_display`):** `update_system`, `apt-get install chromium curl`, `collect_macs_html` (the MAC addresses from `/sys/class/net/*/address` as table rows), `write_display_kiosk` (`installers/kiosk/display.sh` with its `SERVER_URL=""` and `MACS_HTML=""` lines filled in → `/usr/local/bin/noticeboard-kiosk.sh`), `write_autostart`, `write_help_shortcut <SERVER_URL>/admin/help`.
-12. The summary (server: URLs using `hostname -I` and `slideshow_port`, the default password, sudo status, logs, branch).
+   10. `chown -R <user> /opt/noticeboard`.
+   11. `write_update_units` (service, path, timer), `write_system_units` (the system step's service and path unit), `write_root_files` (`/usr/local/sbin/noticeboard-system`, `/usr/local/bin/noticeboard` and `/usr/local/lib/noticeboard/{branch,json,release}.sh`, root's, from the files read in: `ROOT_FILES`, `ROOT_LIBS`); enable the timer and the two path units.
+   (`write_installer_record` → `data/installer.json` (`INSTALLER_VERSION=7`) comes last, in `run_installer`, after the Client: a run that stopped part way doesn't count.)
+11. **The Client (`install_client`, `lib/client.sh`), for Client + Server and Client only:** `update_system` (Client only: a Client + Server's was done), `apt-get install chromium curl` (and `cage` when headless); `write_client_files` (the Client's files as read in → `/opt/noticeboard-client/current/`, root-owned, the installer's commit → `/opt/noticeboard-client/version`), `write_client_launcher` (`/usr/local/bin/noticeboard-client`, which runs `current/noticeboard-client`). With a desktop: `write_autostart "/usr/local/bin/noticeboard-client kiosk"` and `write_help_shortcut` (the guide on the Server: `file://…/noticeboard-guide.html`; a Client only: `<SERVER_URL>/admin/help`), and a headless service left from before is removed. Headless: `write_kiosk_service` (`noticeboard-kiosk.service`: cage on tty1 as the user, `Conflicts=getty@tty1.service`), enabled; no autostart. Then `remove_old_kiosks` (`start-kiosk.sh` and `/usr/local/bin/noticeboard-kiosk.sh` of installers before 0.9.0). A Client only also gets `openssl`, `write_root_libs` (`/usr/local/lib/noticeboard/{branch,json,release}.sh`, for `reinstall-stable`) and `write_client_update_units` (`noticeboard-client-update.{service,timer}`, the timer enabled): it follows its Server (§18.7 phase 3). Server only: the autostart and the old kiosks are removed instead. Then `save_answers`; a Client only then `follow_server` (no key pinned yet: `noticeboard-client trust-server` shows the Server's key fingerprint and pins it in `/etc/noticeboard/server.pub` after a yes; the Server out of reach or older than 0.9.0: it says the Client won't update itself until that's run; with a key: a first `noticeboard-client check`, so the Client runs its Server's files from the start); with a Server, `write_installer_record`.
+12. The summaries: the Server's (URLs using `hostname -I` and `slideshow_port`, the default password, sudo status, logs, branch) and the Client's (what it shows, the sudo status for a Client only, how to stop a headless kiosk, and on a Raspberry Pi the screen-blanking advice).
 13. **`check_firewall`** (optional; its errors never stop the installer):
     - Ask first.
     - If ufw is active, only allow the slideshow port.
@@ -572,7 +601,9 @@ Entry point: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboa
       - Confirm the slideshow port, and ask about VNC.
       - Install ufw, allow the ports plus `5353/udp`, set the default policies.
       - Over SSH, arm a 3-minute `systemd-run` undo before `ufw --force enable`, then ask the user to confirm a new SSH login within 170 s.
-14. `offer_reboot` (Enter = `systemctl reboot`).
+**`install.sh --apply`** (root's system step, §18.7 phase 2): `apply_saved_installation` instead of `run_installer`: the saved answers (none: an error), no questions, no hand-over, sudo check, firewall or reboot; `install_server_packages` (the package list updated but no system upgrade: `APPLY`), `install_server_services --no-restart`, `install_client`, `save_answers`, `write_installer_record`. Never the code: update.sh installs it next. On a Client only, `noticeboard-client check` runs it from a verified bundle (`NOTICEBOARD_INSTALLER_SHA=local`): `install_client` only, never a key pinned.
+
+14. With a Client: `offer_reboot` (Enter = `systemctl reboot`): the kiosk starts at start-up (a headless one started at once would take over tty1, where the installer may be running).
 
 Where each step lives: §12.9. The prompts (`ask_yes_no`, `ask_choice`, `ask_port`, `ask_yes_in_time`) and the boxed `banner` are in `lib/ui.sh`, used by every step that asks or prints a heading.
 
@@ -582,7 +613,7 @@ Where each step lives: §12.9. The prompts (`ask_yes_no`, `ask_choice`, `ask_por
 
 ### 9.1 `installers/update.sh`
 
-Everything runs from `main()` on the last line, because `git checkout` replaces this file while it runs. `set -euo pipefail`. `INSTALL_DIR` is taken from the script's own location. Before `main()` it loads `installers/lib/branch.sh` and `lib/json.sh` from its own commit, so a checkout can't swap them mid-run; if it can't, it stops before touching anything.
+Everything runs from `main()` on the last line, because `git checkout` replaces this file while it runs. `set -euo pipefail`. `INSTALL_DIR` is taken from the script's own location. Before `main()` it loads `installers/lib/branch.sh`, `json.sh`, `schedule.sh` and `release.sh` from its own commit, so a checkout can't swap them mid-run; if it can't, it stops before touching anything.
 
 1. Work out `BRANCH`: `NOTICEBOARD_BRANCH` (a one-off) → `update-branch.env` → `main`. Also read `MAIN_AT_SWITCH`.
 2. If running as root while the folder is owned by someone else, re-exec as the owner. Refuse to run as any other user.
@@ -592,20 +623,23 @@ Everything runs from `main()` on the last line, because `git checkout` replaces 
 6. The service must be `active` or `activating`, else `check: waiting`.
 7. Uploads in progress (a file younger than 60 min in `tmp/noticeboard-uploads`) → `check: waiting`.
 7a. **May this run install?** `due` when requested, when switching, or when `install_due` (lib/schedule.sh) says so. Otherwise it only checks; in manual mode, not at all if the last check was less than a day ago.
-8. **Merged-branch return**, only when `due`, following a non-main branch and not switching: `branch_merged`.
-   - Fetch main.
+8. **Return to main once a Release has the branch's work** (§18.6), only when `due`, following a non-main branch and not switching: `branch_merged`.
+   - Ask for main's latest Release (`latest_release`) and fetch its tag; unsure (none, or GitHub can't be asked): stay.
    - If the branch was deleted (`ls-remote` exit code 2), compare `CURRENT`.
-   - Otherwise require main to have moved on from `MAIN_AT_SWITCH`.
-   - Then `merge-base --is-ancestor`, or `merge-tree --write-tree` to detect a squash or rebase.
-   - If merged: `write_branch_setting main`, `switching=1`, `RETURNED_FROM`.
-9. `git fetch origin +refs/heads/B:refs/remotes/origin/B`. On failure: a switch is cancelled; a deleted branch gives `check: error`; otherwise `check: offline`.
-10. `TARGET = origin/B`; record `fetchedAt`, and when `due` `installCheckedAt` (and remove a set time that has come). If it equals `CURRENT`: when switching, check out the branch and write the notice or status. Always `check: up-to-date`.
+   - Otherwise require the latest Release to have changed since the switch (`MAIN_AT_SWITCH`, the Release's commit then; without a record, the Release must differ from the branch's tip).
+   - Then `merge-base --is-ancestor` into the Release's commit, or `merge-tree --write-tree` to detect a squash or rebase.
+   - If it's in the Release but the Release needs a newer installer than `data/installer.json` records (`installer_behind`; no record: never waits), stay and keep its tag in `INSTALLER_FOR` (update-check.json's `installerFor`, the notice). Runs that don't look again keep it; following main or switching clears it.
+   - Otherwise: `write_branch_setting main`, `switching=1`, `RETURNED_FROM`, `RELEASE`.
+9. **The target.** On main, `fetch_release`: the latest Release's tag is fetched on its own (`+refs/tags/T:refs/tags/T`) and `TARGET` is its commit (`RELEASE` its tag). None published: a switch to main is cancelled, Restore Defaults reinstalls `CURRENT`, otherwise `check: up-to-date` saying so (exit 0). GitHub can't be asked: a switch is cancelled, otherwise `check: offline`. On another branch, `fetch_branch_tip`: `git fetch origin +refs/heads/B:refs/remotes/origin/B` and `TARGET = origin/B`; on failure a switch is cancelled, a deleted branch gives `check: error`, otherwise `check: offline`. `TARGET_NAME` is how messages name it ("Release v0.8.0 (abc1234)" or "abc1234 from B"), and the recovery command (`installer_url`) comes from the same place.
+10. Record `fetchedAt`, and when `due` `installCheckedAt` (and remove a set time that has come). If `TARGET` equals `CURRENT`: when switching, check out the branch and write the notice or status. Always `check: up-to-date`.
+10a. **Never backwards on main:** not switching and not restoring, a Release already in what runs (`merge-base --is-ancestor TARGET CURRENT`, e.g. a Server with newer commits of main from before the first Release) leaves it as it is (`check: up-to-date`). A switch to main or Restore Defaults installs an older Release.
 11. A previously failed target (`tmp/update-failed-commit`) is skipped unless forced.
-11a. **Not due:** `check: available` with the waiting commit, its subject and date, and when it will be installed; exit 0.
+11a. **Not due:** `check: available` with the waiting commit, its subject and date (on main, its Release: `availableRelease`), and when it will be installed; exit 0.
 12. `refuse_reason`: the target has files in `data tmp logs .env`, or (when switching) its `update.sh` lacks the text `update-branch.env`.
+12a. **The system step** (main only, §18.7 phase 2): a Release whose `installer.version` is above the record (`installer_behind`), or a Full update (the request `full`), when the system step is set up (`system_step_ready`: `systemctl is-enabled noticeboard-system.path`): `run_system_step` writes `tmp/system-request` (the commit), sets `status: updating`, and waits for `tmp/system-result` with that commit (`sleep 5`, at most 45 min). Done: carry on. Failed, refused or no answer: the commit goes into `update-failed-commit`, `status: failed` with the step's message, exit 1: the code isn't touched. Not set up: a Full update fails saying to run the installer once by hand; otherwise the code installs as before (the installer notice asks for a run by hand). A Full update on a branch fails at once (its installer is run by hand), and a Full update skips the up-to-date and never-backwards exits: the Release is installed again.
 13. On a switch, `backup_settings` → `data/backups/<time>-from-<prev>/`.
 14. `status: updating`. `PORT = server_port` (node + configIO).
-14a. **Restore Defaults** (`data/restore-defaults` exists): the run is due and forced, skips the merged-branch return, installs even when `TARGET` equals `CURRENT`, first cleans the folder (`clean_folder`: `git clean -ffdxq` keeping `RESTORE_KEEP`: `data/`, `tmp/`, `logs/`, `.env`, `start-kiosk.sh`, `node_modules/`, `client/*/dist/`), restarts the server even if the install failed and was rolled back (the server resets its data at start-up), and writes its status after the restart.
+14a. **Restore Defaults** (`data/restore-defaults` exists): the run is due and forced, skips the merged-branch return, installs even when `TARGET` equals `CURRENT` (on main, the latest Release, even an older one than what runs), first cleans the folder (`clean_folder`: `git clean -ffdxq` keeping `RESTORE_KEEP`: `data/`, `tmp/`, `logs/`, `.env`, `start-kiosk.sh`, `node_modules/`, `client/*/dist/`), restarts the server even if the install failed and was rolled back (the server resets its data at start-up), and writes its status after the restart.
 15. `install_commit`: `checkout --force -B`, `npm install --include=dev`, `npm run build`, `npm prune --omit=dev`. On failure: re-install `CURRENT` → `rolled-back`, or `failed`.
 16. `wait_for_uploads` (at most 30 min), then `restart_server`:
     - `kill -TERM` the `MainPID`; systemd restarts the service.
@@ -619,13 +653,13 @@ Every `write_check` also records `installCheckedAt`, `fetchedAt` and `nextInstal
 
 ### 9.2 Server side (`services/updates/`)
 
-- **`getInfo`:** git HEAD and branch, the configured branch, the status file, the check file, whether the timer and path units are enabled (from the `*.wants` symlinks), whether a request is pending, and `busy` (requested or updating less than 60 min ago).
-- **`checkBranch`:** `ls-remote`, fetch, the same refusals as `update.sh`, the latest commit's subject and date, and `requirementsOf(commit)`. The latter reads `system-requirements.json` at that commit, runs `systemCheck.checkRequirements`, and calls `installerNeeds`.
+- **`getInfo`:** git HEAD and branch, the Release running on main (`releases.releaseAt`: the highest `vX.Y.Z` tag on HEAD; `release` and `version`), the configured branch, the status file, the check file, whether the timer and path units are enabled (from the `*.wants` symlinks), whether a request is pending, and `busy` (requested or updating less than 60 min ago). `versionInfo` (the sidebar) adds the same `version`.
+- **`checkBranch`:** what a switch would install: for main, its latest Release (`mainTarget`: `releases.latestRelease` asks GitHub and fetches the tag; none published → 409, GitHub unreachable → 502), with `older: true` when that's an ancestor of HEAD (the admin panel warns); for another branch, `branchTip` (`ls-remote`, fetch). Then the same refusals as `update.sh`, the commit's subject and date, and `requirementsOf(commit)`. The latter reads `system-requirements.json` at that commit, runs `systemCheck.checkRequirements`, and calls `installerNeeds`.
 - **The switch has three steps:** `checkBranch`, then `verify-password` issues a one-time token, then `switch` consumes it and calls `requestSwitch`.
   - `requestSwitch` rechecks the branch and refuses missing software unless `acceptMissing`.
   - `updateFiles.saveSwitch` writes the branch file, then `status: requested`, then the request file, and restores all three on failure.
-- **The schedule:** `setSchedule` and `setInstallAt` check the values (`updates/schedule.js`), save them (`updateFiles`) and write a `check` request, so update.sh records the new next install time within seconds; `installNow` writes status `requested` and an `install-now` request. `getInfo` adds the schedule and the waiting version (`waitingUpdate`: the check file's `available`, unless it is the running commit); `manualUpdateWaiting` gives the screens' `updateAvailable`.
-- **Installer-needed:** `installerVersion.installedVersion` reads `data/installer.json`, else estimates from `start-kiosk.sh` (contains `kiosk-exit` → 1, else 0; no file → null). It is compared with `installer.version` in `system-requirements.json`.
+- **The schedule:** `setSchedule` and `setInstallAt` check the values (`updates/schedule.js`), save them (`updateFiles`) and write a `check` request, so update.sh records the new next install time within seconds; `installNow` writes status `requested` and an `install-now` request; `fullUpdate` (main only, with the system step set up, else 409 and why) writes status `requested` and a `full` request. `getInfo` adds the schedule, the waiting version (`waitingUpdate`: the check file's `available`, unless it is the running commit), whether the system step is set up (`systemStep`: its path unit's `*.wants` link) and its last answer (`lastSystemStep`); `updateWaiting` gives the screens' `updateAvailable`, on any schedule.
+- **Installer-needed** (on main with the system step set up, `automatic`: only when its last run, for a Release not running yet, failed: `systemFailed` with its message; §18.7 phase 2): `installerVersion.installedVersion` reads `data/installer.json`, else estimates from `start-kiosk.sh` (contains `kiosk-exit` → 1, else 0; no file → null). It is compared with `installer.version` in `system-requirements.json`. `status()` also gives `ref`, where the installer command comes from (on main the running Release's tag, else the branch), and, while a Release with the followed branch's work waits for the installer (update-check.json's `installerFor`), that Release's needs instead, read from its tag, with `returning` (the notice then says to choose main when the installer asks). `lastByHand`: on main without the system step, for a version whose installer sets it up (6 on): the notice says this run is the last by hand. `installerNeeds`' `displays` (each Client needs one run as Client only) holds only while the record is below 7; from 7 on a change for the Clients gives `clientsFollow` (they follow by themselves) (§18.7 phase 4).
 
 ---
 
@@ -644,21 +678,32 @@ ExecStart=/usr/bin/node server/index.js, Restart=always, RestartSec=5
 noticeboard-update.service   Type=oneshot, User=<user>, ExecStart=/bin/bash /opt/noticeboard/installers/update.sh, TimeoutStartSec=60min
 noticeboard-update.timer     OnBootSec=5min, OnUnitActiveSec=15min, RandomizedDelaySec=60
 noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
+noticeboard-system.service   Type=oneshot (root), ExecStart=/usr/local/sbin/noticeboard-system, TimeoutStartSec=45min
+noticeboard-system.path      PathExists=/opt/noticeboard/tmp/system-request
+```
+
+**A Client only's update units** (installer version 7, §18.7 phase 3):
+
+```
+noticeboard-client-update.service  Type=oneshot (root), ExecStart=/usr/local/bin/noticeboard-client check, TimeoutStartSec=20min
+noticeboard-client-update.timer    OnBootSec=5min, OnUnitActiveSec=15min, RandomizedDelaySec=120
 ```
 
 **Desktop:**
-- XDG autostart runs `Exec=<kiosk script>`.
-- Chromium runs with flags that suppress error dialogs, the infobar, update checks and the first-run pages, with its own `--user-data-dir`, and (installer version 3) `--autoplay-policy=no-user-gesture-required`, so background audio plays without a click. The Server's kiosk opens `http://localhost:<port>/`, the port read from `data/config.json` each time it waits for the Server (installer version 4; 3000 if it can't be read).
-- `xset` turns screen blanking off (X11 only; it's a no-op on Wayland/labwc).
+- XDG autostart runs `Exec=/usr/local/bin/noticeboard-client kiosk` (a Client with a desktop). Headless, `noticeboard-kiosk.service` runs `cage -s -- /usr/local/bin/noticeboard-client kiosk` on tty1 as the user (`PAMName=login`, `Conflicts=getty@tty1.service`, `Restart=always`), and Chromium gets `--ozone-platform-hint=auto` for cage's Wayland display.
+- Chromium runs with flags that suppress error dialogs, the infobar, update checks and the first-run pages, with its own `--user-data-dir`, and (installer version 3) `--autoplay-policy=no-user-gesture-required`, so background audio plays without a click. A Client + Server's kiosk opens `http://localhost:<port>/`, the port read from `data/config.json` each time it waits for the Server (3000 if it can't be read).
+- `xset` turns screen blanking off (X11 only; it's a no-op on Wayland/labwc; not run headless). On a Raspberry Pi, the summary says where to turn Screen Blanking off.
 
 **Privileges:**
 - The installer runs as root.
 - The server and the updater run as the desktop user.
 - The updater restarts the server by killing it (systemd restarts it), so it never needs sudo.
+- On main, what only root can do goes to root's system step (installer version 6): it runs only main's latest Release's installer, downloaded from GitHub at the commit GitHub says is that Release's, never code from the app's folder; update.sh only asks (`tmp/system-request`) and reads the answer (§18.7 phase 2).
+- On a Client only, root's `noticeboard-client check` runs an installer only from a bundle whose signature verifies with the Server key pinned at install (`/etc/noticeboard/server.pub`); `reinstall-stable` only from GitHub over HTTPS, at main's latest Release (§18.7 phase 3).
 
 **Other integration:**
-- **Logging:** the kiosk scripts use `logger -t noticeboard-kiosk` (the journal).
-- **ARP:** the server's MAC filter reads the ARP table through `node-arp` (which runs `arp`).
+- **Logging:** the Client's kiosk uses `logger -t noticeboard-kiosk` and its updater `logger -t noticeboard-client` (the journal).
+- **ARP:** the server's MAC filter reads the kernel's ARP table, `/proc/net/arp`, on Linux (no program to run); elsewhere (a PC running the tests) through `node-arp` (which runs `arp`).
 
 ---
 
@@ -679,7 +724,7 @@ noticeboard-update.path      PathExists=/opt/noticeboard/tmp/update-request
 | sharp (native) | mediaService, brandingService | images and the logo |
 | fluent-ffmpeg | mediaService | video transcoding, duration, thumbnails (needs the `ffmpeg` and `ffprobe` binaries) |
 | p-queue 7 (ESM only) | uploadQueue (`require('p-queue').default`) | processing queue. Needs Node's `require(esm)`, available from **Node 20.19** or **22.12** |
-| node-arp | macLookup | MAC lookup |
+| node-arp | macLookup | MAC lookup off Linux (a PC running the tests); on Linux the server reads `/proc/net/arp` itself |
 | socket.io / socket.io-client | realtime/displaySocket.js / useSocket.js | real-time channel |
 | winston | logger | logging |
 | vue, vue-router | client apps | UI |
@@ -694,9 +739,10 @@ Build only (npm's devDependencies, removed by `npm prune --omit=dev` after the b
 | `node` 20.19+ or 22.12+, `npm` | server, installers | runtime and build |
 | `git` 2.38+ (for `merge-tree --write-tree`) | installers, updates/git.js | install, update, branch info |
 | `ffmpeg`, `ffprobe` | mediaService | video |
-| `curl` | installers, kiosk scripts | downloads, health and exit checks |
-| `chromium` / `chromium-browser` | kiosk scripts | display |
-| `arp` (net-tools) | node-arp | MAC filter |
+| `curl` | installers, the Client's kiosk | downloads, health and exit checks, GitHub's Releases API (`lib/release.sh`) |
+| `chromium` / `chromium-browser` | the Client's kiosk | display |
+| `cage` | `noticeboard-kiosk.service` (a headless Client) | the kiosk full screen without a desktop |
+| `openssl` (1.1.1+, for `pkeyutl -rawin`), `tar`, `sha256sum` | `noticeboard-client` (a Client only) | verifying the Server's signed bundle, unpacking it, the key's fingerprint |
 | `date` (GNU: `-d`, used by lib/schedule.sh), `systemctl`, `systemd-run`, `flock`, `runuser`, `logger`, `xset`, `xdg-user-dir`, `getent`, `visudo`, `passwd`, `ss`, `ps`, `sshd`, `ufw`, `firewall-cmd`, `nft`, `iptables`, `apt-get`, `apt-cache`, `hostname`, `stat` | installers | OS set-up |
 
 `system-requirements.json` lists Node.js, npm, Git, FFmpeg, FFprobe, curl and Chromium, with version ranges and install hints. It also holds `installer.version` and `installer.changes`.
@@ -781,12 +827,16 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Owns:** the login rate limit (5 per 15 minutes).
 - **Uses:** adminPassword (`verify`), adminSession (`issue`, `clear`, `isLoggedIn`), asyncRoute, logger.
 
+**`routes/api/client.js`**
+- **Purpose:** what a Client only asks its Server for, to update itself (§4.1, §18.7 phase 3): `GET /version`, `/bundle`, `/bundle.sig`, `/key`. MAC filter only, like the viewer.
+- **Uses:** services/clientBundle, asyncRoute. **Used by:** routes/api/index.js; `noticeboard-client` on a Client only, the installer's Client step.
+
 **`routes/api/device.js`**
 - **Purpose:** the server's addresses for the pin, and kiosk exit requests.
 - **Functions:** `deviceOf` (loopback → `this-server`, else the plain address).
 - **State:** the `exitRequests` Map.
 - **Uses:** `network` (`lanInterfaces`, `plainAddress`, `isLoopback`).
-- **Relied on by:** the kiosk scripts (exact JSON).
+- **Relied on by:** the Client's kiosk (exact JSON).
 
 **`routes/api/settings/`**
 - **`index.js`:** mounts the five parts under `/api/settings` (their paths don't overlap).
@@ -794,7 +844,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **`security.js`:** `/security` and `/password` (adminPassword).
 - **`logo.js`:** `/logo` GET/POST/DELETE (`logoInfo`, uploads with prefix `logo`, 20 MB, `LOGO_MIME`; brandingService; `displayEvents.displaySettingsChanged`).
 - **`updates.js`:** the software-update routes and `/version` (services/updates, `jsonRoute`, `wrongPasswordLimiter`).
-- **`maintenance.js`:** `/maintenance/verify-password` (the password for an action → its token; `wrongPasswordLimiter`) , `/maintenance/delete-all` (with the token: `contentReset.deleteAllContent`) and `/maintenance/restore-defaults` (with the token: `contentReset.requestRestore`).
+- **`maintenance.js`:** `/maintenance/verify-password` (the password for an action → its token; `wrongPasswordLimiter`) , `/maintenance/delete-all` (with the token: `contentReset.deleteAllContent`) `/maintenance/restore-defaults` (with the token: `contentReset.requestRestore`), `/maintenance/restart` and `/maintenance/full-update` (with the token: `updates.fullUpdate`).
 - **`videos.js`:** `GET/POST /videos/convert` (videoConversion `status`, `start`).
 
 **`routes/api/slideshows.js`**
@@ -941,8 +991,13 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** slideshows.js, slides.js, tracks.js, settings/logo.js, uploadQueue; displaySocket listens.
 
 **`services/contentReset.js`**
-- **Purpose:** `deleteAllContent()` → `{ deleted: [names], deletedAudio: [names] }`: every audio show (`audioShowStore.removeMany`, in one config write with every slideshow's `audioShow` removed; skipped when there are none, so the slideshows' entries stay as they are), then every slideshow but the sample (`store.removeMany`: one config write, then the folders), then `displayEvents.playlistChanged()` (the audio reaches the screens through the config change). `requestRestore(by)`: the marker, the status and the `restore-defaults` request (D42). `applyPendingRestore()` (start-up): the reset itself. `KEPT_DATA`: `update-branch.env`, `installer.json`.
+- **Purpose:** `deleteAllContent()` → `{ deleted: [names], deletedAudio: [names] }`: every audio show (`audioShowStore.removeMany`, in one config write with every slideshow's `audioShow` removed; skipped when there are none, so the slideshows' entries stay as they are), then every slideshow but the sample (`store.removeMany`: one config write, then the folders), then `displayEvents.playlistChanged()` (the audio reaches the screens through the config change). `requestRestore(by)`: the marker, the status and the `restore-defaults` request (D42). `applyPendingRestore()` (start-up): the reset itself. `KEPT_DATA`: `update-branch.env`, `installer.json`, `client-signing.key` (every Client only has its public key pinned).
 - **Uses:** slideshowStore, audioShowStore, slideshowRules (`isSample`), displayEvents, services/updates (`updaterReady`, `updateFiles.saveRestoreRequest`), pathHelpers, logger. **Used by:** settings/maintenance.js, server/index.js.
+
+**`services/clientBundle.js`**
+- **Purpose:** the Server's side of "Clients follow their Server" (§18.7 phase 3): `version()` → `{ version, commit, clientHash }` (the Release's tag on main, else `<branch>@<short commit>`; a SHA-256 of `git ls-tree` of the installer's files at the running commit); `bundle()` → the tar.gz of `installers/install.sh`, `lib/`, `client/`, `root/` at the running commit (`git archive`, once per commit in `tmp/client-bundle-<commit>.tar.gz`) and its ed25519 signature (`.sig`); `publicKey()` → PEM. The key pair (`data/client-signing.key`, 600) is made on first need.
+- **Uses:** updates/git, updates/releases (`releaseAt`), pathHelpers (`clientKeyPath`, `clientBundlePath`), Node crypto. **Used by:** routes/api/client.js.
+- **Change impact:** every Client only's `noticeboard-client` reads these answers: the version's fields, the bundle's layout and the signature's form are §15 contracts.
 
 **`services/actionTokens.js`**
 - **Purpose:** the one-time proof that the admin password was checked (D40): `issue(action, subject)`, `take(token, action, subject)` (5 minutes, one use, that action and subject only). Actions: `switch` (the branch as subject), `delete-all`, `restore-defaults`.
@@ -957,12 +1012,13 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Used by:** settings/general.js.
 
 **`services/updates/`**
-- **`index.js`:** `getInfo`, `versionInfo`, `getNotice`/`dismissNotice`, `installerStatus`, `listBranches`, `checkBranch` (+ `requirementsOf`), `requestSwitch`, `setSchedule`, `setInstallAt`, `installNow`, `waitingUpdate`, `manualUpdateWaiting`; re-exports `validBranchName`, `issueToken` and `takeToken`. Errors for the admin carry `expose`. Used by settings/updates.js.
+- **`index.js`:** `getInfo`, `versionInfo`, `getNotice`/`dismissNotice`, `installerStatus`, `listBranches`, `checkBranch` (+ `requirementsOf`), `requestSwitch`, `setSchedule`, `setInstallAt`, `installNow`, `fullUpdate`, `waitingUpdate`, `updateWaiting`; re-exports `validBranchName`, `issueToken` and `takeToken`. Errors for the admin carry `expose`. Used by settings/updates.js, settings/maintenance.js (`fullUpdate`), displaySettings (`updateWaiting`).
 - **`git.js`:** `git(args, timeout)` in ROOT, never prompting.
 - **`branchName.js`:** `validBranchName`, the JS twin of `installers/lib/branch.sh` `valid_branch` (kept in step by `tests/installers/branch-names.sh`).
+- **`releases.js`:** `latestRelease` (asks GitHub's Releases API, `NOTICEBOARD_GITHUB_API` or api.github.com, and fetches the tag; null when none is published), `releaseAt` (the highest `vX.Y.Z` tag on a commit), `versionName`. The JS twin of `installers/lib/release.sh` (D48).
 - **`updateFiles.js`:** the one owner of the files shared with update.sh: `readBranchSetting`, `readStatus`/`readCheck`/`readNotice`, `deleteNotice`, `requestPending`, `unitsEnabled`, `readSchedule`/`saveSchedule`/`saveInstallAt` (`update-schedule.env`), `requestRun` (`check` or `install-now`), `saveInstallNow`, `saveSwitch` (the three writes in order, restored on failure).
 - **`schedule.js`:** `EVERY`, `DEFAULT`, `parseSchedule`, `parseInstallAt` (a valid schedule and set time; the rules for when to install are only in lib/schedule.sh, D41).
-- **`installerVersion.js`:** `installedVersion` (record, else the kiosk-script heuristic), `installerNeeds`, `status`. Also used by server/test/installer.test.js.
+- **`installerVersion.js`:** `installedVersion` (record, else the kiosk-script heuristic), `installerNeeds`, `status` (with `ref` and `returning`, §9.2). Also used by server/test/installer.test.js.
 
 ### 12.5 Utilities
 
@@ -979,8 +1035,8 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 - **Purpose:** the winston logger. Creates `logs/` when first required. JSON lines to the console (the journal on an installed Server) and to `logs/app.log`; info and above, or debug too with `NOTICEBOARD_LOG_LEVEL=debug`.
 
 **`utils/macLookup.js`**
-- **Purpose:** `isLocalhost` ("the Server itself" for MAC filtering: the set `127.0.0.1`, `::1`, `::ffff:127.0.0.1`, `localhost`, **empty string**, kept on purpose: §14 D6) and `lookupMac` (node-arp, lower-cased).
-- **Uses:** `network.plainAddress`.
+- **Purpose:** `isLocalhost` ("the Server itself" for MAC filtering: the set `127.0.0.1`, `::1`, `::ffff:127.0.0.1`, `localhost`; not an empty address, §18.5 item 3) and `lookupMac` (lower-cased; on Linux from the kernel's ARP table, `/proc/net/arp`, read directly; elsewhere node-arp).
+- **Uses:** `network.plainAddress`, `pathHelpers.arpTablePath`, node-arp (off Linux).
 
 **`utils/network.js`**
 - **Purpose:** `plainAddress` (strips `::ffff:`), `isLoopback` (127.0.0.0/8, `::1`, `::ffff:127.x`: the kiosk-exit rule), `lanInterfaces()` (non-internal IPv4 interfaces with their MACs).
@@ -1003,7 +1059,7 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | File | Purpose | Uses | Notes |
 |---|---|---|---|
 | `index.html`, `main.js` | mount | App.vue | inline base styles (duplicated in App.vue's `<style>`) |
-| `App.vue` | composition, `?kiosk=off`, idle cursor, the background colour (`--nb-background`), the slideshow on air for the background audio | useSocket, useActivity, recovery, the six components | |
+| `App.vue` | composition, `?kiosk=off` and `?kiosk=headless`, idle cursor, the background colour (`--nb-background`), the slideshow on air for the background audio | useSocket, useActivity, recovery, the six components | |
 | `composables/useSocket.js` | socket.io client; playlist, settings, background audio, build reload; the time exchanges and `serverNow` (`?debugClockOffset` for tests) | `@shared` SOCKET_EVENTS, recovery | `'connect'`/`'disconnect'` are socket.io built-ins |
 | `serverClock.js` | the Server's time as this screen can best tell it: offsets from time:ping/pong exchanges, the shortest round trip winning; `window.noticeboardClock()` | none | tested by `client/display/test/serverClock.test.mjs` |
 | `composables/useActivity.js` | activity with real mouse moves; idle after 3 s | none | |
@@ -1064,8 +1120,9 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `components/settings/RestartNotice.vue` | the "Restart the Server" box (every page, `.page-warning`) while a saved port isn't in use yet: what changes, what the Clients and the firewall need; "Restart the Server now…" (password and last chance), then waits for the Server on its new port and moves the page there | useApi, useRestartState, ConfirmDangerDialogs | |
 | `components/settings/ServerPortCard.vue` | Settings → Port: the port, checked as the server checks it, and what a change needs | useApi, useFlash, useRestartState, FlashMessage, CollapsibleCard, `@shared` LIMITS | |
 | `composables/useRestartState.js` | `useRestartState()` → `{ state, refresh }`: GET /settings/maintenance/restart, one copy for the whole admin panel | useApi | used by RestartNotice, ServerPortCard |
-| `components/updates/InstallerNotice.vue` | run-the-installer box (in the layout: every page; the box is `.page-warning`) | useApi, `@shared` installerCommand | |
-| `components/updates/UpdateAvailableNotice.vue` | "Update available" with manual updates (in the layout: every page, nothing to close), linking to `/settings#updates` | useApi | |
+| `components/updates/InstallerNotice.vue` | run-the-installer box (in the layout: every page; the box is `.page-warning`): the failed system step, the return to main, the last run by hand on main (`lastByHand`), one run on each Client as Client only (`displays`) or nothing to do on them (`clientsFollow`) | useApi, `@shared` installerCommand | |
+| `components/updates/UpdateAvailableNotice.vue` | "Update available" whenever a newer version waits, on any schedule, with when it installs (in the layout: every page, nothing to close), linking to `/settings#updates` | useApi, useUpdateInfo (`when`) | |
+| `components/updates/FullUpdate.vue` | in the Software updates card: "Full update…" on main with the system step set up, its last answer; following a branch, or before the step is set up, how to run the installer by hand | useApi, ConfirmDangerDialogs, useUpdateInfo, `installerCommand` | |
 | `components/updates/UpdateSchedule.vue` | in the Software updates card: the waiting version (Update now, Set a time, or the automatic install's time) and the schedule form | useApi, useFlash, FlashMessage, useUpdateInfo helpers | |
 | `components/updates/SoftwareUpdates.vue` | the card (`id="updates"`): puts the parts together, shows the outcome of the last attempt; open while an update runs, went wrong, or (manual) waits | useUpdateInfo, UpdateStatus, UpdateSchedule, BranchSwitcher, SwitchDialogs, CollapsibleCard | |
 | `components/updates/UpdateStatus.vue` | the facts (running, updates and the schedule, last check, last update) and the progress box | useUpdateInfo helpers | |
@@ -1103,22 +1160,24 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 
 ### 12.9 Installers
 
-**`installers/install.sh`** (see §8): the configuration (including `INSTALLER_VERSION` and the list of parts), `main()`, the switch to the latest installer (`use_latest_installer`, `run_installer_from`, `use_branch_installer`, `followed_branch`: they run before any part is loaded, so they're in this file; `followed_branch` keeps its simple name check, which only chooses which installer to download) and the loader (`load_modules`, `download_modules`, `load_modules_from`). Each part has the module header described at the top of this document.
+**`installers/install.sh`** (see §8): the configuration (including `INSTALLER_VERSION` and the list of parts), `main()`, the switch to the latest installer (`use_latest_installer`, `run_installer_from`, `use_branch_installer`, `followed_branch`: they run before any part is loaded, so they're in this file; `followed_branch` keeps its simple name check, which only chooses which installer to download) the loader (`load_modules`, `download_modules`, `load_modules_from`), `run_installer` (the questions and steps in order) and `apply_saved_installation` (`--apply`). Each part has the module header described at the top of this document.
 
 | Part | What it has | Used by |
 |---|---|---|
-| `lib/ui.sh` | `has_tty`, `ask`, `ask_yes_no`, `ask_choice` (the 1/2 questions), `ask_port`, `ask_yes_in_time`, `banner`; `choose_mode`, `choose_branch`, `offer_reboot` | main, sudo, display, server, firewall |
+| `lib/ui.sh` | `has_tty`, `ask`, `ask_yes_no`, `ask_choice` (the numbered questions), `ask_port`, `ask_yes_in_time`, `banner`; `choose_role` (with `set_role`, `has_server`, `has_client`), `choose_platform`, `choose_branch`, `offer_reboot` | main, sudo, client, server, firewall |
 | `lib/branch.sh` | `valid_branch` (the full rule), `read_branch_setting`, `read_main_at_switch`, `write_branch_setting` (atomic) | ui, server, **update.sh** |
 | `lib/json.sh` | `write_json`, `json_string` | server (`update-status.json`), **update.sh** |
+| `lib/release.sh` | `latest_release` (main's latest published Release: its tag, or none, or GitHub couldn't be asked), `release_tag_ref` (D48) | main (`use_branch_installer`), server (`main_ref`), **update.sh** |
 | `lib/schedule.sh` | `read_schedule`, `now_epoch`, `iso_time`, `to_epoch`, `install_due`, `next_install`, `set_install_at` (D41) | **update.sh only** (not one of `INSTALLER_MODULES`) |
-| `lib/system.sh` | `update_system`, `chromium_package`, `node_new_enough`, `lock_install_dir`, `slideshow_port` | server, display, firewall |
+| `lib/answers.sh` | `load_answers` (→ `SAVED_*`), `refuse_role_change`, `save_answers` (`/etc/noticeboard/install.env`) | main, ui (the defaults), client (the saved URL) |
+| `lib/system.sh` | `update_system`, `chromium_package`, `is_raspberry_pi`, `detect_platform`, `node_new_enough`, `lock_install_dir`, `slideshow_port` | server, client, firewall, ui, main |
 | `lib/sudo.sh` | `check_sudo_password` and its helpers, `SUDO_STATUS` | main, the summaries |
-| `lib/server.sh` | `install_server`, `fetch_branch`, `save_branch_setting`, `write_service`, `write_update_units`, `write_installer_record` (its own `printf`: `version` is a number), `summary_server` | main |
-| `lib/display.sh` | `install_display`, `collect_macs_html`, `ask_server_url`, `summary_display` | main |
-| `lib/kiosk.sh` | `write_server_kiosk` (the template as it is), `write_display_kiosk` (the template with `SERVER_URL` and `MACS_HTML` filled in) | server, display |
-| `lib/desktop.sh` | `write_autostart`, `write_help_shortcut` | server, display |
+| `lib/server.sh` | `install_server` (= `install_server_packages`, `install_server_code`, `install_server_services [--no-restart]`), `fetch_branch`, `main_ref` (main's latest Release, else its latest commit), `save_branch_setting`, `write_service`, `write_update_units`, `write_system_units`, `write_root_files` (with `write_root_libs`), `write_installer_record` (its own `printf`: `version` is a number), `summary_server` | main, `--apply` |
+| `lib/client.sh` | `ask_server_url`, `install_client`, `write_client_files`, `write_client_launcher`, `write_kiosk_service`, `write_client_update_units` (a Client only), `follow_server` (a Client only, not with `--apply`: the key pinned, then a first check), `remove_old_kiosks`, `summary_client` | main, `--apply` |
+| `lib/desktop.sh` | `write_autostart`, `write_help_shortcut` | client |
 | `lib/firewall.sh` | `check_firewall`, `setup_ufw`, the detection helpers, `firewall_reminder` | main |
-| `kiosk/server.sh`, `kiosk/display.sh` | the two kiosk scripts exactly as installed (display: empty `SERVER_URL=""` and `MACS_HTML=""` lines to fill in) | kiosk.sh |
+| `root/noticeboard-system`, `root/noticeboard` | root's system step and the Server's command, installed exactly as they are (`ROOT_FILES`), with the parts they load (`ROOT_LIBS`: branch, json, release) | server.sh (`write_root_files`); `noticeboard-system.service`, people |
+| `client/kiosk.sh`, `client/noticeboard-client` | the Client's kiosk and command, installed exactly as they are (`CLIENT_FILES`); the kiosk reads `install.env`, starts again from new files when the version changes and writes `/tmp/noticeboard-kiosk-up`; the command's `check`, `trust-server` and `reinstall-stable` follow the Server on a Client only (§18.7 phase 3) | client.sh (installs them); the launcher, the autostart, the headless service and `noticeboard-client-update.service` run them |
 
 **`installers/update.sh`:** see §9.1.
 
@@ -1152,9 +1211,9 @@ Layout of each entry: **purpose** · responsibilities · key functions · import
 | `enqueueProcessing` | services/uploadQueue.js | slides.js POST | mediaService, updateSlide (store.modifySlides), displayEvents.playlistChanged | tmp upload | media file, slideshow.json, deletes the tmp file | upload pipeline; update.sh's upload-wait |
 | `syncSampleSlideshow` | services/sampleSlideshow.js | index.js | uniqueSlug, replaceSlides (store.modifySlides), store.commitEntries, enqueueThumbnail | sample-data, config | copies files, writes slideshow.json and config | sample behaviour after every update |
 | `requestSwitch` | services/updates/index.js | settings/updates.js | getInfo, checkBranch, updateFiles.saveSwitch | systemd dir, files | writes the branch file, status, request (→ systemd path unit → update.sh) | **the contract with update.sh** |
-| `checkBranch` | same | settings/updates.js, requestSwitch | git, requirementsOf | git objects | fetches a remote-tracking branch | the switch checks shown to the admin |
+| `checkBranch` | same | settings/updates.js, requestSwitch | git, releases.latestRelease (main), requirementsOf | git objects, GitHub's Releases API | fetches a remote-tracking branch, or main's latest Release's tag | the switch checks shown to the admin |
 | `installerVersion.installedVersion` / `installerNeeds` | services/updates/installerVersion.js | installerStatus, requirementsOf, test | configIO.readJsonFile, fs | installer.json, start-kiosk.sh, system-requirements.json | none | the home page installer box, switch warning |
-| `versionInfo` | services/updates/index.js | settings/updates.js `/version` | git, updateFiles.readStatus | HEAD, update-status.json | none | sidebar "Last updated" |
+| `versionInfo` | services/updates/index.js | settings/updates.js `/version` | git, updateFiles.readStatus, releases.releaseAt | HEAD and its tags, update-status.json | none | sidebar version and "Last updated" |
 | `adminPassword.usesDefault` | services/adminPassword.js | settings/security.js `/security` | bcrypt | config.passwordHash | cache | the default-password banner |
 | `requireApprovedDevice` / `requireAdmin` | middleware/access.js | every route (via macFilter/adminAuth) | macService, adminSession | config.macFiltering, ARP, the cookie | 404 / 401 responses, logs | **who can reach anything**; the 404 and 401 conventions other programs rely on |
 | `displaySettings.current` / `refresh` | services/displaySettings.js | realtime/displaySocket.js | brandingService, configService, installerVersion.status | config.display, logo mtime, installer.json, system-requirements.json | none | the `display:settings` payload (open screens: keys may only be added) |
@@ -1208,7 +1267,7 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 | D27 | The update status file | `lib/json.sh` `write_json` (install.sh, update.sh), `updateFiles` (server, JSON.stringify) | `installer.json` is written with `printf`, because its version is a number. |
 | D28 | The port in config.json | `configIO.readConfig`, used through small wrappers: `slideshow_port` (lib/system.sh), update.sh's `server_port`, server/index.js | update.sh has its own two-line wrapper so the update path loads as little as possible. |
 | D29 | Node.js version rule | `lib/system.sh` `node_new_enough` and `system-requirements.json` | Two copies because the installer checks Node.js before the repository exists; a unit test keeps them equal (20.19+ on 20, 22.12+, or 23+). |
-| D30 | The kiosk scripts | `installers/kiosk/server.sh`, `display.sh` | Each script has its own copy of the common parts (browser detection, flags, `xset`, the exit check, the restart loop), because they are installed exactly as written. Sharing them would change the installed scripts: a change for its own `INSTALLER_VERSION`. |
+| D30 | The kiosk | `installers/client/kiosk.sh` only (since installer version 5) | One kiosk for a Client + Server and a Client only, with a desktop or headless: what differs is read from `install.env`. |
 | D31 | Yes/no and 1/2 questions | `lib/ui.sh` `ask_yes_no`, `ask_choice` | |
 | D32 | The installer's boxed headings | `lib/ui.sh` `banner` | |
 | D33 | Reading and writing JSON files | `configIO`: `readJsonFile`, `writeFileAtomic` (temporary file `.<pid>.tmp`), `writeConfig` (`.tmp`) | |
@@ -1218,17 +1277,18 @@ Behaviour that more than one part needs, and where it lives. Most of it has one 
 | D37 | The background colour's default and form; the video formats and their default | `shared/contract.json` `display` (`defaultBackground`, `colourPattern`, `videoFormats`, `defaultVideoFormat`) | Read by settingsService (checks a new colour or format; `videoFormat()`), brandingService (sends the colour) and, through `shared/index.js`, the viewer, the Branding card and the Display card. |
 | D38 | Media names: the rule, and what the admin panel shows | `services/mediaNames.js` (the rule: trimmed, no control characters, at most `limits.mediaNameMax`); `mediaDisplayName` in `shared/index.js` (`name`, else `originalName`, else the type and date added) | For slides now, and for audio tracks later. Names stay in the admin panel: the playlist doesn't carry them. |
 | D39 | Section cards that fold, and never hide a warning | `components/ui/CollapsibleCard.vue` + `useCollapsed` | Each card says when it needs attention: Change password (the default password), Software updates (an update running, the server restarting, the last attempt failed, rolled back or cancelled, an error message), Slides (a failed slide or upload). The page warnings sit outside the cards. |
-| D40 | Asking for the admin password again before something that can't easily be undone | `services/actionTokens.js` (the one-time token, per action), `middleware/passwordLimiter.js` (wrong tries, counted together), `components/ui/ConfirmDangerDialogs.vue` (the dialogs), `.danger-dialog` in `styles/base.css` (their texts) | Used by the branch switch and Delete All; Restore Defaults will use it too. Each action keeps its own warning texts. |
-| D41 | The update schedule: when an install is due | `installers/lib/schedule.sh` only (update.sh); it writes the next install time into update-check.json for the admin panel | The server only checks and saves the values (`updates/schedule.js`, `updateFiles`); `updateFiles.readSchedule` reads the file with the same defaults as `read_schedule`. |
-| D42 | Restore Defaults: what is reset and what is kept | the server (`contentReset.applyPendingRestore`, `KEPT_DATA`) for data/, tmp/ and logs/; update.sh (`RESTORE_KEEP`, `clean_folder`) for the rest of the folder | Two lists on purpose: each side resets what it owns. A file the installer adds to the folder must go on `RESTORE_KEEP` (`tests/installers/update-restore.sh` checks every file the installer writes). |
+| D40 | Asking for the admin password again before something that can't easily be undone | `services/actionTokens.js` (the one-time token, per action), `middleware/passwordLimiter.js` (wrong tries, counted together), `components/ui/ConfirmDangerDialogs.vue` (the dialogs), `.danger-dialog` in `styles/base.css` (their texts) | Used by the branch switch, Delete All, Restore Defaults, Restart and Full update. Each action keeps its own warning texts. |
+| D41 | The update schedule: when an install is due | `installers/lib/schedule.sh` only (update.sh); it writes the next install time into update-check.json for the admin panel | The server only checks and saves the values (`updates/schedule.js`, `updateFiles`); `updateFiles.readSchedule` reads the file with the same defaults as `read_schedule`. A newer version waiting shows on every admin page (`UpdateAvailableNotice`) and screen (`updates.updateWaiting`) on any schedule (since §18.7 phase 2). |
+| D42 | Restore Defaults: what is reset and what is kept | the server (`contentReset.applyPendingRestore`, `KEPT_DATA`) for data/, tmp/ and logs/; update.sh (`RESTORE_KEEP`, `clean_folder`) for the rest of the folder | Two lists on purpose: each side resets what it owns. The Client signing key is kept: a new one would stop every Client only updating until `trust-server` is run on each. A file the installer adds to the folder must go on `RESTORE_KEEP` (`tests/installers/update-restore.sh` checks every file the installer writes). |
 | D43 | A video's format: choosing it, recording it, converting to it | `settingsService.videoFormat` (the choice), `mediaService` (`processVideo`, `videoFormatOf`), the slide's `format`, `videoConversion` (existing videos) | Uploads and conversions encode with the same `processVideo`; a slide without `format` is checked with ffprobe. **H.265 (HEVC) is the default** (the owner, 2026-09-28: smaller files); **H.264 is the fallback for older hardware** (a Raspberry Pi 3 can't decode H.265; Chromium on a Raspberry Pi 4 or 5 uses its hardware decoder; a PC's browser on its own, e.g. Firefox can't, so the admin panel's preview of a new video stays blank there). The setting chooses one format; the viewer never plays both on purpose: a video in the other format is left to fail on a screen that can't play it, showing nothing for its length (the slide clock, §3.5). The Display card warns while it's chosen, and while videos already uploaded aren't all in the saved format (`videoConversion.formats()`, `GET /settings/videos/formats`, since 0.6.13); *Convert existing videos* fixes that. Encoding H.265 takes several times longer than H.264 on a Raspberry Pi. |
 | D44 | An audio show's settings and their limits | `shared/contract.json` `audio` (orders, transitions, fadeSeconds, volume; for a video's sound: withSound, lowerTo): `audioShowRules` checks, `audioShowStore` takes the defaults, the admin card offers them (`@shared` AUDIO) | |
+| D48 | main's latest published Release, and the Release a commit is | `installers/lib/release.sh` `latest_release` (update.sh, the installer) and `updates/releases.js` `latestRelease` (the branch check); `releases.releaseAt` names the running Release (the version shown) | Two copies (bash and JavaScript) of one question to GitHub's API, with the same three answers: a tag; none published (a 404, or an answer marked draft or prerelease); GitHub couldn't be asked. Both honour `NOTICEBOARD_GITHUB_API`, and the tests stand in for the API with one set of files read by both (`tests/helpers/github.sh`, `github.js`). A Release's tag is `v` and its version (§19). |
 
 ---
 
 ## 15. External contracts an installed system relies on
 
-An installed Server receives new code through the `update.sh` that is **already on disk**. The installer, the kiosk scripts and the systemd units change only when the installer is run again. The new code must therefore keep every one of these working:
+An installed Server receives new code through the `update.sh` that is **already on disk**. The installer, the Client (and an older installation's kiosk scripts) and the systemd units change only when the installer is run again. The new code must therefore keep every one of these working:
 
 **Run by systemd and by the updater already on the Server**
 1. **`installers/update.sh`** must stay at that path: the update service runs it.
@@ -1241,10 +1301,10 @@ An installed Server receives new code through the `update.sh` that is **already 
 8. The **`tmp/noticeboard-uploads/`** folder must stay the place where uploads wait, because update.sh waits for it.
 9. **`tmp/update-request`** starts update.sh; the server writes it, and the systemd path unit watches for it. An older update.sh treats any text in it as a request to install, which is only what `check` avoids.
 
-**Kiosk scripts** (not updated by sync)
+**The Client's kiosk, and the kiosk scripts of installations from before 0.9.0** (not updated by sync)
 10. `GET /` answers 200 when the device is allowed and 404 when MAC filtering blocks it.
 11. `POST /api/device/kiosk-exit/claim` returns **exactly** `{"exit":true}` when an exit was requested, with no spaces.
-12. `?kiosk=off` turns off the kiosk behaviours in the viewer.
+12. `?kiosk=off` turns off the kiosk behaviours in the viewer; `?kiosk=headless` keeps them without the exit button.
 
 **Help shortcuts and links**
 13. `/opt/noticeboard/noticeboard-guide.html` (the server's `file://` shortcut) and `/admin/help` (the display shortcut) must stay where they are.
@@ -1262,14 +1322,21 @@ An installed Server receives new code through the `update.sh` that is **already 
 
 **Sessions and URLs**
 17. The session cookie `nb_admin_token`, signed with `config.jwtSecret`, must be accepted, so admins stay logged in across the update.
-18. These URLs must stay: `/`, `/admin`, `/admin/*`, `/admin/help`, `/media/<folder>/slides/<file>`, `/audio/<folder>/tracks/<file>`, `/branding/logo?v=`, and every `/api` path in §4.1 (the admin panel is rebuilt with the code, but the kiosk scripts and open tabs are not).
+18. These URLs must stay: `/`, `/admin`, `/admin/*`, `/admin/help`, `/media/<folder>/slides/<file>`, `/audio/<folder>/tracks/<file>`, `/branding/logo?v=`, and every `/api` path in §4.1 (the admin panel is rebuilt with the code, but the Client's kiosk and open tabs are not).
 
 **Browser storage**
 19. The keys `noticeboard:navCollapsed`, `noticeboard:collapsedCards` and `noticeboard:lastRecoveryReload` (merely nice to keep).
 
 **The installer and the kiosk**
 20. What older installers look for when they hand over: `installers/install.sh` must exist at every commit. It must pass `bash -n`, and for non-main branches contain a line starting with `INSTALLER_VERSION=`. **Older installers download only this one file.**
-21. The installer version heuristic reads `/opt/noticeboard/start-kiosk.sh`.
+21. The installer version heuristic reads `/opt/noticeboard/start-kiosk.sh` (a Server set up before installer records existed).
+21a. `/etc/noticeboard/install.env` (`NOTICEBOARD_ROLE`, `_PLATFORM`, `_SERVER_URL`, `_DISPLAY_USER`) is read by the Client's kiosk on every start and by the installer's next run: its names and format stay.
+21b. Root's system step and update.sh talk through `tmp/system-request` (a commit) and `tmp/system-result` (`{ commit, release, result, message, time }`): an update.sh and a `noticeboard-system` from different versions must still understand each other. The `noticeboard` command writes the same `tmp/update-request` values as the admin panel.
+21c. **A Client only follows its Server** (§18.7 phase 3) through `GET /api/client/version` (`{ version, commit, clientHash }`, flat JSON without quotes in the values), `/bundle` (a tar.gz with `installers/install.sh` at its root path, which takes `--apply` with `NOTICEBOARD_INSTALLER_SHA=local`), `/bundle.sig` (a raw 64-byte ed25519 signature over the whole file) and `/key` (PEM, SPKI): every Client only's `noticeboard-client` reads them, so their paths and forms stay. `data/client-signing.key` must survive every update, branch switch and Restore Defaults: a new key stops every Client only updating until `trust-server` is run on it.
+
+**Releases** (§18.6: a Server on main installs main's latest published Release)
+22. Every Release's tag is `v` and its version (`v0.8.0`), on a commit of main, and a Release is only published with the §19 checklist done. A Server on main installs whatever `GET /repos/fructus-sum/noticeboard/releases/latest` names, so a Release that isn't ready must stay a draft or prerelease; deleting a Release doesn't take a Server back (main never goes backwards by itself).
+23. A Release's commit must meet 1 to 9 like any commit, and its `update.sh` and `install.sh` must keep following Releases: a Release whose updater went back to following main's commits would take every Server on main with it.
 
 ---
 
@@ -1284,26 +1351,33 @@ Behaviour kept as it is until a change is planned for it (§18): fixing one chan
 
 ## 17. Tests
 
-Run them with `node tests/run.js <group> [filter]` or the npm scripts. A file that fails is followed by how it ended (exit code, signal, or why it could not start) and how long it ran. A file whose Node.js process crashed rather than failing a check (a signal, or a Windows crash code such as 0xC0000409, seen now and then on Windows, at any point in a test: after 0.7 to 5 s so far) is run once more, and the summary says so; one that fails a check is never run again. `socket-events.js` waits for the start-up job that makes the sample video's thumbnail (and fills in its length) before it connects: that job resends the playlist when it finishes, which now and then landed in the first step as a second, identical empty playlist (found through the Server's log, which the test prints when a step differs). `npm run build` must come first for api, browser and upgrade.
+Run them with `node tests/run.js <group> [filter]` or the npm scripts. A file that fails is followed by how it ended (exit code, signal, or why it could not start) and how long it ran. A file whose Node.js process crashed rather than failing a check (a signal, or a Windows crash code such as 0xC0000409, seen now and then on Windows, at any point in a test: after 0.7 to 5 s so far) is run once more, and the summary says so; one that fails a check is never run again. `socket-events.js` waits for the start-up job that makes the sample video's thumbnail (and fills in its length) before it connects: that job resends the playlist when it finishes, which now and then landed in the first step as a second, identical empty playlist (found through the Server's log, which the test prints when a step differs). `npm run build` must come first for api, browser and upgrade. The summary gives each file's time and each group's.
+
+**Without waiting for them** (DEVELOPMENT step 4):
+- **GitHub Actions** (`.github/workflows/tests.yml`) runs `npm ci`, `npm run build` and `npm run test:all` on Linux with Node.js 20 for every push and pull request; a newer push to the branch cancels the run still going. `npm ci` also proves `package-lock.json` installs on Linux (the Pi's packages, §11).
+- **`node tests/snapshot.js [<commit>] [<group>] [filter]`** runs the tests on a snapshot of a commit (a git worktree in the temporary folder, with this checkout's `node_modules` linked in and removed link first), so the working tree can change meanwhile. Its log is `<temporary folder>/noticeboard-snapshot-<commit>.log`.
+- **One run at a time in the api, browser and upgrade groups** (fixed ports, one Chrome): `run.js` holds a lock in the temporary folder only while it's in one of them, so unit and installer tests can run beside a background run.
+- **The look snapshots are per system** (`lookFixture` in tests/helpers/app.js): fonts, and so sizes, differ, so Windows's are in `tests/fixtures/` and Linux's in `tests/fixtures/linux/`. Actions records Linux's when missing and keeps them as the `linux-look-snapshots` artifact, to commit. A deliberate change of look is re-recorded on both. Actions uses Google Chrome (`CHROME_PATH`): the runner's Chromium can't play AAC or H.264/H.265, which a Pi's can; the browser tests get Node.js 20's `--experimental-websocket`.
 
 | Group (npm script) | Where | What it covers | Needs |
 |---|---|---|---|
 | unit (`npm test`) | `server/test/`, `client/display/test/` | the Server's clock as a screen tells it (6: exact offsets, the shortest round trip winning, odd answers ignored, two screens minutes apart agreeing); the slide clock (13 tests: the timeline, failing slides keeping their place, hidden and frozen pages catching up, playlist changes, 30 simulated days with two screens whose clocks are minutes apart); the slide timeline (5) and the Server's playlist timeline (5: at once with nothing on, a change at the slide's end, the same playlist ignored, going back cancelling a switch); event audio's rules and the weekly rule (8: each mode, start now ended by a scheduled event, `nextChange`, clashes of every pair of modes, `eventState`, a simulated fortnight minute by minute); the audio engine (17: each track at its time, joining mid-way, two screens with clocks minutes apart on the same track and point all day, drift put back, crossfade timing, show volume, switching shows, fading out, coming back like a radio, a new timeline from the Server, failing and stalling tracks, a refused play retried every minute or at once with `retryNow`, duck/pause/resume, the preview's own timeline, a simulated day of crossfades without timers piling up); the music timeline (5) and the Server's audio timelines (5: a new show, the volume at once, a change at the track's end after it, going back cancelling it, an event and after it); installer version ↔ system requirements (5); the Node.js version rule in installers/lib/system.sh ↔ system-requirements.json (1); the shared foundations: address helpers, both loopback rules, media type lists, contract event names, and `shared/index.js` ↔ the server (mediaUrl, LIMITS), the media name rule and mediaDisplayName (9) | Node 20+ |
-| api (`test:api`) | `tests/api/` | **contract.js**: 106 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), audio shows (`audio-shows.js`: defaults, limits, tracks converted to AAC with their length and name, rename, reorder, delete, `/audio`), MAC filtering's settings (`mac-settings.js`: only the fields sent change, MACs normalised and checked, no duplicates, the Server's own entry kept, a bad change refused and nothing changed), an unreadable config.json (`config-recovery.js`: the last good copy kept on save, a broken file kept and the copy restored, the note until dismissed, no copy: the defaults), the port and restarting (`restart.js`: the port's range, `restartNeeded` in the API and on the screens, the token, the Server stopping and coming back on the new port), MAC filtering on the live connection (`socket-mac.js`: refused at connect through the PC's network address, the Server itself allowed, a connected device dropped when filtering is turned on), background audio (`audio-update.js`: a slideshow's audio show checked and stored only when chosen, `audio:update` with the playlist and only when it changes, published shows with ready tracks only, deleting a show clears it), event audio (`audio-events.js`: the modes and times checked, overlaps refused naming the other show, `eventState`, `audio:update`'s `event` for a start-now event, a running once event taking over, unpublished, stopped), a video's own sound (`video-sound.js`: videos only, the choices and limits, off removing the keys, the playlist's keys only on that video), the update schedule's routes and the screens' mark (`update-schedule.js`), the video format for new uploads and converting the existing videos (`video-format.js`: H.265 by default, H.264 when chosen, checked with ffprobe; other formats refused; each video's length in the playlist; a conversion showing each video processing in its turn while the screens keep its file, then replacing it; a second run changing nothing; a restart mid-way; the count of videos not in the saved format, before and after converting), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files, default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, every audio show gone and the sample's choice of one cleared, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
-| browser (`test:browser`) | `tests/browser/` | branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), a reorder that can't be saved shown in the slide list (`reorder-error.js`), a card's messages (`messages.js`: "Saved."'s timer never clears a later error, which stays until its ✕), screens in step (`screens-in-step.js`: two viewers, each in its own window so neither is a hidden tab, with clocks minutes out agreeing on the Server's time and showing the same slide; a third joining later going straight to it; all three switching together after a change; the slideshow's music playing the same track at the same point on all three), the Port card and the restart box (`restart.js`: on every page, password and last chance, the page moving to the new port by itself), the audio pages (`audio-shows.js`: create, settings, upload through the file picker, ▶/■, "Preview the show" with ⏭ and ■, rename, reorder, delete, the list), background audio (`background-audio.js`: the slideshow's choice and fact, the viewer following it, unpublishing, None, a click starting refused sound; a video's Sound switch, and on screen the video playing with the background lowered to its volume, then paused, and brought back; the Event audio card: Start now taking over a screen, Stop giving the slideshow's show back, an overlapping event refused), Delete All's card and dialogs, the audio shows listed (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the video format setting, its explanations and warning, the warning while uploaded videos aren't in the saved format, and converting the existing videos (`video-format.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
-| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, kiosk scripts, update.sh (updates, branches, merged return, **the schedule** with a fake clock: `update-schedule.sh`; **Restore Defaults**: the clean, the keep list against every file the installer writes, a restart after a failed reinstall: `update-restore.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 10 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
+| api (`test:api`) | `tests/api/` | **full-update.js**: Full update (the password, the token, main only, the system step set up, one at a time), the installer notice after a failed system step, the screens' mark for a version waiting on a daily schedule. **client-updates.js**: what a Client only asks for (the version on main at a Release and on a branch, the key made on first need, the bundle's contents, its signature checked by Node and by openssl, the same hash after a change outside the installer and a new one after a change inside). **contract.js**: 106 entries recorded in `tests/fixtures/api-contract.json`. They cover every route's status, content type and JSON shape, the exact MAC-denied page (seen from the PC's network address), the kiosk-exit answer, the cookie attributes, the socket events and a playlist. Also: branch switching end to end with the real update.sh (31 checks), the slideshow lifecycle, upload errors and stress, graceful shutdown, one admin check per request (`admin-check-once.js`, from the debug log), **the data files byte-for-byte** for a fixed script of actions (`data-files.js` ↔ `tests/fixtures/data-files.json`), the store's edge cases (`slideshow-store.js`), audio shows (`audio-shows.js`: defaults, limits, tracks converted to AAC with their length and name, rename, reorder, delete, `/audio`), MAC filtering's settings (`mac-settings.js`: only the fields sent change, MACs normalised and checked, no duplicates, the Server's own entry kept, a bad change refused and nothing changed), an unreadable config.json (`config-recovery.js`: the last good copy kept on save, a broken file kept and the copy restored, the note until dismissed, no copy: the defaults), the port and restarting (`restart.js`: the port's range, `restartNeeded` in the API and on the screens, the token, the Server stopping and coming back on the new port), MAC filtering on the live connection (`socket-mac.js`: refused at connect through the PC's network address, the Server itself allowed, a connected device dropped when filtering is turned on), background audio (`audio-update.js`: a slideshow's audio show checked and stored only when chosen, `audio:update` with the playlist and only when it changes, published shows with ready tracks only, deleting a show clears it), event audio (`audio-events.js`: the modes and times checked, overlaps refused naming the other show, `eventState`, `audio:update`'s `event` for a start-now event, a running once event taking over, unpublished, stopped), a video's own sound (`video-sound.js`: videos only, the choices and limits, off removing the keys, the playlist's keys only on that video), the update schedule's routes and the screens' mark (`update-schedule.js`), the video format for new uploads and converting the existing videos (`video-format.js`: H.265 by default, H.264 when chosen, checked with ffprobe; other formats refused; each video's length in the playlist; a conversion showing each video processing in its turn while the screens keep its file, then replacing it; a second run changing nothing; a restart mid-way; the count of videos not in the saved format, before and after converting), Restore Defaults (`restore-defaults.js`: the request, then after a restart exactly the kept files (the Client signing key among them), default settings and password, a new session secret, the sample as new, no second reset), Delete All (`delete-all.js`: only the sample left, every audio show gone and the sample's choice of one cleared, settings and logo kept, the tokens, the playlist sent, the shared limit on wrong passwords), slide names (`media-names.js`: recorded on upload, with accents; renaming; the limits; no playlist sent and none carrying names), and **what a display receives for 15 admin actions** (`socket-events.js` ↔ `tests/fixtures/socket-events.json`), and the "app not built" pages (`spa-fallback.js`) | Node 22+; ffmpeg for video |
+| browser (`test:browser`) | `tests/browser/` | Full update's dialogs, the failed-step notice and the branch text (`full-update.js`), branch-switching UI, installer notice, Last updated, login loop, MAC warning, mobile layout, sidebar, merged notice, the viewer and admin panel end to end (`viewer-and-admin.js`), slideshows and media with video (`slideshows-and-media.js`), the viewer's reliability under outages, freezes, crashes and updates (`viewer-reliability.js`, scenarios A–E), and the viewer controls' computed styles (`viewer-look.js` ↔ `tests/fixtures/viewer-look.json`), the admin panel's computed styles (`admin-look.js` ↔ `tests/fixtures/admin-look.json`, 82 elements on desktop and phone), the larger pages' computed styles and texts (`admin-pages-look.js` ↔ `tests/fixtures/admin-pages-look.json`: the slideshow page with its edit form, schedule and preview, the Settings cards, the branch check and the Missing software dialog; 57 elements and 6 texts), the login page (`login-page.js`), and the updater's warnings on every admin page and the viewer's warning mark (`warnings-everywhere.js`), slide names in the slide list, preview and delete question (`slide-names.js`), cards folding to their title without hiding a warning (`collapsible-cards.js`), a reorder that can't be saved shown in the slide list (`reorder-error.js`), a card's messages (`messages.js`: "Saved."'s timer never clears a later error, which stays until its ✕), screens in step (`screens-in-step.js`: two viewers, each in its own window so neither is a hidden tab, with clocks minutes out agreeing on the Server's time and showing the same slide; a third joining later going straight to it; all three switching together after a change; the slideshow's music playing the same track at the same point on all three), the Port card and the restart box (`restart.js`: on every page, password and last chance, the page moving to the new port by itself), the audio pages (`audio-shows.js`: create, settings, upload through the file picker, ▶/■, "Preview the show" with ⏭ and ■, rename, reorder, delete, the list), background audio (`background-audio.js`: the slideshow's choice and fact, the viewer following it, unpublishing, None, a click starting refused sound; a video's Sound switch, and on screen the video playing with the background lowered to its volume, then paused, and brought back; the Event audio card: Start now taking over a screen, Stop giving the slideshow's show back, an overlapping event refused), Delete All's card and dialogs, the audio shows listed (`delete-all.js`), Restore Defaults' warning and request (`restore-defaults.js`), the video format setting, its explanations and warning, the warning while uploaded videos aren't in the saved format, and converting the existing videos (`video-format.js`), the update schedule, the waiting version's choices, the manual notice and the viewer's mark (`update-schedule.js`), slides fitting the screen (`slide-fit.js`: a landscape and a portrait image in a portrait and a landscape window, checked on the screen's pixels, with the background colour) | Chrome (the runner starts a headless one) |
+| installers (`test:installers`) | `tests/installers/` | install flow, branch choice, handover, self-update (the real-GitHub check only with `NB_TEST_NETWORK=1`), sudo, firewall, the Client's kiosk (`kiosk-scripts.sh`: Client + Server and its port, Client only with its waiting pages and MAC addresses, the exit, headless without it), every role and platform with the saved answers, and `--apply` (`install-flow.sh`), **the system step** (`system-step.sh`: root's `noticeboard-system` refusing all but main's latest Release, running its installer with `--apply` and reporting; the `noticeboard` command; update.sh asking for the step: needed, not needed, failing, no answer, not set up, a Full update and one on a branch), **a Client only following its Server** (`client-update.sh`: `noticeboard-client` against a stand-in Server with real ed25519 signatures: the same version, a hash-only change, a new and an older version installed with `--apply`, a bad signature refused, the kiosk not coming back and the previous files put back and skipped, nothing to put back and never GitHub by itself, a failing install, `trust-server`, `reinstall-stable` against the stand-in GitHub, `status`; the kiosk starting again on a new version is in `kiosk-scripts.sh`), update.sh (updates, branches, **main following Releases**: `update-releases.sh` (the latest Release and not main's newer commits, drafts, prereleases and none published, never backwards, a switch to main and Restore Defaults installing an older Release, the waiting Release named, the recovery command); **the return to main once a Release has the branch's work**: `update-merged.sh` (merge, squash, fast-forward, merged but not released, waiting for the installer); **the schedule** with a fake clock: `update-schedule.sh`; **Restore Defaults**: the clean, the keep list against every file the installer writes, a restart after a failed reinstall: `update-restore.sh`), **the module loader** (`module-loader.sh`: local, at a commit, the followed branch, missing or broken parts, the baseline installer handing over), the hand-over to the latest Release's installer (`installer-handover.sh`) and installing it (`install-branch.sh`). They load the installer through `tests/helpers/installer.sh` (`load_installer`), as a real run loads its parts. Plus two comparisons: **golden files** (the 13 generated files ↔ `tests/fixtures/installer-golden/`) and **branch names** (`lib/branch.sh` ↔ the server, `tests/fixtures/branch-names.txt`) | bash (Git Bash on Windows) |
 | upgrade (`test:upgrade`) | `tests/upgrade/` | **the upgrade rehearsal**, in three steps. Nothing about the data, API, playlist, login or kiosk answer may change at any step. | bash, Node |
 
 The upgrade rehearsal works like this:
-1. An installed older version (`NB_BASELINE`, default `fc4ba53`), with data seeded through its own API, takes the working tree through **its own** update.sh, as a real Server does.
-2. The new update.sh installs a following commit.
-3. It goes back to the baseline.
+1. An installed older version (`NB_BASELINE`, default `fc4ba53`), with data seeded through its own API (the first snapshot waits for the slide on air to end, so a baseline from 0.7.0 on shows the playlist as seeded), takes the working tree through **its own** update.sh, as a real Server does. The working tree is also published as main's latest Release, which is what a baseline from 0.8.0 on installs.
+2. The new update.sh installs a following commit, published as main's latest Release.
+3. It goes back to the baseline by a switch to a branch holding it (main never goes back by itself), and the baseline's update.sh takes over again. `NB_BASELINE=28c8b95` rehearses from 0.7.1, `NB_BASELINE=ea4de01` from 0.8.0 (both passed for 0.9.0, 2026-09-29).
 
 The display settings a screen receives are compared the way open screens depend on them: every key the older version sent keeps its value; new keys may be added.
 
 Helpers:
 - `tests/run.js` is the runner. It lists the files itself, so it works on Node 20, and it finds Chrome and Git Bash.
 - `tests/helpers/app.js` makes throwaway app copies and servers.
+- `tests/helpers/github.sh` and `github.js` stand in for GitHub's Releases API (update.sh and the installer through a stand-in `curl`; the server through `NOTICEBOARD_GITHUB_API`), from one set of files (`release`, `release-kind`, `github-down`), so both see the same Releases. No test asks the real GitHub for Releases.
 - `tests/helpers/cdp.js` is the Chrome client (`newWindow`: a page in a window of its own, for tests that need several visible pages: Chrome slows the timers of a tab behind another).
 - `tests/upgrade/state.js` seeds and takes the snapshots for the rehearsal.
 
@@ -1321,7 +1395,8 @@ Every planned change starts here, before any code: what changes and why, the par
 | 18.3 | Audio: audio shows, slideshow background audio, video sound, event audio | Built on `feature/audio-support` (phases 1–7 done); checked on the owner's Pis (2026-09-28: all works, including the lowered background and crossfades); **merged into main** (2026-09-28, main 0.7.1) | 0.6.0 |
 | 18.4 | The words Server and Client everywhere; the supported devices | Done (the kiosk scripts' text with §18.5 item 2, installer version 4); **merged into main** with audio (2026-09-28) | 0.6.1 |
 | 18.5 | The Known Issues cleared for a stable base (§16) | Done (all 12 items); **merged into main** with audio (2026-09-28) | 0.6.2 to 0.6.13 (one per item) |
-| 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Planned, on `feature/releases-installer` (made from main after the audio merge, 2026-09-28), with the installer and update redesign after it (0.9.0) | 0.8.0 |
+| 18.6 | Releases: main follows GitHub Releases; branches return to main once a Release has their work | Built on `feature/releases-installer` (2026-09-28; the sections above describe it); **merged into main** with §18.7 (2026-09-29, main 0.9.0), published in Release v0.9.0 | 0.8.0 |
+| 18.7 | The installer and update redesign: three roles on Raspberry Pi OS or Debian, with a desktop or headless; installations that update themselves; Clients that follow their Server | Reviewed by the owner (2026-09-29). Phases 1 (roles, platforms, saved answers, one Client; installer version 5) 2 (installations that update themselves on main; installer version 6) 3 (Clients only follow their Server; installer version 7) and 4 (the notices for existing installations, the documents, the rehearsals from 0.7.1 and 0.8.0) built on `feature/releases-installer`; checked in Debian VMs (2026-09-29: four fixes); **merged into main** (2026-09-29, the owner: one Release), published as Release v0.9.0; the owner's real-hardware checks follow | 0.9.0 |
 | 18.8 | Every screen in step: slides and music on the Server's clock | Built on `feature/audio-support` (phases 1–3 done, the docs updated); checked on the owner's Pis (2026-09-28); **merged into main** with audio (2026-09-28) | 0.7.0 |
 
 Design notes D44–D47 are reserved for 18.3.
@@ -1454,7 +1529,7 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 ### 18.6 Releases: main follows GitHub Releases
 
-**Version:** 0.8.0 (a feature; 0.7.0 went to §18.8).
+**Version:** 0.8.0 (a feature; 0.7.0 went to §18.8). **Status:** merged into main with §18.7 (2026-09-29), published in Release v0.9.0.
 
 **Why:** merging into main should not by itself update every installed Server; publishing a Release should.
 
@@ -1471,7 +1546,124 @@ cat /proc/device-tree/model; uname -r; chromium --version
 
 **What the admin panel shows:** on main, "Version 0.8.0" (the Release name) with its commit, in the sidebar and the Software updates card; on a branch, the branch and commit as now. Publishing a Release: set the `package.json` versions to its number and add its row to §19 before tagging (a checklist in §19).
 
+**How it's built** (the details settled when building it, 2026-09-28):
+- **One question to GitHub, asked in two languages** (D48): `installers/lib/release.sh` `latest_release` for update.sh and the installer, `server/services/updates/releases.js` for the admin panel. Both ask `NOTICEBOARD_GITHUB_API` (default `https://api.github.com`, set by the tests to a stand-in) and give three answers: a tag, none published yet (GitHub's 404, or an answer marked draft or prerelease), or GitHub couldn't be asked. The tag is then fetched on its own (`+refs/tags/<tag>:refs/tags/<tag>`), so the Server has it locally.
+- **Tags and the version shown:** a Release's tag is `v` and its version (`v0.8.0`, the §19 checklist). The version shown is read from the local tags on the running commit (`git tag --points-at HEAD`, the highest `vX.Y.Z`), only when following main: no network, and the same answer after an installer run or an update.
+- **No Release yet:** a Server on main keeps what it runs (the check says why, and it isn't an error); a switch to main is cancelled ("main has no published Release yet"); Restore Defaults reinstalls the running commit. GitHub unreachable: as for a branch (offline; a switch is cancelled).
+- **Restore Defaults on main** reinstalls the latest Release, even when the Server runs newer commits of main (as a new installation would).
+- **The branch's base** (`NOTICEBOARD_MAIN_AT_SWITCH` in update-branch.env, name kept for older update.sh) now records the latest Release's commit at the switch: a branch counts as in a Release only once the latest Release has changed since, as it needed main to move on before. Without a record, the Release's commit must differ from the branch's tip.
+- **Waiting for the installer before returning:** the Release's `installer.version` is compared with `data/installer.json`'s (no record: never waits). While it waits, update.sh keeps the Release's tag in update-check.json (`installerFor`, kept by runs that don't look again); `installerVersion.status()` then reports that Release's installer needs, with its tag for the command and `returning` so the notice says to choose main when the installer asks.
+- **The installer:** the README's command still runs main's latest installer first; once the questions are answered, a Server staying on (or going back to) main and a Client hand over to the latest Release's installer (`use_branch_installer`, `NOTICEBOARD_INSTALLER_RELEASE` stops it handing over again). `install_server` installs the Release's commit on main, or main's latest commit when none is published or GitHub can't be asked (it says so). Nothing it sets up changes: `INSTALLER_VERSION` stays 4.
+- **The installer command shown:** from the running Release's tag on main (`installerCommand(ref)`), from the branch otherwise; update.sh's recovery text likewise.
+- **The upgrade rehearsal's third step** goes back to the baseline by a branch switch, as main can't go backwards by itself any more.
+
 **Risks:** every Server on main stops following main's commits once this reaches it: it has to arrive through the current mechanism (merged into main), and the first Release must be published straight after, or main's Servers stay on the commit that brought it. The API and the tags are new dependencies of the updater (offline handling as for branches). **Tests:** installers (a stand-in GitHub with Releases: latest, draft and prerelease ignored, none yet, never backwards, a manual switch to an older Release; returning to main only once a Release contains the branch, waiting for the installer when its version rose); api and browser (the version shown, the branch check's older-Release message); the upgrade rehearsal from the version before.
+
+---
+
+### 18.7 The installer and update redesign: three roles, installations that update themselves, Clients that follow their Server
+
+**Version:** 0.9.0 (a feature), on `feature/releases-installer`, after §18.6 (0.8.0). **Status:** reviewed by the owner (2026-09-29, the decisions at the end); phases 1 to 4 built, checked in Debian VMs; **merged into main** (2026-09-29) and published as Release v0.9.0, with 0.8.0 (the owner: one Release); the real-hardware checks are the owner's.
+
+**Why:** today the updater runs as the desktop user and can never change packages, services or kiosk scripts, so "Run the installer again" exists; Clients have no updater, no version and no record, so a change to them means someone re-running the installer on each one; and the installer assumes a Raspberry Pi with a desktop. The owner wants (2026-09-28): one installer with three roles on Raspberry Pi OS or generic Debian, with a desktop or headless; installations that update themselves, installation-level changes included; Clients that follow whatever version their Server runs, with a recovery command; rollback where reasonably possible; a simple design. Out of scope: operating-system updates (the README may point to how they're done) and changing an installation from one role to another.
+
+**B1. One installer, three roles, any suitable Debian**
+- **Questions:** the role (*Client + Server*, *Client only*, *Server only*); for a role with a Client, the platform, preselected by detection (`/proc/device-tree/model` says Raspberry Pi; a display manager exists): *Raspberry Pi (Raspberry Pi OS)*, *Debian with a desktop*, *minimal/headless*; Client only: the Server's address; an advanced "follow a development branch instead" (the default is main's latest Release, §18.6).
+- **Answers are saved** in `/etc/noticeboard/install.env` (root-owned, mode 644: `ROLE`, `PLATFORM`, `SERVER_URL`, `DISPLAY_USER`). Updates re-run steps from it without questions (`--apply`, B2). Reinstalling offers the saved answers; a different role is refused (out of scope), with how to remove the installation first.
+- **Server** (Server only, or Client + Server): as today (Node.js, ffmpeg, git, `/opt/noticeboard`, `noticeboard.service`, the update units), plus the root system step (B2). No Chromium or desktop pieces unless there is a Client.
+- **One Client for every role** (`installers/lib/client.sh`, the kiosk in `installers/client/`), replacing `kiosk/server.sh`, `kiosk/display.sh` and `start-kiosk.sh` (D30 retires). Its files live in `/opt/noticeboard-client/` (`current/`, `previous/`, `version`), root-owned; `/usr/local/bin/noticeboard-client` is its command (B3). The kiosk is today's two scripts made one: the Server's address comes from `install.env` (Client + Server: `http://localhost:<port>`, the port read as today), the waiting page and exit button stay.
+  - With a desktop (Raspberry Pi or Debian): XDG autostart runs the kiosk as today.
+  - Minimal/headless: `noticeboard-kiosk.service` runs `cage -- chromium --kiosk <url>` on tty1 as the display user (packages `cage`, Chromium, `seatd` where needed). The waiting page works the same; the exit button is hidden (`?kiosk=headless`: there's no desktop to exit to).
+- **Raspberry Pi only where it matters:** the sudo NOPASSWD offer, the screen-blanking advice, the Chromium package name. Generic Debian gets the same steps without them. NodeSource stays the source of Node.js where the distribution's is too old.
+
+**B2. Installations update themselves**
+- **A small root service** on a Server that follows main (the owner, 2026-09-29: it only ever runs the installer of main's latest Release), `noticeboard-system.service` (oneshot, root), started by `noticeboard-system.path` on `/opt/noticeboard/tmp/system-request`. It runs the installer's **`--apply <commit>`** mode: no questions, the answers from `install.env`, the steps whose results updates can't change (packages, units, the Client on a Client + Server), then the installer record.
+- **Root never runs code from the user-writable `/opt/noticeboard`**, and never trusts what the request file says: it reads only a commit from it, then checks with GitHub that the commit is main's latest Release (`latest_release`, then the tag's commit; a commit from a fork is reachable through the project's URLs on GitHub, so a commit alone isn't enough) and refuses anything else, downloads the installer at that commit from GitHub (as the hand-over does today, into a root-owned temporary folder), and runs it. The answer goes to `tmp/system-result` (the only thing root writes into the folder, owned by the app's user).
+- **`update.sh`'s order** on main: fetch the target; if the target's `installer.version` is higher than `installer.json`'s, request the system step for the target and wait for its result (at most 30 minutes); install the code as now; `install.sh --apply` records `installer.json`.
+- **If the system step fails:** the code isn't updated, the target is skipped like a failed build (`update-failed-commit`), and the installer notice appears. Package changes are additive, so the old code keeps running.
+- **Full update:** "Full update…" in Software updates (the admin password, as a branch switch), and `sudo noticeboard update --full` on the Server: both force the system step, then reinstall the code. On main only.
+- **On a development branch** there is no system step: `update.sh` installs the code as now, and the installer notice appears, as now, when the branch needs a newer installer, with the command to run by hand; "Full update" and `--full` say so.
+- **Command line** (`/usr/local/bin/noticeboard`, root-owned): `sudo noticeboard update` (update now, whatever the schedule), `sudo noticeboard update --full`, `noticeboard status` (version, branch, last check, last update, installer record). They write the same request files the admin panel does, so there's one path.
+- **The installer notice shows only when someone has to act:** the system step failed, or needs an answer (a new question), or, on a branch, the installer must be run by hand. The admin panel's installer box and the screens' mark follow that.
+- **Schedule:** unchanged (every 15 minutes, 2 hours, daily or weekly at a time, manual). **The waiting-version warnings** (the screens' mark and the admin notice) appear whenever a newer version is waiting, on any schedule (today: manual only).
+
+**B3. Clients follow their Server**
+- **What the Server offers** (it doesn't find, track, contact or push to Clients): `GET /api/client/version` → `{ version, commit, clientHash }` (`version`: the Release's tag, or `<branch>@<commit>`; `clientHash`: the SHA-256 of the Client files at the running commit); `GET /api/client/bundle` → a tar.gz of those files (`installers/client/`, the installer parts a Client needs); `GET /api/client/bundle.sig` → its signature; `GET /api/client/key` → the public key. All MAC-filtered like the viewer.
+- **Signing:** the server makes an ed25519 key pair on first need (the owner, 2026-09-29) (`data/client-signing.key`, mode 600, Node `crypto`), kept by updates, branch switches and Restore Defaults (`KEPT_DATA`, `RESTORE_KEEP`). The Client installer shows the key's fingerprint and pins it in `/etc/noticeboard/server.pub`, as SSH pins a host key. The Client verifies every bundle (`openssl pkeyutl -verify -rawin`) before root runs anything from it. A rebuilt Server has a new key: `sudo noticeboard-client trust-server` shows the new fingerprint and pins it after a yes.
+- **The Client's check** (`noticeboard-client-update.timer`, every 15 minutes, root): read the version the Server offers; the same as `/opt/noticeboard-client/version`: nothing; only the version changed (the same `clientHash`): record it, no kiosk restart, so screens don't blink on every Server update; different (older is fine: the Client follows its Server): download, verify, move `current/` to `previous/`, unpack, run its `--apply` (Client parts only), restart the kiosk, record the version.
+- **Rollback:** if the kiosk doesn't come back (the browser not running, or the Server unreachable from the new kiosk, within 3 minutes), `previous/` is restored, its `--apply` run, and that version skipped until the Server offers another.
+- **Otherwise:** an offline Client catches up at its next check; while the Server is out of reach a Client keeps showing the last viewer it had (as now); the viewer itself is still served by the Server and reloads on `display:build` as today.
+- **Recovery:** `sudo noticeboard-client reinstall-stable` asks GitHub (not the Server) for main's latest Release (lib/release.sh), downloads that tag's Client files over HTTPS, reinstalls them even if current, and restarts the kiosk; the normal checks then resume and may follow the Server again.
+
+**B4. Existing installations**
+- **A Server on main** gets 0.9.0's `update.sh` the usual way, but the root system service doesn't exist on it yet: **one last installer run** is needed (installer version 5, with the usual notice). After that, installation changes apply themselves.
+- **Each existing Client needs one installer run** to become a following Client (role *Client only*, the same Server address, the key pinned); the notice says so. Until then old kiosks keep working (the viewer's URL is unchanged). The Server's own `start-kiosk.sh` is replaced by the shared Client on its installer run.
+
+**Parts affected:** `installers/install.sh` (roles, `--apply`), `lib/ui.sh` (the questions), `lib/server.sh`, `lib/display.sh` → `lib/client.sh`, `lib/kiosk.sh`, `lib/desktop.sh`, `lib/system.sh` (platform detection), new `lib/apply.sh`, `installers/client/` (the kiosk, `noticeboard-client`), `installers/update.sh` (the system step), a new `/usr/local/bin/noticeboard`; the server's `updates/` (`installerVersion`, the system-step files in `updateFiles`), new `routes/api/client.js` and `services/clientBundle.js`, `pathHelpers`, `contentReset` (`KEPT_DATA`); the admin panel's `SoftwareUpdates` (Full update), `InstallerNotice`, `UpdateAvailableNotice`; `system-requirements.json` (installer 5, with its changes); README (the roles), the user guide, this document. Reused: `installerNeeds`/`installedVersion`, `contained_in`, `run_installer_from`/`load_modules_from`, `actionTokens` and `ConfirmDangerDialogs`, `lib/schedule.sh`, `writeFileAtomic`, `lib/release.sh`.
+
+**Risks:** root code triggered from a folder the app's user owns (hence the checks above: a commit only, verified with GitHub, the installer downloaded fresh); a Client that updates itself can break a screen nobody is watching (hence verification, rollback and `reinstall-stable`); the installer's golden files and the kiosk change on purpose (installer 5); `start-kiosk.sh` and the kiosk scripts are §15 contracts for installations that haven't re-run the installer (kept working until then); headless kiosks can only be checked on real hardware.
+
+**Phases** (each designed here in detail as it starts, built, tested with targeted tests, committed): 1. roles, platforms, saved answers and the shared Client (B1; a real run on a Debian VM and a Pi by the owner); 2. the root system step, `--apply`, `noticeboard update [--full]`, the warnings (B2); 3. the Client offer, signing, the Client updater, rollback and `reinstall-stable` (B3); 4. migration and the documents (README with the roles, the guide, this document), then the full test run.
+
+**Phase 1 in detail** (roles, platforms, saved answers, one Client; installer version 5):
+- **The answers:** `choose_role` (1 Client + Server, 2 Client only, 3 Server only; the default is what's installed: `install.env`'s role, else a Server folder → Client + Server, else a Client kiosk → Client only) → `ROLE` (`both`, `client`, `server`), with `MODE` kept for what already reads it (`server` when there's a Server, `display` otherwise). `choose_platform`, for a role with a Client (1 Raspberry Pi with its desktop, 2 Debian with a desktop, 3 minimal/headless), preselected by `detect_platform` in `lib/system.sh` (`/proc/device-tree/model` says Raspberry Pi; a display manager says there's a desktop). `ask_choice` takes the number of choices. Hand-overs pass `NOTICEBOARD_ROLE`, `NOTICEBOARD_PLATFORM`, `NOTICEBOARD_SERVER_URL`, and `NOTICEBOARD_MODE` for an older installer (a Release before 0.9.0: Server only then installs as a Server, as it did); an older installer's `NOTICEBOARD_MODE` reads as Client + Server or Client only.
+- **Saved answers** (`lib/answers.sh`): `/etc/noticeboard/install.env` (`INSTALL_ENV_FILE`), root-owned, 644, lines `NOTICEBOARD_ROLE=`, `NOTICEBOARD_PLATFORM=`, `NOTICEBOARD_SERVER_URL=`, `NOTICEBOARD_DISPLAY_USER=`; read as the defaults, written after a successful run. With a saved role, choosing another is refused before anything changes (changing roles is out of scope; the message says to remove the installation first). Without the file (installed before 0.9.0) nothing is refused.
+- **The Server** (`install_server`): as before, without Chromium, the kiosk, the autostart or the Help shortcut: those are the Client's.
+- **One Client** (`lib/client.sh` `install_client`; the files in `installers/client/`, loaded like the other parts, into `CLIENT_FILE_<name>`): Chromium and curl (and `cage` when headless); `installers/client/kiosk.sh` and `noticeboard-client` into `/opt/noticeboard-client/current/` (root-owned), the version (`installer.json`'s commit) in `/opt/noticeboard-client/version`, and `/usr/local/bin/noticeboard-client`, a launcher that runs `current/noticeboard-client` (so phase 3 can swap `current/`). The kiosk reads `install.env`: Client + Server opens `http://localhost:<port>/` (the port read as before), Client only its Server's address; the waiting page (with this device's MAC addresses, read when it starts) until the Server answers; the crashed-browser restart; the exit button (desktop only). With a desktop: the XDG autostart runs `noticeboard-client kiosk`, and the Help shortcut is written as before. Headless: `noticeboard-kiosk.service` (tty1, `PAMName=login`, `Conflicts=getty@tty1.service`) runs `cage -s -- noticeboard-client kiosk`; the viewer opens with `?kiosk=headless`, which hides the exit button (the viewer's `ExitKiosk`) and keeps the rest of kiosk mode (the nightly reload); leaving it is `sudo systemctl stop noticeboard-kiosk`. The old `start-kiosk.sh` and `/usr/local/bin/noticeboard-kiosk.sh` are removed once the new Client is in place (`installers/kiosk/` goes: D30 retires).
+- **Raspberry Pi only:** the sudo offer (`check_sudo_password`) runs only on a Raspberry Pi; the summary gives the screen-blanking advice there.
+- **The reboot offer:** with any Client (the kiosk starts at start-up; a headless one started at once would take over tty1, where the installer may be running); Server only needs none.
+- **What updates can't change** (installer 5, `displays: true`): the Client, its launcher and autostart or service, and the roles. The golden files are re-recorded on purpose: the autostart, the Help shortcuts, the kiosk service, the launcher (the kiosk scripts leave the set: the Client's files are copied as they are in the repository).
+- **Risks:** a Server's own screen and every Client change how the kiosk starts on their next installer run (until then, the old kiosk keeps working); a headless kiosk can only be checked on real hardware (the owner). **Tests:** `install-flow.sh` (each role and platform, the saved answers reused and a different role refused, an older hand-over's answers), `kiosk-scripts.sh` (the one kiosk: Client + Server's port, Client only's waiting pages and MAC addresses, the exit, headless without it), `golden-files.sh`, `module-loader.sh` (the Client's files), `installer-handover.sh`, `install-branch.sh`; a browser check of `?kiosk=headless`.
+
+**Phase 2 in detail** (installations that update themselves, on main; installer version 6):
+- **Root's own files** (written by the installer, root-owned, never from `/opt/noticeboard`): `/usr/local/sbin/noticeboard-system` (the system step, `installers/root/noticeboard-system`), `/usr/local/bin/noticeboard` (the command, `installers/root/noticeboard`), and copies of `lib/branch.sh`, `json.sh` and `release.sh` in `/usr/local/lib/noticeboard/` for them (one copy of the rules, D48). They're read in by the installer like the Client's files (`ROOT_FILES`).
+- **The system step:** `noticeboard-system.path` (`PathExists=/opt/noticeboard/tmp/system-request`) starts `noticeboard-system.service` (oneshot, root, 45 minutes at most), which runs `noticeboard-system`: it takes the request (a commit), deletes it, and refuses anything but main's latest Release: the Server must follow main (`update-branch.env`), and the commit must be that Release's (`latest_release`, then `GET …/commits/<tag>` with the sha header). Then it downloads that commit's `install.sh` into a root-owned temporary folder (`bash -n`, as the hand-over does) and runs it with `--apply`, `NOTICEBOARD_INSTALLER_SHA=<commit>` and `NOTICEBOARD_INSTALLER_RELEASE=<tag>`, and writes the result to `tmp/system-result` (`{ commit, release, result: done | failed | refused, message, time }`, owned by the app's user).
+- **`install.sh --apply`:** no questions (it stops if there are no saved answers: the installer must have run once), no hand-over, no sudo check, firewall or reboot. `install_server` is split into its packages (`install_server_packages`: the system update, git, ffmpeg, curl, Node.js), its code (`install_server_code`: the folder, the build, config.json, .env, the branch setting) and its services (`install_server_services`: the units, root's files); `--apply` runs the packages and services (without restarting the server: update.sh does, after the code) and the Client, then the record (`installer.json`). An interactive run does all three, as now.
+- **`update.sh`** (on main, when an install is due and not refused): if the Release's `installer.version` is above the record (`installer_behind`) and the system step is set up (`systemctl is-enabled noticeboard-system.path`), it writes the request and waits for the result for that commit (every 5 s, at most 45 minutes), saying so in the status (`updating`, "Setting up the system for Release v…"). Done: it carries on with the code. Failed, refused or no answer: the target is skipped like a failed build (`update-failed-commit`), the status says why, and the code isn't touched. Not set up (a Server from before 0.9.0): as today, the code installs and the installer notice asks for the one last manual run.
+- **Full update:** `update.sh` takes a request `full`: the system step for the target even when not behind, then the code even when it's the one running (as `--force`). The admin panel's "Full update…" (Software updates, on main with the system step set up: the admin password, then a final confirmation, `actionTokens` action `full`, `POST /settings/updates/full`), and `sudo noticeboard update --full`, both write it. On a branch the server refuses it (409) and the card says to run the installer by hand.
+- **The command** `noticeboard`: `sudo noticeboard update` (writes the request `install-now`: installs now, whatever the schedule), `sudo noticeboard update --full`, `noticeboard status` (the version, the branch, the last check, the last update, the installer record and the last system step, read from the files in `data/` and `tmp/`).
+- **The notices:** the installer notice (admin pages, the screens' mark) shows when someone has to act: the installer is behind and the system step isn't set up, or its last run for the running Release's successor failed (`installerVersion.status()`: `automatic`, `systemFailed` with its message). The waiting-version warnings (`UpdateAvailableNotice`, the screens' `updateAvailable`) show whenever a newer version is waiting, on any schedule (`updateWaiting`, formerly `manualUpdateWaiting`).
+- **Risks:** root runs code only from GitHub, at main's latest Release, checked twice (request and GitHub); a failed system step leaves the running version as it is. **Tests:** installers (`noticeboard-system`: refuses a commit that isn't the latest Release, or a Server on a branch; runs `--apply` and reports; `--apply` asks nothing and doesn't touch the code; `update.sh`: system step needed, not needed, failing and skipping the target, not set up; the `noticeboard` command), api (Full update: password, main only), browser (the Full update dialogs; the warnings on any schedule).
+
+**Phase 3 in detail** (Clients follow their Server; installer version 7):
+- **Which Clients:** a **Client only** follows its Server. A Client + Server's own screen doesn't: its bundle would be made and signed by the app's own user on the same machine, so root installing it would be root running code from the app's folder (decision 1). Its Client is kept up to date by the system step with main's Releases (phase 2), and on a branch by hand.
+- **What the Server offers** (`server/services/clientBundle.js`, `server/routes/api/client.js`, MAC-filtered like the viewer; nothing is pushed or tracked): `GET /api/client/version` → `{ version, commit, clientHash }` (`version`: the Release's tag on main, else `<branch>@<short commit>`; `clientHash`: a SHA-256 of `git ls-tree` of the installer files at the running commit, so a Server update that doesn't touch them doesn't restart any screen); `GET /api/client/bundle` → a tar.gz of `installers/install.sh`, `lib/`, `client/` and `root/` at the running commit (`git archive`, made once per commit in `tmp/`); `GET /api/client/bundle.sig` → its ed25519 signature (raw, 64 bytes); `GET /api/client/key` → the public key (PEM). The key pair is made on first need (Node `crypto`) in `data/client-signing.key` (mode 600), kept by Restore Defaults (`KEPT_DATA`); updates and branch switches never touch `data/`.
+- **The Client's check** (`noticeboard-client check`, root, `noticeboard-client-update.timer` every 15 minutes, only on a Client only): ask the version; the same as `/opt/noticeboard-client/version`: nothing; only the version differs (the same hash): record it, no restart; a commit it was told to skip: nothing. Otherwise download the bundle and its signature, verify them with the pinned key (`openssl pkeyutl -verify -pubin -inkey /etc/noticeboard/server.pub -rawin`), unpack into a root-owned folder and run its installer with `--apply` (`NOTICEBOARD_INSTALLER_SHA=local`: its own parts), then record the version and hash and keep the bundle as `installed.tar.gz` (the one before it becomes `previous.tar.gz`). A bundle that doesn't verify is never unpacked.
+- **The kiosk follows by itself:** the running kiosk notices `/opt/noticeboard-client/version` changing (it looks every 3 seconds, as for the exit button), closes its browser and starts again from the new files; once its viewer is up for a version it writes that version to `/tmp/noticeboard-kiosk-up`.
+- **Rollback:** if `/tmp/noticeboard-kiosk-up` doesn't show the new version within 3 minutes (the browser didn't start, or the Server can't be reached from the new kiosk), the check applies `previous.tar.gz` again, restores the version, and writes the commit to `skip` until the Server offers another.
+- **`sudo noticeboard-client trust-server`:** shows the Server's key fingerprint (SHA-256) and pins it after a yes (a rebuilt Server has a new key). The installer does the same for a new Client only (if the Server is out of reach, or too old to offer a key, it says the Client won't update itself until `trust-server` is run).
+- **`sudo noticeboard-client reinstall-stable`:** asks GitHub (not the Server) for main's latest Release (`/usr/local/lib/noticeboard/release.sh`, installed on Clients too), runs that Release's installer with `--apply` (downloaded over HTTPS at its tag, as the system step does), even if it's current, and records `<tag> (stable)` so the next check follows the Server again.
+- **Installed by the installer (a Client only):** `noticeboard-client-update.{service,timer}`, the pinned key, the parts `noticeboard-client` loads, `openssl` and `curl`. `noticeboard-client status` shows the version, the role, the Server, the pinned key's fingerprint and a version skipped.
+- **Risks:** a Client trusts whatever its Server signs (a Server taken over could update its Clients, as it can already change what they show); the pinned key stops anyone else on the network. A Client that updates itself can break a screen nobody is watching: verification, the kiosk's own restart, rollback and `reinstall-stable` are the answers. **Tests:** api (the four endpoints, the signature verifying with the public key, the version on main and on a branch, the key kept by Restore Defaults), installers (`noticeboard-client check` against a stand-in Server: same version, hash only, a new version, an older one, a bad signature refused, rollback, the skip; `trust-server`; `reinstall-stable` against the stand-in GitHub; the kiosk restarting on a new version).
+
+**Phase 4 in detail** (existing installations and the documents; no new installer version):
+- **What an existing installation sees:** a Server on main from before 0.9.0 installs the 0.9.0 Release as usual (its update.sh follows Releases since 0.8.0); root's system step isn't set up yet, so the installer notice asks for **one last run by hand** and says that, once it has run, a Server on main runs the installer by itself when a Release needs it (`installerVersion.status()` → `lastByHand`: on main, the system step not set up, and the version needing an installer that sets it up, `SYSTEM_STEP_FROM` = 6). On a branch the notice is as before.
+- **Clients:** `installerNeeds` → `displays` only when a missed change is for the Clients **and** the Server's installer record is below `CLIENTS_FOLLOW_FROM` (7): Clients set up before then don't follow their Server, so each needs **one run as *Client only*** (the notice: "Run it once on each Client as well, choosing *Client only* and this Server's address; after that each Client follows this Server by itself"). From 7 on, a change for the Clients reaches every Client only by itself (`clientsFollow: true`: the notice says there's nothing to do on them). The screens' mark is unchanged.
+- **Documents:** README (the roles, the one run on each device installed before, Client updates), the user guide (installing each role, Clients' updates and commands, when the installer needs running again), this document (the sections, §19's row for 0.9.0).
+- **Then:** the full run (`node tests/snapshot.js` or Actions), the upgrade rehearsal from 0.7.1 and 0.8.0 (`NB_BASELINE`), and the 2do list's status line for this item, as agreed.
+- **Tests:** unit (`installerNeeds`: `displays` and `clientsFollow` either side of 7), browser (`installer-notice.js`: the last-run line on main without the system step, the Client line before 7, the "follow by themselves" line from 7 on a branch).
+
+**Ready for the hardware checks, from GitHub on the branch** (the owner, 2026-09-29: "Client should only follow the server"; "have everything ready for testing on hardware from GitHub as the branch"):
+- **A Client only follows only its Server.** A failed update puts back the files it had from the Server, and never goes to GitHub by itself (`put_back`: nothing to put back → it says so and leaves the Client as it is; `reinstall-stable` stays the one way to GitHub, run by hand). So there's always something to put back, the installer's Client-only step ends with `follow_server` (was `pin_server_key`): the key pinned if it isn't yet, then a first `noticeboard-client check`, so from the start the Client runs its Server's files, not the installer's. The Server out of reach: it says so, and the timer's next check takes them.
+- **Installing a branch from GitHub**, for any role: `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/<branch>/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=<branch> bash`. `NOTICEBOARD_INSTALL_BRANCH` is the answer the hand-over already passes (`choose_branch`); `use_latest_installer` now takes it before the followed branch, so the branch's own installer runs even on a device with no branch setting (a new device, or any Client), and `choose_branch` takes it for every role (a Client only's installer then doesn't hand back to main's). Without it, nothing changes: a device follows main's installer as before.
+- **The admin panel's installer command** on a branch (`installerCommand(ref)` in `shared/index.js`, for a ref that is neither main nor a Release's tag) carries `NOTICEBOARD_INSTALL_BRANCH=<branch>`, so running it on a Client installs that branch's Client, as on the Server.
+- **Tests:** installers (`install-flow.sh`: the first check after the key is pinned; `installer-handover.sh`: `NOTICEBOARD_INSTALL_BRANCH` choosing the branch's installer on a new device; `client-update.sh`: nothing to put back → no GitHub), unit (`installerCommand` for main, a tag and a branch).
+
+**Found by the test in Debian VMs (WSL2, Debian 13, 2026-09-29):**
+- **A Server without `arp` crashed on every request from another device.** `node-arp` runs `ping` and `arp` without listening for their errors, so a missing program (`arp` is in net-tools, which generic Debian doesn't install) threw an unhandled error and ended the server; systemd restarted it, and the next request from a Client or browser ended it again. A Raspberry Pi with net-tools never saw it. **Fix:** on Linux, `macLookup` reads the kernel's ARP table itself (`/proc/net/arp`, `pathHelpers.arpTablePath()`, `NOTICEBOARD_ARP_TABLE` for tests): no program to run, nothing to crash, and a device that has just sent a request is already in it (the ping node-arp did first isn't needed). Elsewhere (a PC running the tests) node-arp as before. No installer change. **Tests:** unit (`lookupMac` from a table: the address found, an incomplete entry, an address not there, no table), and the VMs again.
+- **A Client on Debian couldn't install Chromium.** `chromium_package` chose `chromium-browser` because `apt-cache show` finds it, but on Debian it's only a name other packages mention ("Candidate: (none)"), so `apt-get install` stopped the installer. **Fix:** it's chosen only when `apt-cache policy` gives it an install candidate (Raspberry Pi OS), else `chromium`.
+- **A Debian without a desktop was taken for one.** `detect_platform` counted a graphical default target as a desktop, and Debian's default target is `graphical.target` even with no desktop installed, so *Debian with a desktop* was preselected on a headless machine. **Fix:** a desktop means a display manager (`display-manager.service`), as on Raspberry Pi OS (lightdm) and Debian's desktops. Both only change how the installer chooses (no installer version change). **Tests:** `install-flow.sh` (Chromium with and without a candidate; a graphical default target without a display manager is headless).
+- **A stopped kiosk still said it was up.** `/tmp/noticeboard-kiosk-up` stayed after the kiosk ended (`sudo systemctl stop noticeboard-kiosk`, as the guide says for a headless Client, or leaving kiosk mode), so every later update waited 3 minutes for a kiosk that wasn't running and put the files back. **Fix:** the kiosk removes it when it ends (`trap`: EXIT, and TERM, INT and HUP end it cleanly); starting again from new files (`exec`) keeps it until the new kiosk writes its version. **Tests:** `kiosk-scripts.sh`. Also seen: the Client's rollback and skip, the refusal of a bundle signed with another key and `trust-server`, and a hash-only update, all working on the VMs.
+- **Small:** `noticeboard status` before the first check printed an empty "Last check" (now "not yet"), and its installer command on a branch names the branch (`NOTICEBOARD_INSTALL_BRANCH`), as the admin panel's does. **Tests:** `system-step.sh`.
+
+**Tests:** installers (every role and platform, the saved answers, `--apply` asking nothing, golden files re-recorded on purpose with installer 5; the system step needed, not needed, failing and skipping the target, a request for a commit that isn't the Release or the branch tip refused; the Client updater against a stand-in Server: same version, different and older versions, a hash-only change, a bad signature refused, rollback after a kiosk failure, `reinstall-stable` against the stand-in GitHub); api and browser (the client endpoints and the signature, Full update with the password, the warnings on any schedule); the upgrade rehearsal from 0.7.1 and 0.8.0; on real hardware before merging: a Raspberry Pi as Client + Server with a desktop, a Debian VM as Server only, a minimal Debian (or an Orange Pi Zero 2W) as Client only, a Client following a branch switch and back, and a rollback.
+
+**The owner's decisions (2026-09-29):**
+1. The root system step only ever runs the installer of **main's latest published Release**, after checking with GitHub that the requested commit is that Release's. A Server on a development branch needs the installer run by hand when the branch changes what only the installer sets up, as today.
+2. The server makes the Client signing key itself, the first time it needs one.
+3. Headless Clients: `cage` on tty1, with the viewer's exit button hidden (`?kiosk=headless`); leaving the kiosk there is `sudo systemctl stop noticeboard-kiosk`.
+4. Clients still follow whatever their Server runs, a branch included: they trust the Server's signature, not GitHub. Decision 1 is about the Server's own root step.
+5. (Later the same day.) **A Client follows only its Server:** a Client + Server's own screen is kept up to date by the system step (it is the Server), and a Client only never goes to GitHub by itself; `reinstall-stable` is the recovery by hand.
 
 ---
 
@@ -1555,9 +1747,17 @@ cat /proc/device-tree/model; uname -r; chromium --version
 - A bug fixed on its own (§16, §18) is a patch release, listed here with what it fixed; a bug fixed inside a feature branch is listed with that version.
 - **Merged together** (the owner, 2026-09-28): the words Server and Client (§18.4) and the Known Issues fixes (§18.5) are built on `feature/audio-support` and merge into main with audio as one item, after the check on a real Pi; each keeps its own version number here, and main moves from 0.5.0 to the last of them at that merge.
 - **Each bug fix counts as its own patch number,** even when several are done together (the owner, 2026-09-28): e.g. §18.5's twelve items are 0.6.2 to 0.6.13, and wording or documentation work such as §18.4 is a patch too.
-- `package.json` (the root, `client/admin` and `client/display`) still says 1.0.0, npm's default; nothing reads it. Setting it to the version here is for the owner to decide (by hand, with the matching top entries of `package-lock.json`, never with npm install on Windows).
+- **One Release can carry several versions** (the owner, 2026-09-29: "one release please, we keep using the number to track things, so I can tell how far ahead branch testing is to the release"): each piece of work keeps its own number here (0.8.0 and 0.9.0), and the Release takes the highest (v0.9.0).
+- `package.json` (the root, `client/admin` and `client/display`) says the version of main's latest Release (from 0.9.0; 1.0.0, npm's default, before), set by hand with the matching top entries of `package-lock.json`, never with npm install on Windows. Nothing reads it.
 
-**Current:** main is **0.7.1**. The merge of `feature/audio-support` (2026-09-28, after the check on the owner's Pis) brought **0.6.0** "Audio" (§18.3), **0.6.1** (§18.4 the words Server and Client), **0.6.2–0.6.13** (§18.5 the Known Issues, one per item), **0.6.14** (the fix from the Pi test), **0.7.0** (§18.8 every screen in step) and **0.7.1** (the Branding card first on the Settings page). Planned, on `feature/releases-installer`: **0.8.0** (§18.6 Releases) and **0.9.0** (the installer and update redesign).
+**Publishing a Release** (once §18.6 is on main, a Server on main installs main's latest published Release, §15 22–23)
+1. The work is merged into main, and main's version, this section's history row and the line at the top of this document are updated in the merge commit (the rules above).
+2. The `version` of `package.json` (the root, `client/admin` and `client/display`) and the matching top entries of `package-lock.json` are set to the version, by hand (never with npm install on Windows), in a commit on main.
+3. The full test run has passed on that commit.
+4. On GitHub, a new Release from that commit of main: the tag `v` and the version (`v0.9.0`), the name `Noticeboard 0.9.0`, and the history row's "What it brought" and "Bugs fixed" as its notes. Not a draft or prerelease: those are never installed. Every Server on main installs it at its next scheduled install.
+5. The first Release, v0.9.0 (0.8.0 and 0.9.0 together), was published straight after they reached main (2026-09-29). A Server on 0.7.1 installs the merge commit itself (its updater follows main's commits), and from then on only Releases.
+
+**Current:** main is **0.9.0**, the first Release (v0.9.0, 2026-09-29). The merge of `feature/releases-installer` brought **0.8.0** (§18.6 Releases) and **0.9.0** (§18.7 the installer and update redesign), published together. Before it, the merge of `feature/audio-support` (2026-09-28) brought 0.6.0 to 0.7.1.
 
 **History** (numbered after the fact for everything before 0.6.0)
 
@@ -1585,3 +1785,5 @@ cat /proc/device-tree/model; uname -r; chromium --version
 | 0.6.14 | 2026-09-28 | merge of `feature/audio-support` | `?debug=audio` on the viewer | a video's sound silenced the background music on a Pi (every sound is now 48 kHz) |
 | 0.7.0 | 2026-09-28 | merge of `feature/audio-support` | Every screen in step (§18.8): every screen keeps to the Server's clock, shows the same slide and plays the same music at the same moment; a playlist change reaches every screen together at the end of the slide on air; music like a radio (a show is joined where it is now); a video starts at the right point and is kept there | screens side by side changing slides at different times, and screens heard together echoing |
 | 0.7.1 | 2026-09-28 | merge of `feature/audio-support` | The Branding card first on the Settings page (the owner, 2026-09-28) | |
+| 0.8.0 | 2026-09-29 | merge of `feature/releases-installer`; Release v0.9.0 | Releases (§18.6): a Server on main installs main's latest published Release rather than every commit, and never goes back by itself; a branch goes back to main once a Release has its work (waiting for the installer when that Release needs it); the version shown is the Release's number; the installer installs main's latest Release. Tests that don't hold up coding: GitHub Actions on Linux, and runs from a snapshot | |
+| 0.9.0 | 2026-09-29 | merge of `feature/releases-installer`; Release v0.9.0 | The installer and update redesign (§18.7, installer version 7): one installer for every device, as Client + Server, Client only or Server only, on Raspberry Pi OS or Debian, with a desktop or headless (cage), its answers saved for next time; on main, installations that run the installer by themselves when a Release needs it, Full update and the `noticeboard` command (`update`, `update --full`, `status`); Clients only that follow their Server's version (signed by the Server, put back if the screen doesn't come back, `noticeboard-client`); the warning for a waiting version on any update schedule; installing a development branch from GitHub (`NOTICEBOARD_INSTALL_BRANCH`) | a Server crashed on every request from another device when `arp` (net-tools) wasn't installed; a Client's kiosk logged "HTTP 000000" when its Server couldn't be reached |

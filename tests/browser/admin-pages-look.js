@@ -7,9 +7,10 @@
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep, git } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, sleep, git, REPO, lookFixture } = require('../helpers/app.js');
+const { startFakeGitHub } = require('../helpers/github.js');
 
-const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'admin-pages-look.json');
+const SNAPSHOT = lookFixture('admin-pages-look.json');   // per system: fonts, and so sizes, differ
 const PROPS = ['display', 'position', 'width', 'height', 'margin', 'padding', 'border', 'border-radius', 'outline',
   'background-color', 'color', 'opacity', 'font-family', 'font-size', 'font-weight', 'line-height', 'cursor', 'gap',
   'flex-wrap', 'justify-content', 'align-items', 'grid-template-columns', 'box-shadow', 'z-index', 'max-width',
@@ -28,7 +29,7 @@ const styles = (finder) => `(() => {
   for (const p of ${JSON.stringify(PROPS)}) out[p] = cs.getPropertyValue(p);
   return out;
 })()`;
-const text = (sel) => `(document.querySelector(${JSON.stringify(sel)})?.innerText ?? '').replace(/\\s+/g, ' ').replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, 'UUID').replace(/[0-9a-f]{7,40}/g, 'SHA').replace(/\\d{1,2}\\/\\d{1,2}\\/\\d{4}, \\d{1,2}:\\d{2}:\\d{2}/g, 'TIME').trim()`;
+const text = (sel) => `(document.querySelector(${JSON.stringify(sel)})?.innerText ?? '').replace(/\\s+/g, ' ').replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, 'UUID').replace(/[0-9a-f]{7,40}/g, 'SHA').replace(/\\d{1,2}\\/\\d{1,2}\\/\\d{4}, \\d{1,2}:\\d{2}:\\d{2}(?: [AP]M)?/g, 'TIME').trim()`;   // a time, 24-hour or with AM/PM (Linux's Chrome)
 
 async function capture(c, map, prefix) {
   const out = {};
@@ -47,8 +48,27 @@ async function capture(c, map, prefix) {
   fs.writeFileSync(path.join(units, 'paths.target.wants/noticeboard-update.path'), '');
   // A last update to show
   fs.writeFileSync(path.join(env.APP, 'data/update-status.json'), JSON.stringify({ state: 'updated', branch: 'main', commit: 'x', message: 'Updated to 1234567 from main.', time: '2026-09-01T10:00:00Z' }));
+  // Checking main shows main's latest Release (SYSTEM_DESIGN §18.6), from a stand-in GitHub: a
+  // commit on top of the copy's own, published as v0.1.0 in a bare copy of this repository that
+  // becomes its origin (so this repository gets no tag, and the Release isn't older than what
+  // runs). Its software list names one program no machine has, so the switch dialog's "Missing
+  // software" step and its text are the same on every machine.
+  const origin = path.join(env.T, 'origin.git');
+  git(env.T, 'clone', '-q', '--bare', REPO, 'origin.git');
+  git(env.T, 'clone', '-q', env.APP, 'release');
+  const release = path.join(env.T, 'release');
+  const list = JSON.parse(fs.readFileSync(path.join(release, 'system-requirements.json'), 'utf8'));
+  list.software = [{ name: 'Widget', commands: ['no-such-program-xyz'], versionArgs: ['--version'], versions: '*', neededFor: 'Showing widgets.', install: 'sudo apt install widget' }];
+  fs.writeFileSync(path.join(release, 'system-requirements.json'), JSON.stringify(list, null, 2));
+  git(release, 'commit', '-qam', 'Release 0.1.0');
+  git(release, 'push', '-q', origin, 'HEAD:refs/tags/v0.1.0');
+  git(env.APP, 'remote', 'set-url', 'origin', origin);
+  const mock = path.join(env.T, 'mock');
+  fs.mkdirSync(mock);
+  fs.writeFileSync(path.join(mock, 'release'), 'v0.1.0\n');
+  const github = await startFakeGitHub(mock);
   const s = server(env);
-  await s.start({ NOTICEBOARD_SYSTEMD_DIR: units });
+  await s.start({ NOTICEBOARD_SYSTEMD_DIR: units, NOTICEBOARD_GITHUB_API: github.url });
   await s.login();
   const sample = (await s.api('GET', '/api/slideshows')).data.find((x) => x.sample);
   for (let i = 0; i < 80; i++) {
@@ -117,11 +137,11 @@ async function capture(c, map, prefix) {
   texts['settings page'] = await c.evaluate(text('main'));
   await c.evaluate(`(() => { const el = document.querySelector('.row input'); el.value = 'main'; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   await c.click('Check branch');
-  await c.until(`/exists on GitHub/.test(document.body.innerText)`, 20000);
+  await c.until(`/installs its latest Release/.test(document.body.innerText)`, 20000);
   await sleep(300);
   Object.assign(look, await capture(c, { 'check result': '.checked', 'software panel': '.software', 'switch button': 'text:button:Switch to main' }, 'settings:'));
   await c.click('Switch to main');
-  // This PC lacks some software main lists (e.g. Chromium), so the 'Missing software' step comes first
+  // main's Release lists a program no machine has (above), so the 'Missing software' step comes first
   await c.until(`!!document.querySelector('.dialog')`);
   await sleep(300);
   Object.assign(look, await capture(c, {
@@ -134,12 +154,14 @@ async function capture(c, map, prefix) {
   texts['after Esc'] = await c.evaluate(`!!document.querySelector('.dialog') ? 'dialog still open' : ([...([...document.querySelectorAll('section.card')].find((c) => c.querySelector('.card-toggle')?.textContent.trim() === 'Software updates')?.querySelectorAll('p.muted:last-of-type') ?? [])].find((el) => !el.closest('.schedule, .waiting'))?.textContent ?? '')`);
   c.close();
   await s.stop();
+  await github.close();
 
   const record = { look, texts };
   if (!fs.existsSync(SNAPSHOT) || process.env.NB_UPDATE_SNAPSHOT === '1') {
+    fs.mkdirSync(path.dirname(SNAPSHOT), { recursive: true });
     fs.writeFileSync(SNAPSHOT, `${JSON.stringify(record, null, 2)}\n`);
     const missing = Object.keys(look).filter((k) => !look[k]);
-    check(`recorded ${Object.keys(look).length} elements and ${Object.keys(texts).length} texts in tests/fixtures/admin-pages-look.json`, missing.length === 0, missing.join(', '));
+    check(`recorded ${Object.keys(look).length} elements and ${Object.keys(texts).length} texts in ${path.relative(path.join(__dirname, '..', '..'), SNAPSHOT)}`, missing.length === 0, missing.join(', '));
   } else {
     const want = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
     let same = 0;

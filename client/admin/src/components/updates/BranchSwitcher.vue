@@ -3,9 +3,11 @@
 //
 // Responsibilities
 //   The branch name (with GitHub's branches as suggestions) and "Check branch"
-//   (POST /settings/updates/check). The result: the change from what runs now, the branch's latest
-//   commit, whether this noticeboard has the software the branch needs, whether the installer must
-//   run again afterwards, and the "Switch to …" button. Editing the name drops the result.
+//   (POST /settings/updates/check). The result: the change from what runs now, what the switch
+//   installs (the branch's latest commit; for main, its latest Release, with a warning when that's
+//   older than what runs: SYSTEM_DESIGN §18.6), whether this noticeboard has the software it
+//   needs, whether the installer must run again afterwards, and the "Switch to …" button. Editing
+//   the name drops the result.
 //
 // Props: info (GET /settings/updates), branches, branchesError
 // Emits: checking (a check started), switch(checked), the checked branch the admin wants
@@ -26,7 +28,7 @@ const emit = defineEmits(['checking', 'switch']);
 
 const branchInput = ref('');
 const checking = ref(false);
-const checked = ref(null);        // the verified branch: { branch, commit, subject, date, current, requirements, installer }
+const checked = ref(null);        // the verified branch: { branch, commit, release, version, older, subject, date, current, requirements, installer }
 const checkError = ref('');
 
 const running = computed(() => runningName(props.info));
@@ -68,8 +70,8 @@ defineExpose({ reset });
     <h3>Branch</h3>
     <p class="muted">
       Updates come from the <strong>{{ info.configuredBranch }}</strong> branch on GitHub. <strong>main</strong> is the
-      stable version; other branches hold work in progress. Nothing changes until you've checked the branch and
-      confirmed twice.
+      stable version: it installs each new Release once it's published. Other branches hold work in progress and
+      install each new change. Nothing changes until you've checked the branch and confirmed twice.
     </p>
     <form class="row" @submit.prevent="checkBranch">
       <input
@@ -98,13 +100,20 @@ defineExpose({ reset });
         <p>This noticeboard already uses <strong>{{ checked.branch }}</strong>.</p>
       </template>
       <template v-else>
-        <p class="tone-ok">✓ <strong>{{ checked.branch }}</strong> exists on GitHub and can be used.</p>
+        <p v-if="checked.release" class="tone-ok">
+          ✓ <strong>{{ checked.branch }}</strong> installs its latest Release, <strong>Version {{ checked.version }}</strong>, and can be used.
+        </p>
+        <p v-else class="tone-ok">✓ <strong>{{ checked.branch }}</strong> exists on GitHub and can be used.</p>
         <p class="change">
           <strong>{{ running }}</strong> <code>{{ short(info.commit) }}</code>
           <span aria-label="to"> → </span>
-          <strong>{{ checked.branch }}</strong> <code>{{ short(checked.commit) }}</code>
+          <strong>{{ checked.release ? `Version ${checked.version}` : checked.branch }}</strong> <code>{{ short(checked.commit) }}</code>
         </p>
-        <p class="muted">Latest commit: “{{ checked.subject }}”, {{ when(checked.date) }}</p>
+        <p class="muted">{{ checked.release ? 'Its commit' : 'Latest commit' }}: “{{ checked.subject }}”, {{ when(checked.date) }}</p>
+        <div v-if="checked.older" class="software software--missing older-release">
+          <strong>⚠ main's latest Release, Version {{ checked.version }}, is older than what's running.</strong>
+          Switching goes back to it: what's newer in the version running now is removed.
+        </div>
 
         <div v-if="!checked.requirements?.listed" class="software software--unknown">
           {{ checked.branch }} doesn’t list the software it needs, so this noticeboard can’t be checked against it.

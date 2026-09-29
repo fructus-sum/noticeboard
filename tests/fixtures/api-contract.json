@@ -346,7 +346,9 @@
       "configuredBranch": "string",
       "instant": "boolean",
       "lastCheck": "null",
+      "lastSystemStep": "null",
       "pending": "boolean",
+      "release": "null",
       "schedule": {
         "at": "null",
         "day": "number",
@@ -354,6 +356,8 @@
         "time": "string"
       },
       "status": "null",
+      "systemStep": "boolean",
+      "version": "null",
       "waiting": "null"
     }
   },
@@ -370,12 +374,18 @@
     "status": 200,
     "type": "application/json",
     "content": {
+      "automatic": "boolean",
       "branch": "string",
       "changes": [],
+      "clientsFollow": "boolean",
       "displays": "boolean",
       "installed": "null",
+      "lastByHand": "boolean",
       "needed": "boolean",
-      "required": "number"
+      "ref": "string",
+      "required": "number",
+      "returning": "null",
+      "systemFailed": "null"
     }
   },
   "updates: version": {
@@ -388,7 +398,8 @@
         "branch": "string",
         "commit": "string",
         "date": "string",
-        "installedAt": "null"
+        "installedAt": "null",
+        "version": "null"
       }
     }
   },

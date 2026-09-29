@@ -1,10 +1,13 @@
 // Branch switching end to end, minus systemd: the real server runs from a git clone whose origin
 // (a local bare repo) has several branches, with fake systemd unit files. The real update.sh
-// (with systemctl, npm, curl, sleep and flock stand-ins) acts on what the server writes.
+// (with systemctl, npm, curl, sleep and flock stand-ins) acts on what the server writes. GitHub's
+// Releases API is stood in for both (tests/helpers/github.js and github.sh read the same files):
+// main follows its latest Release (SYSTEM_DESIGN §18.6).
 //   node tests/run.js api branch-switching
-const { spawn, execFileSync, spawnSync } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const { copyChanges } = require('../helpers/app.js');
+const { startFakeGitHub } = require('../helpers/github.js');
 const os = require('os');
 const path = require('path');
 
@@ -16,6 +19,8 @@ const BASE = `http://localhost:${PORT}`;
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'nb-branch-'));
 const APP = path.join(T, 'app');
 const SYSTEMD = path.join(T, 'systemd');
+const MOCK = path.join(T, 'mock');   // the Releases stand-ins' files: release, release-kind, github-down
+let github;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ok = true;
 const check = (name, pass, detail = '') => { ok &&= !!pass; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? '  (' + detail + ')' : ''}`); };
@@ -36,6 +41,10 @@ function setup() {
   git(work, 'add', '-A'); git(work, 'commit', '-qm', 'main with branch switching');
   git(work, 'remote', 'set-url', 'origin', path.join(T, 'origin.git'));
   git(work, 'push', '-q', 'origin', 'main');
+  // main's first Release
+  fs.mkdirSync(MOCK, { recursive: true });
+  git(work, 'tag', 'v0.1.0'); git(work, 'push', '-q', 'origin', 'refs/tags/v0.1.0');
+  fs.writeFileSync(path.join(MOCK, 'release'), 'v0.1.0\n');
   const branch = (name, change) => {
     git(work, 'checkout', '-q', '-b', name, 'main'); change(work); git(work, 'add', '-A', '-f'); git(work, 'commit', '-qm', name);
     git(work, 'push', '-q', 'origin', name); git(work, 'checkout', '-q', 'main');
@@ -64,11 +73,12 @@ function setup() {
   // Stand-ins for update.sh
   const bin = path.join(T, 'bin');
   fs.mkdirSync(bin);
-  const script = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`);
+  // Executable: Linux only runs a stand-in on the PATH if it is (Windows doesn't care)
+  const script = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
   // A new (made-up, out of range) server PID after every look, as if systemd restarted it
   script('systemctl', `case "$1" in is-active) echo active ;; show) n=$(cat "$(dirname "$0")/pid" 2>/dev/null || echo 3999000); echo "$n"; echo $((n + 1)) > "$(dirname "$0")/pid" ;; esac`);
   script('npm', '[ "$1" = run ] && [ -f BUILD_FAILS ] && exit 1\nexit 0');
-  script('curl', 'exit 0');
+  script('curl', 'case "$*" in */releases/latest*) source "$GITHUB_STANDIN"; fake_latest_release "$@"; exit $? ;; esac\nexit 0');
   script('sleep', 'exit 0');
   script('flock', 'exit 0');
 }
@@ -78,17 +88,26 @@ function installUnits(timer, pathUnit) {
   if (pathUnit) { fs.mkdirSync(path.join(SYSTEMD, 'paths.target.wants'), { recursive: true }); fs.writeFileSync(path.join(SYSTEMD, 'paths.target.wants/noticeboard-update.path'), ''); }
   fs.mkdirSync(SYSTEMD, { recursive: true });
 }
-// What systemd's path unit would do: run update.sh once the request file exists
+// What systemd's path unit would do: run update.sh once the request file exists. Not spawnSync:
+// this process must keep running meanwhile (it is the GitHub stand-in, and a blocked event loop
+// misses the server closing idle connections, so the next request would reuse a closed one).
 function runUpdater() {
   const posix = (p) => p.replace(/^([A-Za-z]):/, (m, d) => `/${d.toLowerCase()}`).replace(/\\/g, '/');
-  const r = spawnSync('bash', ['-c', `PATH="${posix(path.join(T, 'bin'))}:$PATH" bash "${posix(APP)}/installers/update.sh"`], { encoding: 'utf8' });
-  return (r.stdout + r.stderr).trim();
+  return new Promise((resolve) => {
+    const child = spawn('bash', ['-c', `PATH="${posix(path.join(T, 'bin'))}:$PATH" bash "${posix(APP)}/installers/update.sh"`], {
+      env: { ...process.env, MOCK: posix(MOCK), GITHUB_STANDIN: posix(path.join(REPO, 'tests/helpers/github.sh')) },
+    });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    child.on('close', () => resolve(out.trim()));
+  });
 }
 
 // ── server ──
 let server;
 async function startServer() {
-  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD }, stdio: 'ignore' });
+  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD, NOTICEBOARD_GITHUB_API: github.url }, stdio: 'ignore' });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + '/api/auth/status')).ok) return; } catch { /* not yet */ } await sleep(250); }
   throw new Error('server did not start');
 }
@@ -103,12 +122,19 @@ const head = () => git(APP, 'symbolic-ref', '--short', 'HEAD');
 
 (async () => {
   setup();
+  github = await startFakeGitHub(MOCK);
   await startServer();
   check('updates info needs the admin login', (await call('GET', '/settings/updates', undefined, false)).status === 401);
   cookie = (await call('POST', '/auth/login', { password: 'Admin@12345' })).res.headers.get('set-cookie').split(';')[0];
 
   let info = (await call('GET', '/settings/updates')).data;
   check('info: current branch, commit, setting and systemd units', info.available && info.branch === 'main' && /^[0-9a-f]{40}$/.test(info.commit) && info.configuredBranch === 'main' && info.autoUpdates && info.instant && !info.busy && !info.pending, JSON.stringify({ ...info, status: undefined, lastCheck: undefined }));
+
+  check('info: the Release running on main, and its version', info.release === 'v0.1.0' && info.version === '0.1.0', `${info.release} ${info.version}`);
+  const v = (await call('GET', '/settings/version')).data.version;
+  check("the sidebar's version: the Release's", v.version === '0.1.0' && v.branch === 'main', JSON.stringify(v));
+  const inst = (await call('GET', '/settings/updates/installer')).data;
+  check("the installer command on main comes from the Release's tag", inst.ref === 'v0.1.0' && inst.branch === 'main' && inst.returning === null, JSON.stringify(inst));
 
   const branches = (await call('GET', '/settings/updates/branches')).data.branches;
   check('branches from GitHub, main first', branches[0] === 'main' && ['feature/good', 'old', 'tracks-data', 'broken'].every((b) => branches.includes(b)), branches.join(', '));
@@ -150,6 +176,23 @@ const head = () => git(APP, 'symbolic-ref', '--short', 'HEAD');
   check('update.sh installs it: the admin panel sees feature/good', head() === 'feature/good' && info.branch === 'feature/good' && info.configuredBranch === 'feature/good' && info.status.state === 'updated' && !info.busy && !info.pending && info.lastCheck.result === 'up-to-date', `${info.status.message} | ${out.split('\n').pop()}`);
   out = await runUpdater();
   check('the next check keeps feature/good', head() === 'feature/good' && /Up to date/.test(out), out);
+  check('on a branch: no Release version', info.release === null && info.version === null);
+
+  // Checking main: what a switch installs is its latest Release
+  r = await call('POST', '/settings/updates/check', { branch: 'main' });
+  check("check main: its latest Release, older than what runs (feature/good has more), so it says so", r.status === 200 && r.data.release === 'v0.1.0' && r.data.version === '0.1.0' && r.data.older === true && r.data.commit === git(path.join(T, 'origin.git'), 'rev-parse', 'v0.1.0^{commit}'), JSON.stringify({ ...r.data, requirements: undefined }));
+  fs.renameSync(path.join(MOCK, 'release'), path.join(MOCK, 'release.off'));
+  r = await call('POST', '/settings/updates/check', { branch: 'main' });
+  check('check main with no Release published: refused, says why', r.status === 409 && /no published Release yet/.test(r.data.error), r.data.error);
+  fs.renameSync(path.join(MOCK, 'release.off'), path.join(MOCK, 'release'));
+  fs.writeFileSync(path.join(MOCK, 'github-down'), '');
+  r = await call('POST', '/settings/updates/check', { branch: 'main' });
+  check("check main with GitHub's API unreachable: 502, says why", r.status === 502 && /latest Release/.test(r.data.error), r.data.error);
+  fs.rmSync(path.join(MOCK, 'github-down'));
+  fs.writeFileSync(path.join(MOCK, 'release-kind'), 'prerelease');
+  r = await call('POST', '/settings/updates/check', { branch: 'main' });
+  check('a prerelease counts as none', r.status === 409, r.data.error);
+  fs.rmSync(path.join(MOCK, 'release-kind'));
 
   // A switch that fails to build: rolled back, setting restored
   let t = (await call('POST', '/settings/updates/verify-password', { password: 'Admin@12345', branch: 'broken' })).data.token;
@@ -163,7 +206,7 @@ const head = () => git(APP, 'symbolic-ref', '--short', 'HEAD');
   r = await call('POST', '/settings/updates/switch', { branch: 'main', token: t });
   await runUpdater();
   info = (await call('GET', '/settings/updates')).data;
-  check('switch back to main', r.status === 200 && head() === 'main' && info.configuredBranch === 'main' && info.status.state === 'updated', info.status.message);
+  check("switch back to main: its Release, even though it's older", r.status === 200 && head() === 'main' && info.configuredBranch === 'main' && info.status.state === 'updated' && info.version === '0.1.0' && info.commit === git(path.join(T, 'origin.git'), 'rev-parse', 'v0.1.0^{commit}'), info.status.message);
 
   t = (await call('POST', '/settings/updates/verify-password', { password: 'Admin@12345', branch: 'main' })).data.token;
   r = await call('POST', '/settings/updates/switch', { branch: 'main', token: t });
@@ -214,6 +257,25 @@ const head = () => git(APP, 'symbolic-ref', '--short', 'HEAD');
   fs.writeFileSync(path.join(APP, 'data/update-branch.env'), before2 ? before2 + '\n' : 'NOTICEBOARD_BRANCH=main\n');
   fs.rmSync(path.join(APP, 'data/update-status.json'), { force: true });
 
+  // A Release with the followed branch's work that waits for the installer (update.sh's installerFor)
+  const work = path.join(T, 'work');
+  git(work, 'checkout', '-q', '-b', 'release-2', 'main');
+  fs.writeFileSync(path.join(work, 'system-requirements.json'), JSON.stringify({ installer: { version: 99, changes: [{ version: 99, change: 'Something new', displays: true }] }, software: [] }));
+  git(work, 'add', '-A'); git(work, 'commit', '-qm', 'release 2'); git(work, 'tag', 'v0.2.0'); git(work, 'push', '-q', 'origin', 'refs/tags/v0.2.0');
+  git(APP, 'fetch', '-q', 'origin', '+refs/tags/v0.2.0:refs/tags/v0.2.0');
+  const saved = { branch: setting(), check: fs.readFileSync(path.join(APP, 'data/update-check.json'), 'utf8') };
+  fs.writeFileSync(path.join(APP, 'data/update-branch.env'), 'NOTICEBOARD_BRANCH=feature/good\n');
+  fs.writeFileSync(path.join(APP, 'data/installer.json'), '{"version":4,"branch":"feature/good","commit":"x","time":"2026-09-28T00:00:00Z"}');
+  fs.writeFileSync(path.join(APP, 'data/update-check.json'), JSON.stringify({ ...JSON.parse(saved.check), installerFor: 'v0.2.0' }));
+  let st = (await call('GET', '/settings/updates/installer')).data;
+  check("a Release waiting for the installer: the notice's status, with that Release's installer and changes", st.needed === true && st.required === 99 && st.ref === 'v0.2.0' && st.returning?.release === 'v0.2.0' && st.returning?.branch === 'feature/good' && st.changes.join() === 'Something new' && st.displays === true, JSON.stringify(st));
+  fs.writeFileSync(path.join(APP, 'data/update-branch.env'), 'NOTICEBOARD_BRANCH=main\n');
+  st = (await call('GET', '/settings/updates/installer')).data;
+  check('  … ignored once main is followed again', !st.returning && st.ref !== 'v0.2.0', JSON.stringify(st));
+  fs.writeFileSync(path.join(APP, 'data/update-branch.env'), saved.branch + '\n');
+  fs.writeFileSync(path.join(APP, 'data/update-check.json'), saved.check);
+  fs.rmSync(path.join(APP, 'data/installer.json'));
+
   // Wrong passwords are limited; right ones don't count
   for (let i = 0; i < 3; i++) await call('POST', '/settings/updates/verify-password', { password: 'Admin@12345', branch: 'main' });
   const codes = [];
@@ -224,6 +286,7 @@ const head = () => git(APP, 'symbolic-ref', '--short', 'HEAD');
   check('no token 3 leftovers matter', typeof token3 === 'string');
 
   server.kill();
+  await github.close();
   await sleep(500);
   fs.rmSync(T, { recursive: true, force: true });
   console.log(ok ? 'ALL PASSED' : 'SOME FAILED');

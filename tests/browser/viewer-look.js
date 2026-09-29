@@ -5,9 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, sleep, lookFixture } = require('../helpers/app.js');
 
-const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'viewer-look.json');
+const SNAPSHOT = lookFixture('viewer-look.json');   // per system: fonts, and so sizes, differ
 const PROPS = ['position', 'top', 'left', 'right', 'width', 'height', 'min-width', 'max-width', 'padding', 'border',
   'border-radius', 'background-color', 'color', 'opacity', 'cursor', 'display', 'align-items', 'justify-content',
   'z-index', 'transform', 'box-shadow', 'font-family', 'font-size', 'line-height', 'transition'];
@@ -49,12 +49,21 @@ const styles = (selector) => `(() => {
   await sleep(300);
   look['exit pop-up'] = await c.evaluate(styles('.exit-popup'));
   look['exit pop-up buttons'] = await c.evaluate(styles('.exit-actions button'));
+  // A headless Client (cage, no desktop to go to: ?kiosk=headless) has no exit button; the pin stays
+  await c.go(env.base + '/?kiosk=headless');
+  await c.until(`!!document.querySelector('.info-button')`);
+  await c.mouse(300, 300);
+  await c.mouse(320, 320);
+  await sleep(800);
+  check('?kiosk=headless: no exit button, the pin still there',
+    await c.evaluate(`!document.querySelector('.exit-button') && !!document.querySelector('.info-button')`));
   c.close();
   await s.stop();
 
   if (!fs.existsSync(SNAPSHOT) || process.env.NB_UPDATE_SNAPSHOT === '1') {
+    fs.mkdirSync(path.dirname(SNAPSHOT), { recursive: true });
     fs.writeFileSync(SNAPSHOT, `${JSON.stringify(look, null, 2)}\n`);
-    check(`recorded the look of ${Object.keys(look).length} viewer controls in tests/fixtures/viewer-look.json`, Object.values(look).every(Boolean));
+    check(`recorded the look of ${Object.keys(look).length} viewer controls in ${path.relative(path.join(__dirname, '..', '..'), SNAPSHOT)}`, Object.values(look).every(Boolean));
   } else {
     const want = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
     for (const name of Object.keys(want)) {

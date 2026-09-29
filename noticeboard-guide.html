@@ -724,7 +724,8 @@
           <tr><td>Raspberry Pi 3</td><td>yes</td><td>yes</td><td>H.264 only, 1080p only</td><td>Supported (choose H.264 in <strong>Settings → Display</strong>)</td></tr>
           <tr><td>Raspberry Pi 4</td><td>yes</td><td>yes</td><td>H.264 and H.265</td><td>Supported</td></tr>
           <tr><td>Raspberry Pi 5</td><td>yes</td><td>yes</td><td>H.264 and H.265</td><td>Supported</td></tr>
-          <tr><td>Orange Pi Zero 2W</td><td>no</td><td>yes, headless</td><td>H.264 and H.265</td><td>Planned: needs a headless Client installer</td></tr>
+          <tr><td>Orange Pi Zero 2W</td><td>no</td><td>yes, headless</td><td>H.264 and H.265</td><td>The installer can set it up as a headless Client; not yet checked on the device</td></tr>
+          <tr><td>A PC or virtual machine with Debian</td><td>yes</td><td>yes, with a desktop or headless</td><td>depends on the hardware</td><td>The installer can set it up; not yet checked on real hardware</td></tr>
         </tbody>
       </table>
       <p>New videos are converted to <strong>H.265 (HEVC)</strong> by default; <strong>H.264</strong> is the fallback for older hardware such as the Raspberry Pi 3 (see <a href="#settings" style="color:var(--blue)">Settings</a>).</p>
@@ -809,10 +810,10 @@
         <h2>Installation</h2>
       </div>
 
-      <p>One installer sets up a Server or a Client: when it starts, it asks which this device is. It needs a Raspberry Pi running Raspberry Pi OS with the desktop: the current release (Trixie) or Bookworm (see <a href="#devices" style="color:var(--blue)">Supported devices</a>).</p>
+      <p>One installer sets up every device. When it starts, it asks what this device does: <strong>Client + Server</strong> (it runs the noticeboard and shows the slideshow on its own screen), <strong>Client only</strong> (it shows the slideshow from a Server elsewhere) or <strong>Server only</strong> (it runs the noticeboard, with no screen of its own). With a Client, it also asks how the device shows the slideshow, and suggests the answer: a Raspberry Pi with its desktop, Debian with a desktop, or <em>headless</em> (no desktop at all). It runs on Raspberry Pi OS, the current release (Trixie) or Bookworm, and on Debian (see <a href="#devices" style="color:var(--blue)">Supported devices</a>).</p>
 
-      <h3>Option A — A Server (it also shows the slideshow on its own screen)</h3>
-      <p>Every noticeboard has one Server. It also shows the slideshow on its own screen, so a single device is enough to start with.</p>
+      <h3>Option A — A Client + Server (it runs the noticeboard and shows the slideshow on its own screen)</h3>
+      <p>Every noticeboard has one Server. Set up as a Client + Server, it also shows the slideshow on its own screen, so a single device is enough to start with.</p>
 
       <div class="steps">
         <div class="step">
@@ -833,7 +834,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Answer the installer's questions</strong>
-            <p>When asked what this device is, type <code>1</code> (<em>Server</em>). Then answer the sudo question — see the note below.</p>
+            <p>When asked what this device does, type <code>1</code> (<em>Client + Server</em>). When asked how it shows the slideshow, press Enter to take the suggestion (on a Raspberry Pi with its desktop, <code>1</code>). On a Raspberry Pi, answer the sudo question next — see the note below.</p>
           </div>
         </div>
         <div class="step">
@@ -861,10 +862,10 @@
 
       <div class="callout tip">
         <div class="callout-icon">🔒</div>
-        <div class="callout-body"><strong>The sudo question.</strong> Raspberry Pi OS lets you run <code>sudo</code> commands without a password, so anything that takes over its user account can take over the whole device. The installer offers to make <code>sudo</code> ask for your password — we recommend answering <strong>y</strong>. It backs up the setting first and asks you to type your password once to prove it works, so you can't lock yourself out. If you answer <strong>n</strong>, nothing changes, and you can run the installer again later to change your mind.</div>
+        <div class="callout-body"><strong>The sudo question</strong> (Raspberry Pi only). Raspberry Pi OS lets you run <code>sudo</code> commands without a password, so anything that takes over its user account can take over the whole device. The installer offers to make <code>sudo</code> ask for your password — we recommend answering <strong>y</strong>. It backs up the setting first and asks you to type your password once to prove it works, so you can't lock yourself out. If you answer <strong>n</strong>, nothing changes, and you can run the installer again later to change your mind.</div>
       </div>
 
-      <h3>Option B — A Client (it shows the slideshow from a Server)</h3>
+      <h3>Option B — A Client only (it shows the slideshow from a Server)</h3>
       <p>Use this to add another screen: a Client shows the slideshow from a Server that is already running.</p>
 
       <div class="steps">
@@ -879,14 +880,14 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Run the installer on the Client</strong>
-            <p>On the new Client, open a terminal and run the command below. When asked what this device is, type <code>2</code> (<em>Client</em>). After your answers, it brings the device's software fully up to date before installing, which can take a while.</p>
+            <p>On the new Client, open a terminal (or log in over SSH) and run the command below. When asked what this device does, type <code>2</code> (<em>Client only</em>). When asked how it shows the slideshow, press Enter to take the suggestion: <code>3</code> (<em>headless</em>) on a device without a desktop, such as an Orange Pi Zero 2W. After your answers, it brings the device's software fully up to date before installing, which can take a while.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Enter the server URL when prompted</strong>
-            <p>You will be asked: <em>"Noticeboard server URL"</em> — enter it in the format <code>http://192.168.1.42:3000</code> (use the IP from step 1). Then answer the sudo question (see the note above).</p>
+            <p>You will be asked: <em>"Noticeboard server URL"</em> — enter it in the format <code>http://192.168.1.42:3000</code> (use the IP from step 1). On a Raspberry Pi, answer the sudo question next (see the note above).</p>
           </div>
         </div>
         <div class="step">
@@ -907,6 +908,14 @@
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
+      <h3>Option C — A Server only (no screen of its own)</h3>
+      <p>For a Server kept out of sight, such as a small computer in a cupboard or a virtual machine: when asked what this device does, type <code>3</code> (<em>Server only</em>). It installs the noticeboard and its automatic updates, with no browser or kiosk. Open the admin panel from any browser on your network, and show the slideshow with Clients.</p>
+
+      <h3 id="headless" style="scroll-margin-top:80px">A Client without a desktop (headless)</h3>
+      <p>A headless Client shows the slideshow full screen straight on its screen as soon as it starts up, with no desktop behind it (the installer sets up <em>cage</em> for this). Everything else works the same, including the waiting page with its MAC address. There's no exit button in the viewer's corner, as there's no desktop to go to. To stop the slideshow on its screen, and start it again:</p>
+      <pre data-label="Terminal"><code>sudo systemctl stop noticeboard-kiosk
+sudo systemctl start noticeboard-kiosk</code></pre>
+
       <h3 id="static-ip" style="scroll-margin-top:80px">Give the Server a fixed address</h3>
       <p>Clients find the Server by its IP address, so that address must not change. Most home and office networks hand out addresses automatically and can give a device a different one after a restart. If you use Clients, fix the Server's address in one of two ways:</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
@@ -916,7 +925,9 @@
       <p>If the Server's address does change, run the installer again on each Client and give it the new address.</p>
 
       <h3>Running the installer again</h3>
-      <p>You can run the installer again at any time — for example to point a Client at a different Server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub, from the branch the Server follows (<em>main</em> unless you've switched), so what it sets up matches the version it installs. It never touches your slideshows, slides or settings.</p>
+      <p><strong>Trying out a development branch?</strong> Install it on each device, the Server and every Client, with the branch's name in both places of the command, for example: <code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/feature/releases-installer/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=feature/releases-installer bash</code>. A Server installed this way follows that branch, and its Clients follow their Server. A Server already running can switch branch in Settings → Software updates instead; the command the admin panel then shows for the installer names the branch the same way.</p>
+
+      <p>You can run the installer again at any time — for example to point a Client at a different Server, or to answer the sudo question differently. It offers your answers from last time (it keeps them in <code>/etc/noticeboard/install.env</code>), so pressing Enter keeps them. It won't change what a device does (Client + Server, Client only, Server only): to do that, remove the Noticeboard from the device first. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub, from the branch the Server follows (<em>main</em> unless you've switched), so what it sets up matches the version it installs. It never touches your slideshows, slides or settings.</p>
       <p>On a Server that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it. If you go back to <em>main</em>, it hands over to <em>main</em>'s installer, which carries on with your answers.</p>
 
       <h3 id="firewall" style="scroll-margin-top:80px">Firewall (optional)</h3>
@@ -1620,14 +1631,14 @@
       <p>Press <code>Ctrl+C</code> to stop following the log.</p>
 
       <h3 id="updates" style="scroll-margin-top:80px">Automatic updates</h3>
-      <p>The Server keeps itself up to date with Noticeboard on GitHub, following one <em>branch</em> of it: <em>main</em>, the stable version, unless you choose another (see <a href="#branches" style="color:var(--blue)">Switching branch</a>). Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it when the <a href="#update-schedule" style="color:var(--blue)">update schedule</a> says so (straight away, unless you choose otherwise): it rebuilds the app and restarts the Server. The screens go dark for a few seconds, then every screen — the Server's and the Clients' — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way a Server or Client starts its slideshow full screen (the kiosk) is set up by the installer, so a change to that needs the installer run again.</p>
+      <p>The Server keeps itself up to date with Noticeboard on GitHub, following one <em>branch</em> of it: <em>main</em>, the stable version, unless you choose another (see <a href="#branches" style="color:var(--blue)">Switching branch</a>). On <em>main</em>, a new version is a new <em>Release</em>: the project publishes one when a version is finished and tested (such as Version 0.8.0), and the Server installs only published Releases, never work in progress, and never goes back to an older one by itself. On any other branch, every change is a new version. Every 15 minutes it checks for a new version; if there isn't one, nothing happens. If there is, it installs it when the <a href="#update-schedule" style="color:var(--blue)">update schedule</a> says so (straight away, unless you choose otherwise): it rebuilds the app and restarts the Server. The screens go dark for a few seconds, then every screen — the Server's and the Clients' — reloads itself and shows the new version. Nobody needs to touch the screens. Automatic updates cover the Noticeboard app itself; the way a Server or Client starts its slideshow full screen (the kiosk) is set up by the installer, so a change to that needs the installer run again.</p>
 
       <div class="callout tip">
         <div class="callout-icon">ℹ</div>
         <div class="callout-body"><strong>Updates are careful.</strong> An update waits while an upload is being processed. If a new version fails to install or doesn't start, the Server puts the previous version back, keeps running it, and skips that version until a newer one is published. Updates never change or delete your slideshows, slides or settings. The updater runs as the Server's normal user, so it never needs <code>sudo</code>.</div>
       </div>
 
-      <p><strong>Last updated</strong>, above <strong>Log out</strong> in the admin panel's sidebar, shows when the noticeboard was last updated: when it installed the version it runs, the same time as <strong>Last update</strong> in the Software updates card. It changes only when an update is installed, not every time you open the page. Hover over it to see the version and when that version was made (on a copy that hasn't been updated by the updater or the installer, it shows that date instead). Click it to open the project on GitHub.</p>
+      <p><strong>Last updated</strong>, above <strong>Log out</strong> in the admin panel's sidebar, shows when the noticeboard was last updated: when it installed the version it runs, the same time as <strong>Last update</strong> in the Software updates card. It changes only when an update is installed, not every time you open the page. On <em>main</em> it also shows the version, such as <strong>Version 0.8.0</strong>. Hover over it to see the version and when that version was made (on a copy that hasn't been updated by the updater or the installer, it shows that date instead). Click it to open the project on GitHub.</p>
 
       <h3 id="update-schedule" style="scroll-margin-top:80px">When updates are installed</h3>
       <p>In <strong>Settings → Software updates</strong>, <strong>Update schedule</strong> chooses when a new version is installed. Times are the noticeboard's own clock.</p>
@@ -1646,7 +1657,7 @@
       <table>
         <thead><tr><th>Line</th><th>What it tells you</th></tr></thead>
         <tbody>
-          <tr><td><strong>Running</strong></td><td>The branch and version (a short code such as <code>5b6d51f</code>) the noticeboard is running now.</td></tr>
+          <tr><td><strong>Running</strong></td><td>What the noticeboard is running now: on <em>main</em>, the Release's version (such as <strong>Version 0.8.0</strong>); on another branch, the branch. Either way with a short code such as <code>5b6d51f</code> for the exact version.</td></tr>
           <tr><td><strong>Updates</strong></td><td>How often it checks and installs (the update schedule), and when it last checked and what it found: up to date, a new version waiting, waiting for an upload, GitHub unreachable, and so on.</td></tr>
           <tr><td><strong>Last update</strong></td><td>The result of the last update or branch switch: <span class="pill green">Done</span>, <span class="pill amber">Rolled back</span>, <span class="pill amber">Cancelled</span> or <span class="pill red">Failed</span>, with what happened in plain words.</td></tr>
         </tbody>
@@ -1654,8 +1665,12 @@
 
       <h3 id="installer-needed" style="scroll-margin-top:80px">When the installer needs running again</h3>
       <p>Updates change the Noticeboard app, but not what only the installer sets up on the Server and the Clients: the kiosk that shows the slideshow full screen, the system services, the desktop shortcuts and system packages. When a new version (or a branch you switch to) changes one of those, an amber box at the top of every admin page says <strong>Run the installer again on the Server</strong>. It lists what running it brings and shows the command to run, with a <strong>Copy</strong> button. The command is for the branch the Server follows. Until the installer has been run, every screen also shows a small red warning triangle in its bottom-right corner (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</p>
-      <p>Run it in a terminal on the Server, or over SSH. It keeps your answers (press Enter), slideshows and settings, and offers to restart at the end. The box goes away once the installer has run; there's nothing to close. Until then the noticeboard works as before, just without what the box lists. If the box says so, run the installer on each Client too.</p>
+      <p>Run it in a terminal on the Server, or over SSH. It keeps your answers (press Enter), slideshows and settings, and offers to restart at the end. The box goes away once the installer has run; there's nothing to close. Until then the noticeboard works as before, just without what the box lists. If the box says so, run the installer once on each Client too, choosing <em>Client only</em> and the same Server address: Clients set up before version 0.9.0 don't follow their Server yet. After that run, a Client follows its Server's version by itself (see <a href="#client-updates" style="color:var(--blue)">Clients' updates</a>), and the box says there's nothing to do on the Clients.</p>
       <p>Before you switch branch, the check tells you if that branch will need the installer run again (see <a href="#branches" style="color:var(--blue)">Switching branch</a>).</p>
+      <p><strong>On <em>main</em>, once the installer has been run by hand one more time, it runs by itself.</strong> On a Server set up before version 0.9.0, the box says when its run is that last one. When a new Release needs something only the installer sets up, the Server runs that Release's installer itself (as its administrator, downloaded straight from GitHub, and only for <em>main</em>'s latest Release), then installs the Release as usual. You don't need to do anything, and the box only appears if that didn't work: it says why, and the Server keeps running the version it had until the next Release. On a branch other than <em>main</em>, the installer is always run by hand, as above.</p>
+
+      <h3 id="full-update" style="scroll-margin-top:80px">Full update</h3>
+      <p>On <em>main</em>, <strong>Settings → Software updates → Full update…</strong> runs the installer of <em>main</em>'s latest Release on the Server (the system packages it needs, its services and the Server's own screen, with the answers given when it was installed), then installs that Release again. Use it if something the installer set up needs repairing. It asks for the admin password and a final confirmation, like switching branch. Your slideshows, audio and settings are kept. On the Server itself, <code>sudo noticeboard update --full</code> does the same.</p>
 
       <h3 id="branches" style="scroll-margin-top:80px">Switching branch</h3>
       <p>Besides <em>main</em>, the project on GitHub can have other branches holding work in progress, such as a new feature being tried out. You can switch this noticeboard to one of them from the admin panel. Updates then come from that branch until you switch back. Nothing changes until you've checked the branch and confirmed twice.</p>
@@ -1693,7 +1708,7 @@
 
       <div class="callout tip">
         <div class="callout-icon">⤴</div>
-        <div class="callout-body"><strong>When the branch is merged into main, the noticeboard goes back to main by itself.</strong> A branch is usually temporary: once its features are finished, they're merged into <em>main</em>. When all of the branch's work is part of <em>main</em>, the next update check (within 15 minutes) switches the noticeboard back to <em>main</em>, so it gets <em>main</em>'s updates again. This happens whether the branch was merged, squashed or rebased, and also if it was deleted after being merged. A branch deleted <em>without</em> being merged is left alone, because its features aren't in <em>main</em>. When the noticeboard has gone back, a notice at the top of every admin page says so. It stays until someone closes it with ✕, which closes it on every page. If going back fails, it's undone like any other switch, and tried again once <em>main</em> has a new version.</div>
+        <div class="callout-body"><strong>When the branch's work is in a Release of main, the noticeboard goes back to main by itself.</strong> A branch is usually temporary: once its features are finished, they're merged into <em>main</em> and published in a Release. When all of the branch's work is part of <em>main</em>'s latest Release, the next update check (within 15 minutes) switches the noticeboard back to <em>main</em>, so it gets <em>main</em>'s Releases again. Merged into <em>main</em> but not published yet isn't enough. This happens whether the branch was merged, squashed or rebased, and also if it was deleted after being merged. A branch deleted <em>without</em> being merged is left alone, because its features aren't in <em>main</em>. If that Release needs the installer run again (see <a href="#installer-needed" style="color:var(--blue)">Run the installer again</a>), the noticeboard stays on the branch, and every admin page shows the command to run: when the installer asks which branch to follow, choose <em>main</em>. When the noticeboard has gone back, a notice at the top of every admin page says so. It stays until someone closes it with ✕, which closes it on every page. If going back fails, it's undone like any other switch, and tried again once <em>main</em> has a new Release.</div>
       </div>
 
       <h3 id="branch-software" style="scroll-margin-top:80px">Software a branch needs</h3>
@@ -1727,12 +1742,29 @@
         <thead><tr><th>To…</th><th>Run this on the Server</th></tr></thead>
         <tbody>
           <tr><td>See what the updater did</td><td><code>sudo journalctl -u noticeboard-update</code> (or look at Settings → Software updates)</td></tr>
+          <tr><td>See what's running, and how updates went</td><td><code>noticeboard status</code></td></tr>
+          <tr><td>Update now, whatever the schedule says</td><td><code>sudo noticeboard update</code></td></tr>
+          <tr><td>Run a full update (on <em>main</em>: the installer, then the Release again)</td><td><code>sudo noticeboard update --full</code> (or Settings → Software updates → Full update…)</td></tr>
+          <tr><td>See what the installer did when it ran by itself</td><td><code>sudo journalctl -u noticeboard-system</code></td></tr>
           <tr><td>Check for an update now</td><td><code>bash /opt/noticeboard/installers/update.sh</code></td></tr>
           <tr><td>Retry a version that was skipped</td><td><code>bash /opt/noticeboard/installers/update.sh --force</code></td></tr>
           <tr><td>Switch branch</td><td>Use Settings → Software updates in the admin panel</td></tr>
           <tr><td>Go back to <em>main</em> from the Server itself</td><td>Run the installer and choose <em>Go back to main</em></td></tr>
           <tr><td>Turn automatic updates off</td><td><code>sudo systemctl disable --now noticeboard-update.timer</code></td></tr>
           <tr><td>Turn them back on</td><td><code>sudo systemctl enable --now noticeboard-update.timer</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="client-updates" style="scroll-margin-top:80px">Clients' updates</h3>
+      <p>A <em>Client only</em> keeps its own files in step with its Server: every 15 minutes it asks the Server which version it runs and, when the Client's files changed, downloads them, checks they carry the Server's signature, installs them and starts the slideshow again. A Server update that doesn't change the Client's files leaves the screen alone. If the slideshow doesn't come back within 3 minutes, the Client puts its previous files back and waits for the Server's next version. When the installer sets up a Client, it shows the Server's key fingerprint and asks you to trust it, as SSH does the first time you connect to a computer.</p>
+      <table>
+        <thead><tr><th>To…</th><th>Run this on the Client</th></tr></thead>
+        <tbody>
+          <tr><td>See the Client's version, its Server and the trusted key</td><td><code>noticeboard-client status</code></td></tr>
+          <tr><td>Check the Server for new Client files now</td><td><code>sudo noticeboard-client check</code></td></tr>
+          <tr><td>Trust the Server's key again (after rebuilding the Server)</td><td><code>sudo noticeboard-client trust-server</code></td></tr>
+          <tr><td>Reinstall the Client from <em>main</em>'s latest Release on GitHub (if it stopped working)</td><td><code>sudo noticeboard-client reinstall-stable</code></td></tr>
+          <tr><td>See what the Client's updates did</td><td><code>sudo journalctl -u noticeboard-client-update</code></td></tr>
         </tbody>
       </table>
 
@@ -1849,7 +1881,7 @@
       <table>
         <thead><tr><th>It says</th><th>What it means</th></tr></thead>
         <tbody>
-          <tr><td><span class="pill amber">Cancelled</span></td><td>The switch never started, so nothing changed: the branch couldn't be downloaded (is the Server online?), was unusable, or its latest version had already failed once. Try again later, or choose another branch.</td></tr>
+          <tr><td><span class="pill amber">Cancelled</span></td><td>The switch never started, so nothing changed: the branch couldn't be downloaded (is the Server online?), was unusable, its latest version had already failed once, or (switching to <em>main</em>) no Release of <em>main</em> has been published yet. Try again later, or choose another branch.</td></tr>
           <tr><td><span class="pill amber">Rolled back</span></td><td>The new branch failed to install (it didn't build, or its downloads failed) or didn't start, so the previous branch and version were put back. Nothing else changed. Try again later, or choose another branch.</td></tr>
           <tr><td><span class="pill red">Failed</span></td><td>Putting the previous version back failed too. Run the installer on the Server, as the message says (see <a href="#branches" style="color:var(--amber)">Switching branch</a>).</td></tr>
           <tr><td><span class="pill blue">Waiting to start</span> for a while</td><td>Another update, an upload or the installer is running. The switch starts at the next check, within 15 minutes.</td></tr>

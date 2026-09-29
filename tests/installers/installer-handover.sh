@@ -4,24 +4,29 @@
 # to main's with the answers when "go back to main" is chosen, and records its version.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO/tests/helpers/installer.sh"
-T=$(mktemp -d); export T
+T=$(mktemp -d); export T MOCK="$T/mock"; mkdir -p "$MOCK"
+source "$REPO/tests/helpers/github.sh"   # the Releases API: $MOCK/release is the latest Release's tag
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "PASS  $1"; }
 bad() { fail=$((fail+1)); echo "FAIL  $1"; [ -n "${2:-}" ] && sed 's/^/        /' "$2"; }
 MAIN_SHA=1111111111111111111111111111111111111111
 QA_SHA=2222222222222222222222222222222222222222
+REL_SHA=4444444444444444444444444444444444444444   # the commit of the Release v0.8.0
 
 # Stand-in GitHub: $QA is ok | old (no INSTALLER_VERSION) | fail | gone
 fake_curl() {
   curl() {
     echo "curl $*" >> "$T/curl.log"
     case "$*" in
+      */releases/latest*) fake_latest_release "$@"; return $? ;;
       *api.github.com*/commits/main*) printf '%s' "$MAIN_SHA" ;;
+      *api.github.com*/commits/v0.8.0*) printf '%s' "$REL_SHA" ;;
       *api.github.com*/commits/QALife-updates*) [ "$QA" = fail ] || [ "$QA" = gone ] && return 22; printf '%s' "$QA_SHA" ;;
       *raw.githubusercontent.com*)
         local out="" url=""; while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; url="$1"; shift; done
         case "$url" in
           *"$MAIN_SHA"*) printf '#!/usr/bin/env bash\necho "MAIN INSTALLER sha=$NOTICEBOARD_INSTALLER_SHA from=$NOTICEBOARD_INSTALLER_BRANCH mode=${NOTICEBOARD_MODE:-} branch=${NOTICEBOARD_INSTALL_BRANCH:-} args=$*"\n' > "$out" ;;
+          *"$REL_SHA"*) printf '#!/usr/bin/env bash\nINSTALLER_VERSION=4\necho "RELEASE INSTALLER sha=$NOTICEBOARD_INSTALLER_SHA from=$NOTICEBOARD_INSTALLER_BRANCH release=${NOTICEBOARD_INSTALLER_RELEASE:-} mode=${NOTICEBOARD_MODE:-} branch=${NOTICEBOARD_INSTALL_BRANCH:-} args=$*"\n' > "$out" ;;
           *"$QA_SHA"*)
             if [ "$QA" = old ]; then printf '#!/usr/bin/env bash\necho "OLD QA INSTALLER"\n' > "$out"
             else printf '#!/usr/bin/env bash\nINSTALLER_VERSION=2\necho "QA INSTALLER sha=$NOTICEBOARD_INSTALLER_SHA from=$NOTICEBOARD_INSTALLER_BRANCH args=$*"\n' > "$out"; fi ;;
@@ -49,6 +54,17 @@ QA=ok latest QALife-updates
 grep -q "Running the latest installer from QALife-updates (2222222)" "$T/out" && grep -q "QA INSTALLER sha=$QA_SHA from=QALife-updates args=--arg" "$T/out" \
   && ok "following a branch: that branch's latest installer, pinned to its commit" || bad "qa" "$T/out"
 grep -q "raw.githubusercontent.com/fructus-sum/noticeboard/$QA_SHA/installers/install.sh" "$T/curl.log" && ok "download pinned to the branch's commit" || bad "pin" "$T/curl.log"
+NOTICEBOARD_INSTALL_BRANCH=QALife-updates QA=ok latest ""
+grep -q "QA INSTALLER sha=$QA_SHA from=QALife-updates" "$T/out" \
+  && ok "a branch asked for (NOTICEBOARD_INSTALL_BRANCH) on a device following none: that branch's installer (§18.7)" || bad "asked-for branch" "$T/out"
+NOTICEBOARD_INSTALL_BRANCH=QALife-updates QA=ok latest main
+grep -q "QA INSTALLER sha=$QA_SHA" "$T/out" && ok "  … before the branch the Server follows" || bad "asked-for over followed" "$T/out"
+NOTICEBOARD_INSTALL_BRANCH='bad;rm' latest ""
+grep -q "MAIN INSTALLER" "$T/out" && ! grep -q "commits/bad" "$T/curl.log" && ok "  … an invalid one ignored, never used in a URL" || bad "asked-for invalid" "$T/out"
+( load_installer; set_role client; export NOTICEBOARD_INSTALL_BRANCH=QALife-updates; choose_branch; echo "INSTALL_BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "^INSTALL_BRANCH=QALife-updates$" "$T/out" && ok "  … a Client only takes it too (so its installer doesn't hand back to main's)" || bad "client branch" "$T/out"
+( load_installer; set_role client; unset NOTICEBOARD_INSTALL_BRANCH; choose_branch; echo "INSTALL_BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "^INSTALL_BRANCH=main$" "$T/out" && ! grep -q "follows the branch" "$T/out" && ok "  … and without it, a Client only is asked nothing and installs main's" || bad "client no branch" "$T/out"
 QA=old latest QALife-updates
 grep -q "The installer from QALife-updates can't be used (it's too old), so this uses main's." "$T/out" && grep -q "MAIN INSTALLER" "$T/out" && ! grep -q "OLD QA" "$T/out" \
   && ok "a branch whose installer is older than this: main's, and says why" || bad "old" "$T/out"
@@ -78,8 +94,33 @@ grep -q "MAIN INSTALLER sha=$MAIN_SHA from=main mode=server branch=main args=--a
   && ok "branch installer, 'go back to main' chosen: hands over to main's, with the answers" || bad "handover" "$T/out"
 handover QALife-updates QALife-updates
 grep -q "CONTINUED WITH THIS COPY mode=unset" "$T/out" && [ ! -f "$T/curl.log" ] && ok "kept the branch: carries on, no downloads" || bad "keep" "$T/out"
+rm -f "$MOCK/release"
 handover main main
-grep -q CONTINUED "$T/out" && [ ! -f "$T/curl.log" ] && ok "main's installer installing main: carries on" || bad "main-main" "$T/out"
+grep -q CONTINUED "$T/out" && grep -q "releases/latest" "$T/curl.log" && ! grep -q "raw.githubusercontent" "$T/curl.log" \
+  && ok "main's installer installing main, no Release published yet: carries on" || bad "main-main" "$T/out"
+echo v0.8.0 > "$MOCK/release"
+handover main main
+grep -q "Running the installer of Release v0.8.0 (4444444)" "$T/out" \
+  && grep -q "RELEASE INSTALLER sha=$REL_SHA from=v0.8.0 release=v0.8.0 mode=server branch=main args=--arg" "$T/out" \
+  && ok "main's installer installing main: hands over to the latest Release's installer, with the answers" || bad "main-release" "$T/out"
+handover QALife-updates main
+grep -q "RELEASE INSTALLER sha=$REL_SHA from=v0.8.0 release=v0.8.0 mode=server branch=main" "$T/out" \
+  && ok "branch installer, 'go back to main' chosen: the Release's installer" || bad "qa-release" "$T/out"
+( load_installer; fake_curl
+  export NOTICEBOARD_INSTALLER_BRANCH=v0.8.0 NOTICEBOARD_INSTALLER_SHA=$REL_SHA NOTICEBOARD_INSTALLER_RELEASE=v0.8.0; MODE=server; INSTALL_BRANCH=main
+  rm -f "$T/curl.log"; use_branch_installer; echo CONTINUED ) > "$T/out" 2>&1
+grep -q CONTINUED "$T/out" && [ ! -f "$T/curl.log" ] && ok "the Release's installer: carries on, never hands over again" || bad "release-release" "$T/out"
+( load_installer; fake_curl
+  export NOTICEBOARD_INSTALLER_BRANCH=main NOTICEBOARD_INSTALLER_SHA=$MAIN_SHA; MODE=display; INSTALL_BRANCH=main
+  use_branch_installer --x; echo CONTINUED ) > "$T/out" 2>&1
+grep -q "RELEASE INSTALLER .*mode=display branch=main" "$T/out" && ok "a Client: the Release's installer too" || bad "client-release" "$T/out"
+touch "$MOCK/github-down"
+handover main main
+grep -q CONTINUED "$T/out" && ! grep -q "RELEASE INSTALLER" "$T/out" && ok "the Releases API unreachable: main's installer carries on" || bad "api-down" "$T/out"
+echo prerelease > "$MOCK/release-kind"; rm -f "$MOCK/github-down"
+handover main main
+grep -q CONTINUED "$T/out" && ! grep -q "RELEASE INSTALLER" "$T/out" && ok "an answer marked prerelease counts as none" || bad "prerelease" "$T/out"
+rm -f "$MOCK/release" "$MOCK/release-kind"
 handover QALife-updates main local
 grep -q CONTINUED "$T/out" && [ ! -f "$T/curl.log" ] && ok "a local copy (NOTICEBOARD_INSTALLER_SHA=local) never hands over" || bad "local" "$T/out"
 ( load_installer; curl() { return 22; }
@@ -96,12 +137,12 @@ grep -q "QA INSTALLER" "$T/out" && ok "main's installer (branch installer was to
 # The answers carried over are used, not asked again
 ( load_installer; ask() { echo ASKED; REPLY=1; }
   NOTICEBOARD_MODE=server NOTICEBOARD_INSTALL_BRANCH=main; BRANCH_FILE="$T/b.env"; echo NOTICEBOARD_BRANCH=QALife-updates > "$T/b.env"
-  choose_mode; choose_branch; echo "MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
-grep -q "MODE=server BRANCH=main" "$T/out" && ! grep -q ASKED "$T/out" && ! grep -q "Is this device the Server or a Client" "$T/out" \
+  choose_role; choose_branch; echo "ROLE=$ROLE MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "ROLE=both MODE=server BRANCH=main" "$T/out" && ! grep -q ASKED "$T/out" && ! grep -q "What should this device do" "$T/out" \
   && ok "handed-over answers: mode and branch not asked again" || bad "answers" "$T/out"
 ( load_installer; ask() { echo ASKED; REPLY=2; }
-  unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH; INSTALL_DIR="$T/nothing"; KIOSK_SCRIPT="$T/nothing"; BRANCH_FILE="$T/b.env"
-  choose_mode; choose_branch; echo "MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
-grep -q "ASKED" "$T/out" && grep -q "MODE=display" "$T/out" && ok "without them: asked as before" || bad "asked" "$T/out"
+  unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH; INSTALL_DIR="$T/nothing"; OLD_CLIENT_KIOSK="$T/nothing"; BRANCH_FILE="$T/b.env"
+  choose_role; choose_branch; echo "ROLE=$ROLE MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "ASKED" "$T/out" && grep -q "ROLE=client MODE=display" "$T/out" && ok "without them: asked as before" || bad "asked" "$T/out"
 
 rm -rf "$T"; echo "passed=$pass failed=$fail"; [ $fail -eq 0 ]

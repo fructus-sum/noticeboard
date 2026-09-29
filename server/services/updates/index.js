@@ -7,44 +7,54 @@
 //   Errors meant for the admin carry `expose` and a status (routes answer them with jsonRoute).
 //
 // Provides
-//   getInfo()              → what the Software updates card shows (or { available: false, reason })
-//   versionInfo()          → { commit, date, installedAt, branch } for "Last updated", or null
+//   getInfo()              → what the Software updates card shows (or { available: false, reason }),
+//                            with the Release running on main (release, version)
+//   versionInfo()          → { commit, date, installedAt, branch, version } for the sidebar's
+//                            version and "Last updated" (version: the Release on main), or null
 //   getNotice(), dismissNotice(by)   the home page notice (e.g. "merged into main")
 //   installerStatus()      → whether the running version needs the installer run again
 //   listBranches()         → the branches on GitHub, main first
-//   checkBranch(name)      → the checks update.sh makes before installing a branch, plus its
-//                            latest commit, the software it needs and its installer needs.
-//                            Downloads the branch, so the switch itself is quicker
+//   checkBranch(name)      → the checks update.sh makes before installing a branch, plus what a
+//                            switch installs (a branch's latest commit; main's latest Release,
+//                            with older: true when that's older than what runs), the software it
+//                            needs and its installer needs. Downloads it, so the switch itself is
+//                            quicker
 //   requestSwitch(name, by, { acceptMissing })  saves the switch and starts update.sh
 //   setSchedule(body, by)  → info: saves the update schedule, then asks update.sh to check
 //                            (it works out the next install time)
 //   setInstallAt(value, by) → info: a set time for the waiting update, then a check
 //   installNow(by)         → info: installs the latest version of the followed branch now
-//   waitingUpdate(info)    → the version waiting to be installed ({ commit, subject, date,
-//                            nextInstall }), or null
+//   fullUpdate(by)         → info: a Full update (main only, with the system step set up): root's
+//                            system step for main's latest Release, then its code again
+//                            (SYSTEM_DESIGN §18.7 phase 2)
+//   waitingUpdate(info)    → the version waiting to be installed ({ commit, release, subject,
+//                            date, nextInstall }), or null
 //   updaterReady()         → info, or throws (409) when this noticeboard can't update itself
-//   manualUpdateWaiting()  → whether the screens show the warning mark for it: manual
-//                            updates, and a version waiting (SYSTEM_DESIGN §14 D41)
+//   updateWaiting()        → whether the screens show the warning mark for it: a newer version
+//                            waiting, on any schedule (SYSTEM_DESIGN §14 D41, §18.7 phase 2)
 //   validBranchName                              (from branchName.js)
 //   issueToken(branch), takeToken(token, branch) the password check's one-time token for a
 //                            switch (services/actionTokens, action 'switch')
 //
 // Used by
-//   routes/api/settings/updates.js, services/displaySettings.js (manualUpdateWaiting),
+//   routes/api/settings/updates.js, routes/api/settings/maintenance.js (fullUpdate),
+//   services/displaySettings.js (updateWaiting),
 //   services/contentReset.js (updaterReady, getInfo)
 //
 // Uses
-//   ./git, ./branchName, ./updateFiles, ./installerVersion, ./schedule, services/actionTokens,
+//   ./git, ./branchName, ./updateFiles, ./installerVersion, ./releases, ./schedule, services/actionTokens,
 //   utils/systemCheck, utils/logger
 //
 // Change impact
 //   checkBranch must refuse what update.sh refuses (files in data/, tmp/, logs/ or .env; an
-//   update.sh without branch switching), or the admin would be told a switch works that the
+//   update.sh without branch switching), and check what update.sh would install (for main, the
+//   latest Release: SYSTEM_DESIGN §18.6), or the admin would be told a switch works that the
 //   updater then cancels.
 const { git } = require('./git');
 const { validBranchName } = require('./branchName');
 const files = require('./updateFiles');
 const installer = require('./installerVersion');
+const releases = require('./releases');
 const scheduleRules = require('./schedule');
 const tokens = require('../actionTokens');
 const { checkRequirements } = require('../../utils/systemCheck');
@@ -80,21 +90,27 @@ async function getInfo() {
       reason: "This copy of the noticeboard wasn't installed from GitHub by the installer, so it can't update itself.",
     };
   }
-  const [configured, status, lastCheck, units, pending, schedule] = await Promise.all([
+  const [configured, status, lastCheck, units, pending, schedule, release, lastSystemStep] = await Promise.all([
     files.readBranchSetting(),
     files.readStatus(),
     files.readCheck(),
     files.unitsEnabled(),
     files.requestPending(),
     files.readSchedule(),
+    branch === 'main' ? releases.releaseAt(commit) : null,
+    files.readSystemResult(),
   ]);
   return {
     available: true,
     branch: branch || null,        // null: not on a branch (someone checked out a commit)
     commit,
+    release,                       // on main: the Release running (its tag), or null
+    version: release ? releases.versionName(release) : null,
     configuredBranch: configured,
     autoUpdates: units.timer,      // checked every 15 minutes
     instant: units.path,           // a switch starts within seconds (else at the next check)
+    systemStep: units.system,      // root's system step is set up (installer version 6): Full update
+    lastSystemStep,                // its last answer ({ commit, release, result, message, time }), or null
     pending,
     busy: inProgress(status),
     status,                        // the last update or switch (update.sh)
@@ -109,19 +125,19 @@ function waitingUpdate({ commit, lastCheck }) {
   if (lastCheck?.result !== 'available' || !lastCheck.available || lastCheck.available === commit) return null;
   return {
     commit: lastCheck.available,
+    release: lastCheck.availableRelease || null,   // on main: the Release waiting
     subject: lastCheck.availableSubject || '',
     date: lastCheck.availableDate || null,
     nextInstall: lastCheck.nextInstall || null,
   };
 }
 
-async function manualUpdateWaiting() {
-  const [schedule, lastCheck, commit] = await Promise.all([
-    files.readSchedule(),
+async function updateWaiting() {
+  const [lastCheck, commit] = await Promise.all([
     files.readCheck(),
     git(['rev-parse', 'HEAD']).catch(() => null),
   ]);
-  return schedule.every === 'manual' && !!waitingUpdate({ commit, lastCheck });
+  return !!waitingUpdate({ commit, lastCheck });
 }
 
 // The updater must be set up for any of these to happen
@@ -172,6 +188,33 @@ async function installNow(by) {
   return getInfo();
 }
 
+// A Full update: root's system step for main's latest Release (its installer, --apply), then its
+// code again. main only (a branch's installer is run by hand: the owner, 2026-09-29), and only
+// once the system step is set up (installer version 6).
+async function fullUpdate(by) {
+  const info = await updaterReady();
+  if (info.branch !== 'main' || info.configuredBranch !== 'main') {
+    throw userError(409, `A full update only runs by itself for main's Releases, and this noticeboard follows ${info.configuredBranch}. Run the installer on the Server by hand instead.`);
+  }
+  if (!info.systemStep) {
+    throw userError(409, "The installer's system step isn't set up on this noticeboard yet. Run the installer on the Server once by hand; after that, Full update works from here.");
+  }
+  if (info.busy) throw userError(409, 'An update is already in progress. Wait for it to finish.');
+  const when = info.instant ? 'It starts within a few seconds.' : 'It starts at the next update check, within 15 minutes.';
+  await files.saveInstallNow({
+    state: 'requested',
+    branch: 'main',
+    previousBranch: info.branch,
+    commit: info.commit,
+    previousCommit: info.commit,
+    target: '',
+    message: `Full update requested: the installer's system step, then main's latest Release installed again. ${when}`,
+    time: new Date().toISOString(),
+  }, 'full');
+  logger.warn('Full update requested', { by });
+  return getInfo();
+}
+
 // When the installed version was made (date), and when this noticeboard installed it
 // (installedAt: the last update's time, if that update installed the version running now)
 async function versionInfo() {
@@ -181,7 +224,8 @@ async function versionInfo() {
     const status = await files.readStatus();
     const installedAt = status?.state === 'updated' && status.commit === commit && !Number.isNaN(Date.parse(status.time))
       ? status.time : null;
-    return { commit, date, installedAt, branch: branch || null };
+    const release = branch === 'main' ? await releases.releaseAt(commit) : null;
+    return { commit, date, installedAt, branch: branch || null, version: release ? releases.versionName(release) : null };
   } catch {
     return null;
   }
@@ -214,6 +258,41 @@ async function checkBranch(name) {
   if (!validBranchName(name)) {
     throw userError(400, "That isn't a valid branch name. Branch names use letters, numbers, and . _ / -");
   }
+  const { commit, release } = name === 'main' ? await mainTarget() : await branchTip(name);
+  if (await git(['ls-tree', '-r', '--name-only', commit, '--', 'data', 'tmp', 'logs', '.env'])) {
+    throw userError(422, `"${name}" can't be used: it contains files in data/, tmp/, logs/ or .env, which would overwrite this noticeboard's content or settings.`);
+  }
+  const updater = await git(['show', `${commit}:installers/update.sh`]).catch(() => '');
+  if (!updater.includes(SUPPORT_MARKER)) {
+    throw userError(422, `"${name}" can't be used: it's older than branch switching, so this noticeboard couldn't be switched back from the admin panel.`);
+  }
+  const [subject = '', date = ''] = (await git(['log', '-1', '--format=%s%x00%cI', commit])).split('\0');
+  // A switch to main installs its latest Release even when it's older than what runs
+  const older = !!release && commit !== await git(['rev-parse', 'HEAD'])
+    && await git(['merge-base', '--is-ancestor', commit, 'HEAD']).then(() => true, () => false);
+  return {
+    branch: name, commit, subject, date,
+    release, version: release ? releases.versionName(release) : null, older,
+    ...(await requirementsOf(commit)),
+  };
+}
+
+// What a switch to main installs: its latest Release (update.sh installs the same)
+async function mainTarget() {
+  let latest;
+  try {
+    latest = await releases.latestRelease();
+  } catch {
+    throw userError(502, "Couldn't ask GitHub for main's latest Release. Check this noticeboard's internet connection and try again.");
+  }
+  if (!latest) {
+    throw userError(409, "main has no published Release yet, so there's nothing to switch to: a noticeboard on main installs main's Releases.");
+  }
+  return { commit: latest.commit, release: latest.tag };
+}
+
+// What a switch to another branch installs: its latest commit, downloaded
+async function branchTip(name) {
   let found;
   try {
     found = await git(['ls-remote', '--heads', 'origin', `refs/heads/${name}`], 20000);
@@ -226,16 +305,7 @@ async function checkBranch(name) {
   } catch {
     throw userError(502, `Couldn't download "${name}" from GitHub to check it. Try again.`);
   }
-  const commit = await git(['rev-parse', `refs/remotes/origin/${name}`]);
-  if (await git(['ls-tree', '-r', '--name-only', commit, '--', 'data', 'tmp', 'logs', '.env'])) {
-    throw userError(422, `"${name}" can't be used: it contains files in data/, tmp/, logs/ or .env, which would overwrite this noticeboard's content or settings.`);
-  }
-  const updater = await git(['show', `${commit}:installers/update.sh`]).catch(() => '');
-  if (!updater.includes(SUPPORT_MARKER)) {
-    throw userError(422, `"${name}" can't be used: it's older than branch switching, so this noticeboard couldn't be switched back from the admin panel.`);
-  }
-  const [subject = '', date = ''] = (await git(['log', '-1', '--format=%s%x00%cI', commit])).split('\0');
-  return { branch: name, commit, subject, date, ...(await requirementsOf(commit)) };
+  return { commit: await git(['rev-parse', `refs/remotes/origin/${name}`]), release: null };
 }
 
 // The branch's system-requirements.json checked against this noticeboard (requirements:
@@ -304,8 +374,9 @@ module.exports = {
   setSchedule,
   setInstallAt,
   installNow,
+  fullUpdate,
   waitingUpdate,
-  manualUpdateWaiting,
+  updateWaiting,
   updaterReady,
   validBranchName,
   issueToken: (branch) => tokens.issue('switch', branch),

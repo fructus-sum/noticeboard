@@ -7,7 +7,7 @@
 #   SUDO_STATUS           one line for the summary, or empty when not checked
 #
 # Used by
-#   install.sh main(); the summaries in server.sh and display.sh print SUDO_STATUS
+#   install.sh main() (on a Raspberry Pi only); the summaries in server.sh and client.sh print SUDO_STATUS
 #
 # Uses
 #   ui.sh (ask, ask_yes_no); DESKTOP_USER, SUDOERS_BACKUP_DIR (install.sh); visudo, runuser

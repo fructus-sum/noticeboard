@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
-# The files the installer writes onto a Pi (systemd units, both kiosk scripts, the autostart entry,
-# the Help shortcut), generated for fixed answers and compared with tests/fixtures/installer-golden/,
-# which was recorded from the baseline installer. Restructuring the installer must not change
+# The files the installer writes onto a device (systemd units, the Client's launcher, autostart entry
+# and headless kiosk service, the Help shortcuts, the system step's units, a Client only's update
+# units), generated for fixed answers and compared with
+# tests/fixtures/installer-golden/, recorded again on purpose with installer versions 5 (the Client)
+# 6 (the system step) and 7 (a Client only's updates, SYSTEM_DESIGN §18.7). The Client's and root's own files are installed as
+# they are in installers/client/ and installers/root/. Restructuring the installer must not change
 # them (SYSTEM_DESIGN §8, §14 D30). NB_UPDATE_SNAPSHOT=1 records them again (only for a deliberate,
 # reviewed change, together with INSTALLER_VERSION).
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -23,16 +26,16 @@ pass=0; fail=0
   UPDATE_PATH_FILE="$OUT/noticeboard-update.path"
   write_service
   write_update_units
-  AUTOSTART_FILE="$OUT/autostart-server.desktop"; write_autostart /opt/noticeboard/start-kiosk.sh
-  AUTOSTART_FILE="$OUT/autostart-display.desktop"; write_autostart /usr/local/bin/noticeboard-kiosk.sh
+  SYSTEM_SERVICE_FILE="$OUT/noticeboard-system.service"; SYSTEM_PATH_FILE="$OUT/noticeboard-system.path"; SYSTEM_STEP=/usr/local/sbin/noticeboard-system
+  write_system_units
+  AUTOSTART_FILE="$OUT/autostart.desktop"; write_autostart "/usr/local/bin/noticeboard-client kiosk"
+  CLIENT_DIR=/opt/noticeboard-client; CLIENT_LAUNCHER="$OUT/noticeboard-client"; write_client_launcher
+  CLIENT_LAUNCHER=/usr/local/bin/noticeboard-client; KIOSK_SERVICE_FILE="$OUT/noticeboard-kiosk.service"; write_kiosk_service
+  CLIENT_UPDATE_SERVICE_FILE="$OUT/noticeboard-client-update.service"; CLIENT_UPDATE_TIMER_FILE="$OUT/noticeboard-client-update.timer"; write_client_update_units
   write_help_shortcut "file:///opt/noticeboard/noticeboard-guide.html" >/dev/null
   cp "$T/home/pi/Desktop/noticeboard-help.desktop" "$OUT/help-server.desktop"
   write_help_shortcut "http://192.168.1.10:3000/admin/help" >/dev/null
   cp "$T/home/pi/Desktop/noticeboard-help.desktop" "$OUT/help-display.desktop"
-  INSTALL_DIR="$T/opt"; write_server_kiosk; cp "$T/opt/start-kiosk.sh" "$OUT/start-kiosk.sh"
-  KIOSK_SCRIPT="$OUT/noticeboard-kiosk.sh"; SERVER_URL="http://192.168.1.10:3000"
-  MACS_HTML="<tr><td class='iface'>eth0</td><td class='mac'>dc:a6:32:01:02:03</td></tr>"
-  write_display_kiosk
 ) || { echo "FAIL  couldn't generate the files"; exit 1; }
 
 if [ ! -d "$GOLDEN" ] || [ "${NB_UPDATE_SNAPSHOT:-}" = 1 ]; then

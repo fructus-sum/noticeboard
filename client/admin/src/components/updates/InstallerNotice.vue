@@ -4,7 +4,13 @@
 // Updates can't change what only the installer sets up (kiosk scripts, system services, desktop
 // shortcuts), so when this version needs a newer installer run than the Server had, the Slideshows
 // page says so, with the command to copy. It stays until the installer has been run: there's
-// nothing to close.
+// nothing to close. It also shows while a Release of main with the followed branch's work waits for
+// the installer before the Server returns to main (status.returning, SYSTEM_DESIGN §18.6). On main
+// with root's system step set up, the installer runs by itself, so it shows only when that failed
+// (status.systemFailed, §18.7 phase 2). A Server from before that is told this run is the last one
+// by hand (status.lastByHand), and Clients from before installer 7 need one run each as Client
+// only; after that they follow the Server by themselves (status.displays, status.clientsFollow,
+// §18.7 phase 4).
 //
 // Used by: App.vue (every page but the login page)
 // Uses: useApi (GET /settings/updates/installer), installerCommand from @shared
@@ -15,7 +21,8 @@ import { api } from '../../composables/useApi.js';
 const status = ref(null);
 const copied = ref(false);
 
-const command = computed(() => installerCommand(status.value?.branch));
+// On main, the Release running (or waiting for it) has the installer that matches it
+const command = computed(() => installerCommand(status.value?.ref || status.value?.branch));
 
 onMounted(async () => {
   try {
@@ -39,7 +46,19 @@ async function copy() {
 <template>
   <div v-if="status?.needed" class="installer page-warning" role="alert">
     <strong>Run the installer again on the Server</strong>
-    <p>
+    <p v-if="status.systemFailed">
+      <template v-if="status.systemFailed.release">Release {{ status.systemFailed.release }}</template><template v-else>A new Release</template>
+      needs something that only the installer sets up. The installer runs by itself for that, but this time it didn't
+      work: {{ status.systemFailed.message }} The noticeboard keeps running the version it had. The update is tried
+      again with the next Release, or run the installer yourself now.
+    </p>
+    <p v-else-if="status.returning">
+      The work of <strong>{{ status.returning.branch }}</strong>, the branch this noticeboard follows, is now in
+      Release {{ status.returning.release }} of main. That Release needs something that only the installer sets up,
+      so this noticeboard goes back to main once the installer has been run. When the installer asks which branch
+      to follow, choose main. What it brings:
+    </p>
+    <p v-else>
       This version of the noticeboard needs something that only the installer sets up, and updates can't do that
       by themselves. Until it's run, what's listed here stays as it was:
     </p>
@@ -54,7 +73,15 @@ async function copy() {
       <code>{{ command }}</code>
       <button type="button" class="btn-ghost" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
     </div>
-    <p v-if="status.displays">Run it on each Client as well (choose "Client" there).</p>
+    <p v-if="status.lastByHand">
+      This is the last time on the Server: once it has run, the noticeboard runs the installer by itself whenever a
+      new Release needs it.
+    </p>
+    <p v-if="status.displays">
+      Run it once on each Client as well, choosing <em>Client only</em> and this Server's address. After that, each
+      Client follows this Server's version by itself.
+    </p>
+    <p v-else-if="status.clientsFollow">The Clients follow this Server by themselves: nothing to do on them.</p>
     <p class="installer__more">
       This goes away once the installer has run.
       <a href="/admin/help#installer-needed" target="_blank" rel="noopener">More in Help ↗</a>

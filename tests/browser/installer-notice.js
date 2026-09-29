@@ -1,5 +1,7 @@
 // "Run the installer again on the Server": the home page box, from the installer's record (or the
-// kiosk script an older installer left), and the warning when checking a branch that needs it.
+// kiosk script an older installer left), and the warning when checking a branch that needs it; a
+// Server from before 0.9.0 told its run is the last by hand, and whether its Clients need one too or
+// follow it by themselves (SYSTEM_DESIGN §18.7 phase 4).
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const { copyChanges } = require('../helpers/app.js');
@@ -65,7 +67,7 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
 
 (async () => {
   setup();
-  const server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD }, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, NODE_PATH: MODULES, NOTICEBOARD_SYSTEMD_DIR: SYSTEMD, NOTICEBOARD_API_RATE_LIMIT: '1000' }, stdio: 'ignore' });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + '/api/auth/status')).ok) break; } catch { /* not yet */ } await sleep(250); }
   check('logged out: the installer status needs a login', (await fetch(BASE + '/api/settings/updates/installer')).status === 401);
 
@@ -140,7 +142,7 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
   git(APP, 'fetch', '-q', 'origin', 'needs-installer'); git(APP, 'checkout', '-q', '-B', 'needs-installer', 'origin/needs-installer');
   follow('needs-installer');
   text = await home();
-  check('after switching: the box on the home page, with that branch\'s installer command', /Run the installer again/.test(text) && text.includes('/noticeboard/needs-installer/installers/install.sh') && text.includes('A desktop shortcut'), text.slice(0, 60));
+  check('after switching: the box on the home page, with that branch\'s installer command', /Run the installer again/.test(text) && text.includes('/noticeboard/needs-installer/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=needs-installer bash') && text.includes('A desktop shortcut'), text.slice(0, 60));
   check('only the Server this time (no Client change missed)', !/each Client/.test(text));
   record(3);
   check('once the installer has run (record 3): the box is gone', (await home()) === '');
@@ -152,6 +154,26 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
   const fits = await c.evaluate(`(() => { const r = document.querySelector('.installer').getBoundingClientRect(); const code = document.querySelector('.installer code').getBoundingClientRect(); return document.documentElement.scrollWidth <= innerWidth && code.right <= r.right + 1; })()`);
   check('phone: the box and its command fit the screen', fits);
   await c.screenshot(path.join(require('os').tmpdir(), 'noticeboard-test-installer-notice-phone.png'));
+
+  // A Server from before 0.9.0 on main (SYSTEM_DESIGN §18.7 phase 4): its last run by hand, and one
+  // run on each Client as Client only; from installer 7 on, the Clients follow by themselves
+  await c.send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
+  git(APP, 'checkout', '-q', 'main'); follow(null);
+  fs.writeFileSync(path.join(APP, 'system-requirements.json'), requirements(8, [
+    { version: 5, change: 'One installer for every device', displays: true },
+    { version: 6, change: 'The installer runs by itself on main' },
+    { version: 7, change: 'Clients follow their Server', displays: true },
+    { version: 8, change: 'A newer Client', displays: true },
+  ]));
+  record(4);
+  text = await home();
+  check('a Server from before 0.9.0 on main: this run by hand is the last', /last time on the Server/.test(text),
+    text ? text.replace(/\n/g, ' ').slice(0, 120) : await c.evaluate(`fetch('/api/settings/updates/installer').then((r) => r.text())`));
+  check('  … and one run on each Client, as Client only', /once on each Client[\s\S]*Client only/.test(text) && !/nothing to do on them/.test(text));
+  record(7); follow('needs-installer');
+  text = await home();
+  check('Clients that follow (record 7), on a branch: nothing to do on them, and no "last time"', /Run the installer again/.test(text) && /nothing to do on them/.test(text)
+    && !/each Client/.test(text) && !/last time/.test(text), text.replace(/\n/g, ' ').slice(0, 120));
 
   c.close();
   server.kill();

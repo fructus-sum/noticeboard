@@ -1,14 +1,14 @@
 // How the admin panel looks, as the browser computes it: the login page, the slideshow list (a
 // published, an unpublished, a hidden and the sample slideshow), the Settings page and the MAC
-// filtering pop-up, on a desktop and on a phone. Recorded in tests/fixtures/admin-look.json
+// filtering pop-up, on a desktop and on a phone. Recorded in tests/fixtures/admin-look.json (Linux: tests/fixtures/linux/)
 // from the code before the global styles moved into styles/base.css and the repeated pieces into
 // shared components; it must look exactly the same (NB_UPDATE_SNAPSHOT=1 records it again, only for a deliberate change).
 const fs = require('fs');
 const path = require('path');
 const { connect } = require('../helpers/cdp.js');
-const { makeApp, server, page, check, done, sleep } = require('../helpers/app.js');
+const { makeApp, server, page, check, done, sleep, lookFixture } = require('../helpers/app.js');
 
-const SNAPSHOT = path.join(__dirname, '..', 'fixtures', 'admin-look.json');
+const SNAPSHOT = lookFixture('admin-look.json');   // per system: fonts, and so sizes, differ
 const PROPS = ['display', 'position', 'width', 'height', 'margin', 'padding', 'border', 'border-radius', 'outline',
   'background-color', 'color', 'opacity', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing',
   'text-transform', 'text-decoration-line', 'cursor', 'gap', 'flex-wrap', 'justify-content', 'align-items',
@@ -94,9 +94,10 @@ async function capture(c, map, prefix) {
   await s.stop();
 
   if (!fs.existsSync(SNAPSHOT) || process.env.NB_UPDATE_SNAPSHOT === '1') {
+    fs.mkdirSync(path.dirname(SNAPSHOT), { recursive: true });
     fs.writeFileSync(SNAPSHOT, `${JSON.stringify(look, null, 2)}\n`);
     const missing = Object.keys(look).filter((k) => !look[k]);
-    check(`recorded the look of ${Object.keys(look).length} admin elements in tests/fixtures/admin-look.json`, missing.length === 0, missing.join(', '));
+    check(`recorded the look of ${Object.keys(look).length} admin elements in ${path.relative(path.join(__dirname, '..', '..'), SNAPSHOT)}`, missing.length === 0, missing.join(', '));
   } else {
     const want = JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8'));
     let same = 0;

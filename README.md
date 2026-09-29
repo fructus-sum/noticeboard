@@ -6,7 +6,7 @@ It would work well anywhere that needs centrally managed information or media ac
 
 > **Note:** Support for multiple Display Groups is currently under construction. At present, the system supports one Display Group only.
 
-**Server** means the device running the Noticeboard server; **Client** means a device showing the Noticeboard viewer on its screen. A Raspberry Pi can be either, depending on how it is installed, and a Server also shows the slideshow on its own screen.
+**Server** means the device running the Noticeboard server; **Client** means a device showing the Noticeboard viewer on its screen. The installer sets a device up as a **Client + Server** (it runs the Noticeboard and shows the slideshow on its own screen), a **Client only**, or a **Server only** (no screen of its own).
 
 ### Supported devices
 
@@ -15,7 +15,8 @@ It would work well anywhere that needs centrally managed information or media ac
 | Raspberry Pi 3 | yes | yes | H.264 only, 1080p only | Supported (choose H.264 in Settings) |
 | Raspberry Pi 4 | yes | yes | H.264 and H.265 | Supported |
 | Raspberry Pi 5 | yes | yes | H.264 and H.265 | Supported |
-| Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | Planned: needs a headless Client installer |
+| Orange Pi Zero 2W | no | yes, headless | H.264 and H.265 | The installer can set it up as a headless Client (0.9.0); not yet checked on the device |
+| A PC or virtual machine with Debian | yes | yes, with a desktop or headless | depends on the hardware | The installer can set it up (0.9.0); not yet checked on real hardware |
 
 New videos are converted to H.265 (HEVC) by default; H.264 is the fallback for older hardware such as the Raspberry Pi 3 (Settings → Display).
 
@@ -78,7 +79,7 @@ If these devices are on the same local network, the Server can identify the Clie
 
 ## Installation
 
-One installer sets up a Server or a Client. It runs on a Raspberry Pi with Raspberry Pi OS with the desktop (the current release, Trixie, or Bookworm; see [Supported devices](#supported-devices)). Run it on the device, from a terminal:
+One installer sets up every device, as a Client + Server, a Client only or a Server only. It runs on Raspberry Pi OS (the current release, Trixie, or Bookworm) or Debian, with a desktop or headless (see [Supported devices](#supported-devices)). Run it on the device, from a terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash
@@ -92,46 +93,53 @@ sudo bash installers/install.sh
 
 It asks:
 
-1. **What this device is:** a *Server* or a *Client* (see below).
-2. **The Server's address** (Clients only), e.g. `http://192.168.1.10:3000`. The pin in the top-left corner of the Server's screen shows it.
-3. **Whether to keep the branch** (only on a Server that follows a branch other than `main`): keep it, or go back to `main`.
-4. **Whether `sudo` should ask for a password.** Raspberry Pi OS lets the desktop user run `sudo` without one. If you answer yes, the installer backs up the rule in `/etc/sudoers.d`, turns it off, and has you type your password once to prove it works before keeping the change. If the password doesn't work, the rule goes straight back, so you can't be locked out.
-5. **Firewall (optional):** at the end it offers to check or set up a firewall, and changes nothing unless you say yes. See the user guide for details.
+1. **What this device does:** *Client + Server*, *Client only* or *Server only* (see below).
+2. **Whether to keep the branch** (only on a Server that follows a branch other than `main`): keep it, or go back to `main`.
+3. **How it shows the slideshow** (with a Client): a *Raspberry Pi with Raspberry Pi OS and its desktop*, *Debian with a desktop*, or *minimal/headless* (no desktop: the slideshow goes full screen straight on the screen, with [cage](https://github.com/cage-kiosk/cage)). The installer suggests the right one.
+4. **The Server's address** (Client only), e.g. `http://192.168.1.10:3000`. The pin in the top-left corner of the Server's screen shows it.
+5. **Whether `sudo` should ask for a password** (Raspberry Pi only). Raspberry Pi OS lets the desktop user run `sudo` without one. If you answer yes, the installer backs up the rule in `/etc/sudoers.d`, turns it off, and has you type your password once to prove it works before keeping the change. If the password doesn't work, the rule goes straight back, so you can't be locked out.
+6. **Firewall (optional):** at the end it offers to check or set up a firewall, and changes nothing unless you say yes. See the user guide for details.
 
-Running it again is safe: it offers your previous answers, so Enter keeps them, and it never touches your slideshows, slides or settings. It always runs its newest version: whichever copy you start, it first downloads the installer from the latest commit of the branch the Server follows on GitHub (`main`, unless it has been switched to another branch) and runs that. When it's done, it offers to reboot (Enter = yes). To run a local copy exactly as it is, e.g. to test changes to it: `sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh`.
+Running it again is safe: it offers your previous answers (saved in `/etc/noticeboard/install.env`), so Enter keeps them, and it never touches your slideshows, slides or settings. It won't change a device from one role to another: to do that, remove the Noticeboard from it first. It always runs its newest version: whichever copy you start, it first downloads the installer from the latest commit of the branch the Server follows on GitHub (`main`, unless it has been switched to another branch) and runs that; on `main`, once you've answered, it hands over to the installer of `main`'s latest Release, and installs that Release. When it's done, a device with a Client is offered a reboot (Enter = yes). To run a local copy exactly as it is, e.g. to test changes to it: `sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh`.
 
-### Server (stores the content, runs the admin panel, and shows the slideshow on its own screen)
+**Trying out a development branch** (work in progress, not for everyday use): install it on each device, Server and Clients alike, with the branch's name in both places, e.g. for `feature/releases-installer`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/feature/releases-installer/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=feature/releases-installer bash
+```
+
+A Server set up this way follows that branch; its Clients follow their Server. A Server already running can instead switch branch in **Settings → Software updates**, then run the command the admin panel shows.
+
+### The Server (Client + Server, Server only: stores the content and runs the admin panel)
 
 - Updates the device's software first (`apt-get update`, then a full upgrade), which can take a while if it hasn't been updated recently
-- Installs Node.js 20, FFmpeg, and Chromium
-- Clones the repo to `/opt/noticeboard` (or updates it, on the branch it follows) and builds the web apps
+- Installs Node.js 20 and FFmpeg
+- Clones the repo to `/opt/noticeboard` (or updates it, on the branch it follows: on `main`, its latest Release) and builds the web apps
 - Creates a `noticeboard` systemd service (starts on boot, restarts on crash) and sets up automatic updates
-- Starts the viewer full screen (kiosk mode) at login once the server answers, in a browser profile of its own, and opens it again if it closes or crashes
-- Puts a **Noticeboard Help** shortcut on the desktop
+
+### The Client (Client + Server, Client only: shows the slideshow on the device's screen)
+
+- Updates the device's software first, the same way, and installs Chromium (and cage, when headless)
+- Installs the Client in `/opt/noticeboard-client`, run by `noticeboard-client kiosk`: at login with a desktop, or from start-up when headless
+- Shows the viewer full screen (kiosk mode), in a browser profile of its own, and opens it again if it closes or crashes. Until its Server answers, it shows a waiting page with the device's MAC address and the reason it's waiting (Server unreachable, or not yet approved by MAC filtering), and switches to the slideshow by itself as soon as it can
+- With a desktop, puts a **Noticeboard Help** shortcut on it; the viewer's exit button leaves the kiosk for an ordinary browser window. Headless, the kiosk stops with `sudo systemctl stop noticeboard-kiosk`
+- A Client only follows its Server's version by itself: every 15 minutes it asks the Server which Client files it runs, and installs them when they change, but only if they carry the Server's signature (the installer shows the Server's key fingerprint and asks you to trust it). If the slideshow doesn't come back after such an update, the Client puts its previous files back. `sudo noticeboard-client reinstall-stable` reinstalls the Client from `main`'s latest Release on GitHub; `noticeboard-client status` shows its version and Server
 
 After the installer's reboot, the slideshow appears automatically.
 
-### Client (shows the slideshow from a Server)
-
-- Updates the device's software first, the same way, and installs Chromium
-- Starts the viewer full screen at login. Until the Server answers, it shows a waiting page with this Client's MAC address and the reason it's waiting (Server unreachable, or not yet approved by MAC filtering), and switches to the slideshow by itself as soon as it can
-- Puts a **Noticeboard Help** shortcut on the desktop
-
-After the installer's reboot, the kiosk starts automatically.
-
 **Using Clients? Give the Server a fixed IP address** (a reservation in your router, or a static address on the Server itself), since the Clients find it by its address. The user guide explains both.
 
-**Installed before?** Run the installer again once on each Server and Client (over SSH is fine) to get the latest kiosk set-up. After that, the Server keeps itself up to date.
+**Installed before 0.9.0?** Run the installer again once on each Server and each Client (over SSH is fine; on a Client, choose *Client only* and the same Server address). It keeps your answers and content. After that, a Server on `main` runs the installer by itself when a Release needs it, and each Client follows its Server's version by itself.
 
 ## Updates
 
-The Server checks GitHub every 15 minutes and installs new versions by itself, on the schedule you choose in **Settings → Software updates** (straight away, every 2 hours, daily, weekly, or only when you say); every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Server to another branch (with checks, the admin password and a final confirmation); a Server whose branch is merged into `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. Before a switch, the Server checks its software against the branch's list of what it needs (`system-requirements.json`) and warns about anything missing, with an extra confirmation to switch anyway. When a version needs something only the installer sets up (such as the kiosk), the admin panel's Slideshows page says to run the installer again and shows the command. The user guide has the details and the commands.
+The Server checks GitHub every 15 minutes and installs new versions by itself: on `main`, each published [Release](https://github.com/fructus-sum/noticeboard/releases) (never work in progress, and never an older version by itself); on another branch, each new commit. It installs them on the schedule you choose in **Settings → Software updates** (straight away, every 2 hours, daily, weekly, or only when you say); every screen then reloads onto the new version. A version that fails to build or start is rolled back automatically. **Settings → Software updates** shows what's running and how updates went, and can switch the Server to another branch (with checks, the admin password and a final confirmation); a Server whose branch's work is in a Release of `main` goes back to `main` by itself. Your slideshows, slides and settings are never changed by an update. Before a switch, the Server checks its software against the branch's list of what it needs (`system-requirements.json`) and warns about anything missing, with an extra confirmation to switch anyway. When a version needs something only the installer sets up (such as the kiosk), a Server on `main` runs that Release's installer by itself (once the installer has been run by hand one more time), and **Full update** in Software updates does the same on request; on another branch, the admin panel says to run the installer again and shows the command. On the Server, `sudo noticeboard update [--full]` and `noticeboard status` do the same from the command line. The user guide has the details and the commands.
 
 ## Status
 
 - **Current:** everything listed above is implemented and described in the user guide.
 - **Tested:** the slide timing (`npm test`, including a simulated 30 days), the viewer in a real browser under outages, freezes, crashes and updates, the admin panel end to end, and the installer, kiosk scripts and updater against stand-ins for systemd, apt and the browser. The installer is in use on Raspberry Pi OS Trixie (labwc desktop).
-- **Limitations:** only the Server updates itself (Clients load new versions from it); kiosk scripts and system settings only change when the installer runs; a screen can't wake a monitor that is switched off (screen blanking is set in the operating system).
+- **Limitations:** a Client only's own files follow its Server (installer version 7 or later, and a Server running 0.9.0 or later); on a development branch, what only the installer sets up on the Server changes when the installer is run by hand; a screen can't wake a monitor that is switched off (screen blanking is set in the operating system).
 
 ## Development
 
@@ -155,6 +163,8 @@ The other test groups each run a throwaway copy of the app, never this folder's 
 - **`test:upgrade`:** an installed baseline takes the current code through its own `update.sh`, and nothing may change.
 
 Video tests need ffmpeg: on the `PATH`, or set `FFMPEG_PATH` and `FFPROBE_PATH`. The installer tests need bash (Git Bash on Windows).
+
+Every push runs the whole suite on GitHub Actions (Linux, Node.js 20: `.github/workflows/tests.yml`). To run it locally without holding up work, `node tests/snapshot.js` tests the last commit in a separate worktree, so this folder can change meanwhile (`node tests/snapshot.js <commit> <group> [filter]` for part of it).
 
 There is one version of the software: run on a PC, it works exactly as on a Server. After changing the viewer or the admin panel, run `npm run build` again; after changing the server, restart it. Changes are tried out on a GitHub branch, which a Server can follow (Settings → Software updates).
 

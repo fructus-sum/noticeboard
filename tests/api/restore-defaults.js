@@ -1,7 +1,7 @@
 // Restore Defaults on the server side (SYSTEM_DESIGN §14 D42): the password gives a token for that
 // action; the request leaves the marker, the status and a "restore-defaults" request for update.sh;
-// at the next start-up (update.sh restarts the server) everything in data/ but the branch setting
-// and the installer's record is gone, the logs are emptied, the waiting files deleted, and the
+// at the next start-up (update.sh restarts the server) everything in data/ but the branch setting,
+// the installer's record and the Client signing key is gone, the logs are emptied, the waiting files deleted, and the
 // server starts as a new install: default settings and password (and port: it comes back on 3000,
 // which must be free), a new session secret (the old login no longer works), the sample slideshow
 // as new.
@@ -40,6 +40,8 @@ const sharp = require(path.join(MODULES, 'sharp'));
   fs.writeFileSync(at('data', 'backups', '20260901-from-x', 'config.json'), '{}');
   fs.writeFileSync(at('data', 'installer.json'), '{"version":2,"branch":"main","commit":"x","time":"2026-09-01T10:00:00Z"}');
   fs.writeFileSync(at('data', 'update-branch.env'), 'NOTICEBOARD_BRANCH=main\n');
+  // The key every Client only has pinned (SYSTEM_DESIGN §18.7 phase 3): losing it would strand them
+  fs.writeFileSync(at('data', 'client-signing.key'), 'KEY\n', { mode: 0o600 });
   fs.mkdirSync(at('tmp', 'noticeboard-uploads'), { recursive: true });
   fs.writeFileSync(at('tmp', 'noticeboard-uploads', 'upload-1-a.png'), 'x');
   fs.writeFileSync(at('tmp', 'update-failed-commit'), 'abc');
@@ -69,9 +71,10 @@ const sharp = require(path.join(MODULES, 'sharp'));
   env.base = 'http://localhost:3000';
   await s.start({ NOTICEBOARD_SYSTEMD_DIR: units });
   const dataLeft = fs.readdirSync(at('data')).sort().join(' ');
-  check('data/ holds only the kept files and a new install\'s', dataLeft === 'config.json config.last-good.json installer.json slideshows update-branch.env', dataLeft);
+  check('data/ holds only the kept files and a new install\'s', dataLeft === 'client-signing.key config.json config.last-good.json installer.json slideshows update-branch.env', dataLeft);
   check('  … the kept files unchanged', fs.readFileSync(at('data', 'update-branch.env'), 'utf8') === 'NOTICEBOARD_BRANCH=main\n'
-    && JSON.parse(fs.readFileSync(at('data', 'installer.json'), 'utf8')).version === 2);
+    && JSON.parse(fs.readFileSync(at('data', 'installer.json'), 'utf8')).version === 2
+    && fs.readFileSync(at('data', 'client-signing.key'), 'utf8') === 'KEY\n');
   check('tmp/ keeps only the updater\'s lock', fs.readdirSync(at('tmp')).join(' ') === 'update.lock', fs.readdirSync(at('tmp')).join(' '));
   check('the old logs are gone, the current one emptied and carrying on', !fs.existsSync(at('logs', 'app1.log'))
     && fs.readFileSync(at('logs', 'app.log'), 'utf8').includes('Restore Defaults'));

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The Noticeboard Client's command, written by the installer: the Client's files are in
+# /opt/noticeboard-client/current (noticeboard-client kiosk | version)
+exec "/opt/noticeboard-client/current/noticeboard-client" "$@"

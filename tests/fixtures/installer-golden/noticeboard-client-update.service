@@ -1,0 +1,9 @@
+[Unit]
+Description=Noticeboard Client: install the Client files its Server runs, when they change
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/noticeboard-client check
+TimeoutStartSec=20min
