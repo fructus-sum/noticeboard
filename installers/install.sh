@@ -153,9 +153,7 @@ run_installer() {
     echo "ERROR: User '$DESKTOP_USER' not found. Run this with sudo from the user the Noticeboard runs as."
     exit 1
   fi
-  if has_server; then
-    choose_branch
-  fi
+  choose_branch
   if has_client; then
     choose_platform
   fi
@@ -181,7 +179,7 @@ run_installer() {
   fi
   save_answers
   if [ "$ROLE" = client ]; then
-    pin_server_key
+    follow_server
   fi
   if has_server; then
     write_installer_record   # last: a run that stopped part way doesn't count
@@ -208,12 +206,19 @@ run_installer() {
 # to main's. A link pinned to a commit is never stale. If GitHub can't be reached, carry
 # on with this copy. To run a local copy as it is (e.g. to test changes):
 #   sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh
+# To install a development branch on any device (a new one, or a Client, which follows no branch
+# of its own; SYSTEM_DESIGN §18.7):
+#   curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/<branch>/installers/install.sh #     | sudo NOTICEBOARD_INSTALL_BRANCH=<branch> bash
 use_latest_installer() {
   if [ -n "${NOTICEBOARD_INSTALLER_SHA:-}" ]; then
     return 0
   fi
   local branch
-  branch=$(followed_branch)
+  if [[ "${NOTICEBOARD_INSTALL_BRANCH:-}" =~ ^[A-Za-z0-9._/-]{1,100}$ ]]; then
+    branch=$NOTICEBOARD_INSTALL_BRANCH
+  else
+    branch=$(followed_branch)
+  fi
   if [ "$branch" != main ]; then
     run_installer_from "$branch" "$@" \
       || echo "The installer from $branch can't be used ($INSTALLER_PROBLEM), so this uses main's."
@@ -389,7 +394,7 @@ load_modules_from() {   # load_modules_from <folder>
             ask_server_url is_raspberry_pi check_sudo_password install_server write_installer_record \
             summary_server install_client remove_old_kiosks save_answers summary_client check_firewall offer_reboot \
             install_server_packages install_server_services role_name set_role has_server has_client \
-            pin_server_key write_root_libs; do
+            follow_server write_root_libs; do
     declare -F "$fn" >/dev/null || return 1
   done
 }

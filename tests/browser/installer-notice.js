@@ -142,7 +142,7 @@ const follow = (b) => (b ? fs.writeFileSync(path.join(APP, 'data/update-branch.e
   git(APP, 'fetch', '-q', 'origin', 'needs-installer'); git(APP, 'checkout', '-q', '-B', 'needs-installer', 'origin/needs-installer');
   follow('needs-installer');
   text = await home();
-  check('after switching: the box on the home page, with that branch\'s installer command', /Run the installer again/.test(text) && text.includes('/noticeboard/needs-installer/installers/install.sh') && text.includes('A desktop shortcut'), text.slice(0, 60));
+  check('after switching: the box on the home page, with that branch\'s installer command', /Run the installer again/.test(text) && text.includes('/noticeboard/needs-installer/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=needs-installer bash') && text.includes('A desktop shortcut'), text.slice(0, 60));
   check('only the Server this time (no Client change missed)', !/each Client/.test(text));
   record(3);
   check('once the installer has run (record 3): the box is gone', (await home()) === '');

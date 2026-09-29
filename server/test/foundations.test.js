@@ -91,6 +91,15 @@ test('the web apps make the same media URLs as the server, and use the same limi
   assert.deepEqual(shared.SOCKET_EVENTS, contract.socketEvents);
 });
 
+test('the installer command: main and a Release as they are, a development branch asked for by name (§18.7)', async () => {
+  const shared = await sharedModule();
+  const url = (ref) => `curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/${ref}/installers/install.sh`;
+  assert.equal(shared.installerCommand(), `${url('main')} | sudo bash`);
+  assert.equal(shared.installerCommand('v0.9.0'), `${url('v0.9.0')} | sudo bash`);
+  assert.equal(shared.installerCommand('feature/releases-installer'),
+    `${url('feature/releases-installer')} | sudo NOTICEBOARD_INSTALL_BRANCH=feature/releases-installer bash`);
+});
+
 test('media names: the rule the server stores names by (D38)', () => {
   const { MAX_LENGTH, cleanName, nameFromUpload } = require('../services/mediaNames');
   assert.equal(MAX_LENGTH, contract.limits.mediaNameMax);

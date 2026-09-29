@@ -54,6 +54,17 @@ QA=ok latest QALife-updates
 grep -q "Running the latest installer from QALife-updates (2222222)" "$T/out" && grep -q "QA INSTALLER sha=$QA_SHA from=QALife-updates args=--arg" "$T/out" \
   && ok "following a branch: that branch's latest installer, pinned to its commit" || bad "qa" "$T/out"
 grep -q "raw.githubusercontent.com/fructus-sum/noticeboard/$QA_SHA/installers/install.sh" "$T/curl.log" && ok "download pinned to the branch's commit" || bad "pin" "$T/curl.log"
+NOTICEBOARD_INSTALL_BRANCH=QALife-updates QA=ok latest ""
+grep -q "QA INSTALLER sha=$QA_SHA from=QALife-updates" "$T/out" \
+  && ok "a branch asked for (NOTICEBOARD_INSTALL_BRANCH) on a device following none: that branch's installer (§18.7)" || bad "asked-for branch" "$T/out"
+NOTICEBOARD_INSTALL_BRANCH=QALife-updates QA=ok latest main
+grep -q "QA INSTALLER sha=$QA_SHA" "$T/out" && ok "  … before the branch the Server follows" || bad "asked-for over followed" "$T/out"
+NOTICEBOARD_INSTALL_BRANCH='bad;rm' latest ""
+grep -q "MAIN INSTALLER" "$T/out" && ! grep -q "commits/bad" "$T/curl.log" && ok "  … an invalid one ignored, never used in a URL" || bad "asked-for invalid" "$T/out"
+( load_installer; set_role client; export NOTICEBOARD_INSTALL_BRANCH=QALife-updates; choose_branch; echo "INSTALL_BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "^INSTALL_BRANCH=QALife-updates$" "$T/out" && ok "  … a Client only takes it too (so its installer doesn't hand back to main's)" || bad "client branch" "$T/out"
+( load_installer; set_role client; unset NOTICEBOARD_INSTALL_BRANCH; choose_branch; echo "INSTALL_BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "^INSTALL_BRANCH=main$" "$T/out" && ! grep -q "follows the branch" "$T/out" && ok "  … and without it, a Client only is asked nothing and installs main's" || bad "client no branch" "$T/out"
 QA=old latest QALife-updates
 grep -q "The installer from QALife-updates can't be used (it's too old), so this uses main's." "$T/out" && grep -q "MAIN INSTALLER" "$T/out" && ! grep -q "OLD QA" "$T/out" \
   && ok "a branch whose installer is older than this: main's, and says why" || bad "old" "$T/out"

@@ -151,9 +151,13 @@ grep -q "apt-get install -y -qq chromium curl cage openssl" "$T/calls.log" && cm
 grep -q "won't update itself until it trusts its Server" "$T/client.out" && [ ! -e "$R/etc/noticeboard/server.pub" ]   && ok "Client only: its Server's key asked for; the Server out of reach, so nothing pinned and it says what to run" || { bad "pin"; tail -5 "$T/client.out"; }
 
 # ── Re-run on that Client: Enter keeps role, platform and URL ──
+# (its Server's key pinned meanwhile, so it takes the Client's files from the Server straight away)
+mkdir -p "$R/etc/noticeboard"; echo "KEY" > "$R/etc/noticeboard/server.pub"
 install rerun "$T/nothing-here" "" "" "" n n
 [ $RC -eq 0 ] && [ "$(saved ROLE)" = client ] && [ "$(saved PLATFORM)" = headless ] && [ "$(saved SERVER_URL)" = "http://10.0.0.5:3000" ] \
   && ! grep -qE "Please type|is required" "$T/rerun.out" && ok "Client re-run: Enter keeps role, platform and URL (the saved answers)" || { bad "client re-run"; tail -20 "$T/rerun.out"; }
+grep -q "Taking the Client's files from the Server" "$T/rerun.out" && grep -q "Couldn't reach the Server at http://10.0.0.5:3000" "$T/rerun.out" \
+  && ! grep -q "won't update itself" "$T/rerun.out" && ok "Client with its Server's key: takes the Client's files from the Server at once (it follows only its Server)" || { bad "first check"; tail -8 "$T/rerun.out"; }
 
 # ── A different role: refused before anything changes ──
 install other "$T/nothing-here" "1"

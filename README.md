@@ -102,6 +102,14 @@ It asks:
 
 Running it again is safe: it offers your previous answers (saved in `/etc/noticeboard/install.env`), so Enter keeps them, and it never touches your slideshows, slides or settings. It won't change a device from one role to another: to do that, remove the Noticeboard from it first. It always runs its newest version: whichever copy you start, it first downloads the installer from the latest commit of the branch the Server follows on GitHub (`main`, unless it has been switched to another branch) and runs that; on `main`, once you've answered, it hands over to the installer of `main`'s latest Release, and installs that Release. When it's done, a device with a Client is offered a reboot (Enter = yes). To run a local copy exactly as it is, e.g. to test changes to it: `sudo NOTICEBOARD_INSTALLER_SHA=local bash installers/install.sh`.
 
+**Trying out a development branch** (work in progress, not for everyday use): install it on each device, Server and Clients alike, with the branch's name in both places, e.g. for `feature/releases-installer`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/feature/releases-installer/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=feature/releases-installer bash
+```
+
+A Server set up this way follows that branch; its Clients follow their Server. A Server already running can instead switch branch in **Settings → Software updates**, then run the command the admin panel shows.
+
 ### The Server (Client + Server, Server only: stores the content and runs the admin panel)
 
 - Updates the device's software first (`apt-get update`, then a full upgrade), which can take a while if it hasn't been updated recently

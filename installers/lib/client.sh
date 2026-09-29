@@ -16,7 +16,8 @@
 #   write_client_launcher   /usr/local/bin/noticeboard-client (compared with tests/fixtures/installer-golden)
 #   write_kiosk_service     noticeboard-kiosk.service (compared with tests/fixtures/installer-golden)
 #   write_client_update_units  a Client only's noticeboard-client-update.{service,timer} (golden too)
-#   pin_server_key          a new Client only trusts its Server's key (noticeboard-client trust-server)
+#   follow_server           a Client only trusts its Server's key (noticeboard-client trust-server)
+#                           and takes the Client's files from it (noticeboard-client check)
 #   remove_old_kiosks       start-kiosk.sh and noticeboard-kiosk.sh of installers before 0.9.0
 #   summary_client
 #
@@ -129,18 +130,21 @@ WantedBy=timers.target
 TIMER
 }
 
-# A new Client only trusts its Server's key (shown as a fingerprint, pinned after a yes), so it can
-# check what it installs. Asked once, after the answers are saved; never with --apply.
-pin_server_key() {
-  if [ -s "$SERVER_KEY_FILE" ]; then
-    return 0
-  fi
+# A Client only follows only its Server (SYSTEM_DESIGN §18.7): a new one trusts its Server's key
+# (shown as a fingerprint, pinned after a yes), then takes the Client's files from the Server at
+# once (noticeboard-client check), so it runs its Server's files from the start and a failed update
+# later always has them to put back. After the answers are saved; never with --apply.
+follow_server() {
+  local client=(env NOTICEBOARD_CONFIG="$INSTALL_ENV_FILE" NOTICEBOARD_SERVER_KEY="$SERVER_KEY_FILE"
+                NOTICEBOARD_CLIENT_DIR="$CLIENT_DIR" "$CLIENT_LAUNCHER")
   echo ""
-  if ! NOTICEBOARD_CONFIG="$INSTALL_ENV_FILE" NOTICEBOARD_SERVER_KEY="$SERVER_KEY_FILE" NOTICEBOARD_CLIENT_DIR="$CLIENT_DIR" \
-       "$CLIENT_LAUNCHER" trust-server; then
+  if [ ! -s "$SERVER_KEY_FILE" ] && ! "${client[@]}" trust-server; then
     echo "  This Client won't update itself until it trusts its Server: once the Server runs 0.9.0 or"
     echo "  newer and can be reached, run: sudo noticeboard-client trust-server"
+    return 0
   fi
+  echo "▸ Taking the Client's files from the Server..."
+  "${client[@]}" check || echo "  Not this time: the next check (within 15 minutes) tries again."
 }
 
 # The Client's files as the installer has them (the same commit as the installer), and their version

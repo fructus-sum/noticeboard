@@ -17,9 +17,10 @@
 #   the same command. And a Client only following its Server (SYSTEM_DESIGN §18.7 phase 3): it asks
 #   the Server which Client files it runs, downloads them as a bundle signed with the key pinned at
 #   install, verifies it before root runs anything from it, runs that installer with --apply, and
-#   puts the previous files back (or main's latest Release) if the kiosk doesn't come back within
-#   3 minutes. A Client + Server's own screen doesn't follow this way: root there would run what
-#   the app's own user signed (the system step keeps it up to date instead, §18.7 phase 2).
+#   puts the files it had from the Server back if the kiosk doesn't come back within 3 minutes. It
+#   follows only its Server: it never goes to GitHub by itself (reinstall-stable is run by hand).
+#   A Client + Server's own screen doesn't follow this way: root there would run what the app's own
+#   user signed (the system step keeps it up to date instead, §18.7 phase 2).
 #
 # Uses
 #   kiosk.sh (the same folder); /etc/noticeboard/install.env (the role and the Server's address);
@@ -161,14 +162,14 @@ check() {
   exit 1
 }
 
-# After a failed update: the files installed before it, else main's latest Release
+# After a failed update: the files installed before it, from the Server. A Client follows only its
+# Server: it never goes to GitHub by itself (reinstall-stable is run by hand)
 put_back() {   # put_back <version> <hash>
   if [ -f "$CLIENT_DIR/installed.tar.gz" ] && apply_bundle "$CLIENT_DIR/installed.tar.gz"; then
     record "$1" "$2"
     log "Put back the Client's files of $1."
   else
-    log "No earlier Client files to put back: reinstalling main's latest Release."
-    reinstall_stable
+    log "No earlier Client files from the Server to put back, so the Client stays as it is. If the screen doesn't work, run: sudo noticeboard-client reinstall-stable"
   fi
 }
 

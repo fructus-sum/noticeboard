@@ -19,7 +19,7 @@
 #   choose_role                       → ROLE (both | client | server) and MODE (server | display)
 #   set_role <role>, has_server, has_client
 #   choose_platform                   → PLATFORM (pi | desktop | headless), for a role with a Client
-#   choose_branch                     → INSTALL_BRANCH (a Server)
+#   choose_branch                     → INSTALL_BRANCH (a Server's question; any role: NOTICEBOARD_INSTALL_BRANCH)
 #   offer_reboot                      the last step: reboots unless the answer is n
 #
 # Used by
@@ -156,11 +156,16 @@ choose_platform() {
 }
 
 # A Server follows main unless another branch was chosen in the admin panel
-# (Settings → Software updates). A re-run offers to keep that branch or go back to main.
+# (Settings → Software updates). A re-run offers to keep that branch or go back to main. A branch
+# asked for with NOTICEBOARD_INSTALL_BRANCH is taken as it is, whatever the role.
 choose_branch() {
-  # Already answered (use_branch_installer)
+  # Already answered (use_branch_installer), or asked for (NOTICEBOARD_INSTALL_BRANCH=<branch>): for
+  # every role, so a Client only's installer of that branch doesn't hand back to main's
   if valid_branch "${NOTICEBOARD_INSTALL_BRANCH:-}"; then
     INSTALL_BRANCH=$NOTICEBOARD_INSTALL_BRANCH
+    return
+  fi
+  if ! has_server; then
     return
   fi
   local current

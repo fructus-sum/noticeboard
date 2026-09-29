@@ -8,7 +8,7 @@
 #   the same version: nothing; only the version differs: recorded, nothing installed; a new or older
 #   version: verified, installed with --apply, kept for a rollback; a bad signature: refused; the
 #   kiosk not coming back: the previous files put back and the version skipped; an install failing;
-#   no earlier files: main's latest Release; no key pinned; a Client + Server; trust-server;
+#   no earlier files: left as it is, never GitHub by itself; no key pinned; a Client + Server; trust-server;
 #   reinstall-stable; status.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 T=$(mktemp -d); BIN="$T/bin"; export T MOCK="$T/mock"; mkdir -p "$BIN" "$MOCK"
@@ -136,8 +136,9 @@ rm -f "$MOCK/apply-fails" "$T/client/installed.tar.gz" "$T/client/previous.tar.g
 echo v1 > "$T/kiosk-up"; echo v0.9.0 > "$MOCK/release"; touch "$MOCK/kiosk-down"
 offer v2b "$(printf d%.0s {1..40})" "$(printf 4%.0s {1..64})" v2
 run check
-grep -q "STABLE --apply sha=v0.9.0 release=v0.9.0" <<<"$(applied)" && [ "$(version)" = "v0.9.0 (stable)" ] \
-  && ok "no earlier files to put back: main's latest Release from GitHub" || bad "no earlier" "$OUT"
+[ $RC -ne 0 ] && ! grep -q STABLE <<<"$(applied)" && grep -q "No earlier Client files from the Server" <<<"$OUT" \
+  && [ "$(cat "$T/client/skip")" = "$(printf d%.0s {1..40})" ] \
+  && ok "no earlier files to put back: left as it is and skipped, never GitHub by itself (it follows only its Server)" || bad "no earlier" "$OUT"
 rm -f "$MOCK/kiosk-down"
 
 # ── Out of reach, other roles, the other commands ──
