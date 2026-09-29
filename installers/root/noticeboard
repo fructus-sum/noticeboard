@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# installers/root/noticeboard — the Server's command (/usr/local/bin/noticeboard)
+#
+#   sudo noticeboard update          update now, whatever the update schedule says
+#   sudo noticeboard update --full   also run the installer's system step (on main: packages,
+#                                    services, the Client), then reinstall the code
+#   noticeboard status               the version, the branch, the last check and update, the
+#                                    installer record and the last system step
+#
+# Responsibilities
+#   The command line beside the admin panel's buttons (SYSTEM_DESIGN §18.7 phase 2): it writes the
+#   same request the admin panel writes (tmp/update-request: install-now or full), which systemd's
+#   noticeboard-update.path hands to installers/update.sh, and reads the same files the admin panel
+#   shows. Installed by the installer, root's.
+#
+# Uses
+#   /opt/noticeboard (NOTICEBOARD_DIR in the tests): data/update-branch.env, update-check.json,
+#   update-status.json, installer.json, tmp/update-request, tmp/system-result; git, node
+set -uo pipefail
+
+INSTALL_DIR=${NOTICEBOARD_DIR:-/opt/noticeboard}
+
+# A value from a JSON file written by lib/json.sh or the installer, or nothing (a Server has Node.js)
+value() {   # value <file> <key>
+  node -e 'try { const v = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))[process.argv[2]];
+    if (v !== undefined && v !== null) process.stdout.write(String(v)); } catch {}' "$1" "$2" 2>/dev/null
+}
+
+request() {   # request install-now|full
+  if [ ! -d "$INSTALL_DIR/.git" ]; then
+    echo "There's no Noticeboard Server on this device ($INSTALL_DIR)." >&2
+    exit 1
+  fi
+  if [ "$(id -u)" -ne 0 ] && [ "$(id -un)" != "$(stat -c %U "$INSTALL_DIR")" ]; then
+    echo "Run it with sudo: sudo noticeboard $*" >&2
+    exit 1
+  fi
+  local branch owner
+  branch=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$INSTALL_DIR/data/update-branch.env" 2>/dev/null | head -n 1)
+  if [ "$1" = full ] && [ "${branch:-main}" != main ]; then
+    echo "This Server follows $branch: a full update only runs by itself for main's Releases."
+    echo "Run the installer instead: curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/$branch/installers/install.sh | sudo bash"
+    exit 1
+  fi
+  owner=$(stat -c %U "$INSTALL_DIR")
+  mkdir -p "$INSTALL_DIR/tmp"
+  printf '%s\n' "$1" > "$INSTALL_DIR/tmp/update-request"
+  chown "$owner" "$INSTALL_DIR/tmp/update-request" 2>/dev/null || true
+  if [ "$1" = full ]; then
+    echo "A full update was asked for: it starts within a few seconds (journalctl -u noticeboard-update -f)."
+  else
+    echo "An update was asked for: it starts within a few seconds (journalctl -u noticeboard-update -f)."
+  fi
+}
+
+status() {
+  if [ ! -d "$INSTALL_DIR/.git" ]; then
+    echo "There's no Noticeboard Server on this device ($INSTALL_DIR)."
+    exit 1
+  fi
+  local d="$INSTALL_DIR/data" commit tag branch
+  commit=$(git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null)
+  tag=$(git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" tag --points-at HEAD 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+  branch=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$d/update-branch.env" 2>/dev/null | head -n 1)
+  echo "Running      : ${tag:+Release $tag, }$commit (following ${branch:-main})"
+  echo "Last check   : $(value "$d/update-check.json" time) $(value "$d/update-check.json" message)"
+  echo "Last update  : $(value "$d/update-status.json" time) $(value "$d/update-status.json" state): $(value "$d/update-status.json" message)"
+  echo "Installer    : version $(value "$d/installer.json" version), run $(value "$d/installer.json" time)"
+  if [ -f "$INSTALL_DIR/tmp/system-result" ]; then
+    echo "System step  : $(value "$INSTALL_DIR/tmp/system-result" time) $(value "$INSTALL_DIR/tmp/system-result" result): $(value "$INSTALL_DIR/tmp/system-result" message)"
+  fi
+}
+
+case "${1:-}" in
+  update)
+    if [ "${2:-}" = --full ]; then request full; else request install-now; fi
+    ;;
+  status)
+    status
+    ;;
+  *)
+    echo "Usage: sudo noticeboard update [--full] | noticeboard status"
+    [ -z "${1:-}" ] || [ "$1" = help ] || [ "$1" = --help ] || exit 2
+    ;;
+esac

@@ -16,7 +16,7 @@ bad() { fail=$((fail+1)); echo "FAIL  $1"; [ -n "${2:-}" ] && sed 's/^/        /
 # "GitHub": this working tree's installers, with install.sh's last line (main) replaced by a probe
 PROBE='load_modules; echo "LOADED sha=${NOTICEBOARD_INSTALLER_SHA:-none} $(declare -F install_server install_client check_firewall | tr "\n" " ")client=$([ -n "${CLIENT_FILE_kiosk_sh:-}" ] && [ -n "${CLIENT_FILE_noticeboard_client:-}" ] && echo yes)"'
 probe_copy() {   # probe_copy <folder>: installers/ with the probe install.sh
-  mkdir -p "$1"; cp -r "$REPO/installers/lib" "$REPO/installers/client" "$1/"
+  mkdir -p "$1"; cp -r "$REPO/installers/lib" "$REPO/installers/client" "$REPO/installers/root" "$1/"
   { sed '$d' "$REPO/installers/install.sh"; echo "$PROBE"; } > "$1/install.sh"
 }
 probe_copy "$T/github/installers"
@@ -68,10 +68,11 @@ run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=$SHA
   && ok "at a commit: all parts downloaded and loaded" || bad "sha" "$T/out"
 n_lib=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/lib/" "$T/curl.log")
 n_client=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/client/" "$T/curl.log")
+n_root=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/root/" "$T/curl.log")
 # The installer's own parts (INSTALLER_MODULES); installers/lib also holds parts only update.sh loads
 n_parts=$(sed -n 's/^INSTALLER_MODULES=(\([^)]*\)).*/\1/p' "$REPO/installers/install.sh" | wc -w)
-[ "$n_lib" = "$n_parts" ] && [ "$n_client" = 2 ] && ! grep -q "/main/installers" "$T/curl.log" \
-  && ok "every download pinned to that commit ($n_lib modules, $n_client Client files)" || bad "pinned ($n_lib, $n_client)" "$T/curl.log"
+[ "$n_lib" = "$n_parts" ] && [ "$n_client" = 2 ] && [ "$n_root" = 2 ] && ! grep -q "/main/installers" "$T/curl.log" \
+  && ok "every download pinned to that commit ($n_lib modules, $n_client Client files, $n_root of root's)" || bad "pinned ($n_lib, $n_client, $n_root)" "$T/curl.log"
 [ "$(leftovers)" = "$BEFORE" ] && ok "the downloaded parts are deleted once loaded" || bad "temp folder left in /tmp"
 
 # ── A download fails, or a part is broken: stops before doing anything ──

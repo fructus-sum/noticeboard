@@ -346,6 +346,7 @@
       "configuredBranch": "string",
       "instant": "boolean",
       "lastCheck": "null",
+      "lastSystemStep": "null",
       "pending": "boolean",
       "release": "null",
       "schedule": {
@@ -355,6 +356,7 @@
         "time": "string"
       },
       "status": "null",
+      "systemStep": "boolean",
       "version": "null",
       "waiting": "null"
     }
@@ -372,6 +374,7 @@
     "status": 200,
     "type": "application/json",
     "content": {
+      "automatic": "boolean",
       "branch": "string",
       "changes": [],
       "displays": "boolean",
@@ -379,7 +382,8 @@
       "needed": "boolean",
       "ref": "string",
       "required": "number",
-      "returning": "null"
+      "returning": "null",
+      "systemFailed": "null"
     }
   },
   "updates: version": {

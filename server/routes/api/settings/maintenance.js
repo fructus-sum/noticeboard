@@ -1,5 +1,6 @@
 // server/routes/api/settings/maintenance.js — actions that can't be undone: Delete All, Restore
-// Defaults; and restarting the Server (for a setting that needs it, SYSTEM_DESIGN §18.5 item 4)
+// Defaults; restarting the Server (for a setting that needs it, SYSTEM_DESIGN §18.5 item 4); and a
+// Full update (root's system step, then the code again: §18.7 phase 2)
 //
 // Each is: the admin password (which gives a one-time token for that action, the wrong tries
 // counted with every other password check), then a final confirmation with that token.
@@ -7,10 +8,11 @@
 //
 // Used by
 //   routes/api/settings/index.js; the admin panel (components/settings/DeleteContentCard,
-//   components/settings/RestartNotice)
+//   components/settings/RestartNotice, components/updates/FullUpdate)
 //
 // Uses
-//   services/contentReset, services/restartState, services/actionTokens, services/adminPassword, middleware/asyncRoute,
+//   services/contentReset, services/restartState, services/updates (fullUpdate), services/actionTokens,
+//   services/adminPassword, middleware/asyncRoute,
 //   middleware/passwordLimiter, utils/logger
 //
 // Change impact
@@ -18,6 +20,7 @@
 const express = require('express');
 const contentReset = require('../../../services/contentReset');
 const restartState = require('../../../services/restartState');
+const updateService = require('../../../services/updates');
 const actionTokens = require('../../../services/actionTokens');
 const adminPassword = require('../../../services/adminPassword');
 const { route, jsonRoute } = require('../../../middleware/asyncRoute');
@@ -27,7 +30,7 @@ const logger = require('../../../utils/logger');
 const router = express.Router();
 
 // The actions, each confirmed with its own token (the subject is the same for all: this noticeboard)
-const ACTIONS = new Set(['delete-all', 'restore-defaults', 'restart']);
+const ACTIONS = new Set(['delete-all', 'restore-defaults', 'restart', 'full-update']);
 const SUBJECT = 'noticeboard';
 
 const expired = () => Object.assign(
@@ -67,6 +70,12 @@ router.post('/maintenance/restart', jsonRoute(async (req) => {
   if (!actionTokens.take(req.body?.token, 'restart', SUBJECT)) throw expired();
   restartState.requestRestart(req.ip);
   return { restarting: true, ...restartState.status().port };
+}));
+
+// A Full update (main only; services/updates says why not otherwise)
+router.post('/maintenance/full-update', jsonRoute(async (req) => {
+  if (!actionTokens.take(req.body?.token, 'full-update', SUBJECT)) throw expired();
+  return updateService.fullUpdate(req.ip);
 }));
 
 module.exports = router;

@@ -15,8 +15,14 @@
 # lib/schedule.sh) decides whether a run may install: every run checks for a new version (in
 # manual mode once a day) and records whether one is waiting; it installs only when that's due,
 # or when the admin asked (Update now, a branch switch). The request file says what was asked:
-# "install-now", "check" (only check, e.g. after the schedule changed), "restore-defaults", or
-# anything else (a branch switch, as older servers write it).
+# "install-now", "check" (only check, e.g. after the schedule changed), "restore-defaults", "full"
+# (a Full update), or anything else (a branch switch, as older servers write it).
+#
+# The system step (main only, SYSTEM_DESIGN §18.7 phase 2): before installing a Release that needs a
+# newer installer than this Server's last run, or for a Full update, update.sh asks root's
+# noticeboard-system (tmp/system-request) to run that Release's installer with --apply, and waits
+# for its answer (tmp/system-result). If it fails, nothing else is changed and the Release is
+# skipped like a failed build.
 #
 # Restore Defaults (data/restore-defaults, left by the server): the followed branch's latest version
 # is reinstalled even if it's the one running, into a clean folder (everything untracked deleted
@@ -52,6 +58,8 @@ NOTICE_FILE="$INSTALL_DIR/data/update-notice.json"   # shown on the admin home p
 SCHEDULE_FILE="$INSTALL_DIR/data/update-schedule.env" # the update schedule, written by the admin panel (lib/schedule.sh)
 RESTORE_FILE="$INSTALL_DIR/data/restore-defaults"    # Restore Defaults asked for (the server deletes it at start-up)
 INSTALLER_RECORD="$INSTALL_DIR/data/installer.json"  # the last installer run, written by install.sh
+SYSTEM_REQUEST_FILE="$INSTALL_DIR/tmp/system-request" # asks root's system step to run (noticeboard-system.path)
+SYSTEM_RESULT_FILE="$INSTALL_DIR/tmp/system-result"   # its answer (installers/root/noticeboard-system)
 # What a Restore Defaults clean keeps (git clean patterns; a name without a slash in the middle also
 # matches deeper in the folder, which only keeps more, and none starts with / because Git Bash would
 # rewrite it on Windows, where the tests run): what the server
@@ -99,6 +107,7 @@ TARGET=""            # the commit being installed
 RELEASE=""           # on main: the latest Release's tag, whose commit TARGET is
 TARGET_NAME=""       # TARGET as the admin reads it: "Release v0.8.0 (abc1234)" or "abc1234 from <branch>"
 INSTALLER_FOR=""     # a Release with the followed branch's work, waiting for the installer (branch_merged)
+SYSTEM_MESSAGE=""    # the system step's answer (run_system_step)
 NOW=""               # this run's time, in seconds (lib/schedule.sh now_epoch)
 INSTALL_CHECKED_AT="" # the last run that could install (update-check.json), for the schedule
 FETCHED_AT=""        # the last time GitHub was checked (update-check.json)
@@ -128,8 +137,8 @@ main() {
 
   # The admin panel asked for this run. The request is taken straight away: systemd starts this
   # whenever the file exists, so leaving it would start it again and again. Anything but "check"
-  # asks for an install (a branch switch, or Update now).
-  local requested="" force="" request=""
+  # asks for an install (a branch switch, Update now, or a Full update: "full").
+  local requested="" force="" request="" full=""
   if [ -f "$REQUEST_FILE" ]; then
     request=$(head -c 200 "$REQUEST_FILE" 2>/dev/null | tr -d '\r\n' || true)
     rm -f "$REQUEST_FILE"
@@ -137,6 +146,7 @@ main() {
       requested=1
       force=1   # asked for by the admin, so a commit that failed before is tried again
     fi
+    if [ "$request" = full ]; then full=1; fi
   fi
   if [ "${1:-}" = "--force" ]; then force=1; fi
   # Restore Defaults: asked for now, or left waiting by a run that found the lock busy
@@ -236,7 +246,15 @@ main() {
     fi
   fi
 
-  if [ "$CURRENT" = "$TARGET" ] && [ -z "$restore" ]; then
+  # A Full update is the system step for main's latest Release: a branch's installer is run by hand
+  # (the owner, 2026-09-29)
+  if [ -n "$full" ] && [ -z "$RELEASE" ]; then
+    write_status failed "A full update only runs by itself for main's Releases, and this Server follows $BRANCH. Run the installer on the Server by hand: curl -fsSL $INSTALLER_URL | sudo bash"
+    echo "Not a full update: this Server follows $BRANCH, not main's Releases." >&2
+    exit 1
+  fi
+
+  if [ "$CURRENT" = "$TARGET" ] && [ -z "$restore" ] && [ -z "$full" ]; then
     if [ -n "$switching" ]; then
       # The same version on another branch: nothing to install, just follow the new branch
       git checkout --quiet --force -B "$BRANCH" "$TARGET"
@@ -256,8 +274,8 @@ main() {
 
   # main never goes back by itself: a Release already in what's running (a Server with newer
   # commits of main, e.g. installed before the first Release) leaves it as it is. Only a switch
-  # to main or Restore Defaults installs an older Release.
-  if [ -n "$RELEASE" ] && [ -z "$switching" ] && [ -z "$restore" ] && git merge-base --is-ancestor "$TARGET" "$CURRENT" 2>/dev/null; then
+  # to main, Restore Defaults or a Full update installs an older Release.
+  if [ -n "$RELEASE" ] && [ -z "$switching" ] && [ -z "$restore" ] && [ -z "$full" ] && git merge-base --is-ancestor "$TARGET" "$CURRENT" 2>/dev/null; then
     echo "Up to date (${CURRENT:0:7} already has $RELEASE)."
     write_check up-to-date "Up to date: running ${CURRENT:0:7} from main, which already has the latest Release, $RELEASE."
     exit 0
@@ -292,6 +310,27 @@ main() {
     fi
     echo "Not installing ${TARGET:0:7}: $problem." >&2
     exit 1
+  fi
+
+  # main: a Release that needs a newer installer than this Server's last run (or a Full update)
+  # gets root's system step first (SYSTEM_DESIGN §18.7 phase 2). If it fails, the code isn't
+  # touched and the Release is skipped like a failed build. Not set up yet (a Server from before
+  # 0.9.0): the code installs as before, and the installer notice asks for one run by hand.
+  if [ -n "$RELEASE" ] && { [ -n "$full" ] || installer_behind "$TARGET"; }; then
+    if system_step_ready; then
+      if ! run_system_step; then
+        echo "$TARGET" > "$FAILED_FILE"
+        restore_branch_setting
+        write_status failed "$TARGET_NAME needs the installer's system step, which didn't work: $SYSTEM_MESSAGE Nothing else was changed: still running ${CURRENT:0:7}."
+        echo "The system step for ${TARGET:0:7} didn't work: $SYSTEM_MESSAGE" >&2
+        exit 1
+      fi
+      echo "System step done: $SYSTEM_MESSAGE"
+    elif [ -n "$full" ]; then
+      write_status failed "A full update needs the installer's system step, which isn't set up on this Server yet. Run the installer on the Server by hand once: curl -fsSL $INSTALLER_URL | sudo bash"
+      echo "The system step isn't set up; run the installer once." >&2
+      exit 1
+    fi
   fi
 
   local backup=""
@@ -353,6 +392,8 @@ main() {
   elif [ -n "$switching" ]; then
     write_status updated "Switched from $PREVIOUS_BRANCH to $BRANCH: now running ${TARGET:0:7}. The settings from before the switch are saved in ${backup#"$INSTALL_DIR"/}."
     remember_main
+  elif [ -n "$full" ]; then
+    write_status updated "Full update done: the installer's system step, then $TARGET_NAME installed again."
   else
     write_status updated "Updated to $TARGET_NAME."
   fi
@@ -534,6 +575,40 @@ installer_behind() {   # installer_behind <commit>
       try { const v = JSON.parse(s).installer.version; console.log(Number.isInteger(v) ? v : 0); } catch { console.log(0); }
     });" 2>/dev/null || true)
   [ "${need:-0}" -gt "$have" ]
+}
+
+# Root's system step is set up (installer version 6 and later: noticeboard-system.path)
+system_step_ready() {
+  systemctl is-enabled "${SERVICE_NAME}-system.path" >/dev/null 2>&1
+}
+
+# Ask root's system step to run main's latest Release's installer (--apply) for TARGET, and wait
+# for its answer: tmp/system-result for that commit, at most 45 minutes (its service's own limit).
+# Succeeds when it's done; its message is in SYSTEM_MESSAGE either way.
+run_system_step() {
+  local waited=0 result
+  write_status updating "Setting up what $TARGET_NAME needs (the installer's system step, run by root). This takes a few minutes; the noticeboard keeps running."
+  rm -f "$SYSTEM_RESULT_FILE"
+  printf '%s\n' "$TARGET" > "$SYSTEM_REQUEST_FILE"
+  while [ "$waited" -lt 2700 ]; do
+    if [ -f "$SYSTEM_RESULT_FILE" ] && [ "$(json_value "$SYSTEM_RESULT_FILE" commit)" = "$TARGET" ]; then
+      result=$(json_value "$SYSTEM_RESULT_FILE" result)
+      SYSTEM_MESSAGE=$(json_value "$SYSTEM_RESULT_FILE" message)
+      [ "$result" = done ]
+      return
+    fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+  rm -f "$SYSTEM_REQUEST_FILE"
+  SYSTEM_MESSAGE="It didn't answer within 45 minutes (journalctl -u ${SERVICE_NAME}-system)."
+  return 1
+}
+
+# A value from a JSON file, or nothing (a Server has Node.js)
+json_value() {   # json_value <file> <key>
+  node -e 'try { const v = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))[process.argv[2]];
+    if (v !== undefined && v !== null) process.stdout.write(String(v)); } catch {}' "$1" "$2" 2>/dev/null || true
 }
 
 # Tell the admin panel: in the Software updates card, and with a notice on the home page

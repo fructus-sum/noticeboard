@@ -13,7 +13,7 @@
 //
 // Used by
 //   services/updates (the branch switch: action 'switch', the branch as subject),
-//   routes/api/settings/maintenance.js ('delete-all', 'restore-defaults')
+//   routes/api/settings/maintenance.js ('delete-all', 'restore-defaults', 'restart', 'full-update')
 //
 // Change impact
 //   Tokens live in memory only: a restart forgets them, and the admin simply starts again.

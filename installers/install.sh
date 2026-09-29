@@ -13,20 +13,25 @@
 #   or:      curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash
 #
 # This file holds the configuration, the switch to the latest installer, the loading of its
-# parts, and the order of the steps (run_installer). The steps are in installers/lib/*.sh, and the Client's
-# files it installs in installers/client/ (see load_modules). Older installers hand over by
+# parts, and the order of the steps (run_installer; with --apply, apply_saved_installation). The
+# steps are in installers/lib/*.sh, the Client's files it installs in installers/client/ and root's
+# own files (the system step, the noticeboard command) in installers/root/ (see load_modules).
+#   sudo bash install.sh --apply   no questions: the saved answers, only what updates can't do (run
+#                                  by root's system step at main's latest Release, §18.7 phase 2)
+# Older installers hand over by
 # downloading only this file, so it must keep its name, pass bash -n and keep the line
 # starting INSTALLER_VERSION=.
 #
 # Used by
 #   people (the README's command); older installers and other branches' installers, which hand
-#   over to it (use_latest_installer, use_branch_installer)
+#   over to it (use_latest_installer, use_branch_installer); root's system step (--apply)
 # Uses
-#   installers/lib/*.sh and installers/client/* of the same commit (load_modules); GitHub's API
+#   installers/lib/*.sh, installers/client/* and installers/root/* of the same commit (load_modules); GitHub's API
 #   and raw.githubusercontent.com
 # Change impact
-#   What it installs that updates can't change (the Client, units, shortcuts, packages) only
-#   reaches a Server or Client when the installer runs again: raise INSTALLER_VERSION with such a change
+#   What it installs that updates can't change (the Client, units, root's files, shortcuts,
+#   packages) only reaches a Server or Client when the installer runs again (by hand, or on main by
+#   the system step): raise INSTALLER_VERSION with such a change
 #   (SYSTEM_DESIGN §8, §15). tests/installers compares what it writes with golden files.
 set -euo pipefail
 
@@ -49,16 +54,26 @@ OLD_CLIENT_KIOSK="/usr/local/bin/noticeboard-kiosk.sh"   # a Client's kiosk befo
 DEVICE_MODEL_FILE="/proc/device-tree/model"         # says Raspberry Pi on one (lib/system.sh)
 DISPLAY_MANAGER_UNIT="/etc/systemd/system/display-manager.service"   # there's a desktop
 SUDOERS_BACKUP_DIR="/root/noticeboard-sudoers-backup"
+# The system step (lib/server.sh): its units, and root's own files outside the app's folder
+SYSTEM_SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}-system.service"
+SYSTEM_PATH_FILE="/etc/systemd/system/${SERVICE_NAME}-system.path"
+SYSTEM_STEP="/usr/local/sbin/noticeboard-system"
+SERVER_COMMAND="/usr/local/bin/noticeboard"
+ROOT_LIB_DIR="/usr/local/lib/noticeboard"
 # Raise this, and "installer" in system-requirements.json, whenever this script changes what
 # updates can't: the Client, system services, desktop shortcuts or system packages. A Server
-# whose last installer run (data/installer.json) is older is told to run it again.
-INSTALLER_VERSION=5
+# whose last installer run (data/installer.json) is older is told to run it again, or on main
+# runs it by itself (the system step).
+INSTALLER_VERSION=6
 # A Server follows main unless another branch was chosen in the admin panel (choose_branch)
 INSTALL_BRANCH=main
 # The installer's parts, from the same commit as this script (see load_modules)
 INSTALLER_MODULES=(ui branch json release answers system sudo server client desktop firewall)   # installers/lib/<name>.sh
 CLIENT_FILES=(kiosk.sh noticeboard-client)   # installers/client/<name>, read in as CLIENT_FILE_<name, . and - as _>
+ROOT_FILES=(noticeboard-system noticeboard)  # installers/root/<name>, read in as ROOT_FILE_<name, - as _>
+ROOT_LIBS=(branch json release)              # parts root's files load too: copied as ROOT_LIB_<name>
 ROLE=""; MODE=""; PLATFORM=""; SERVER_URL=""   # the answers (ui.sh, client.sh)
+APPLY=""   # --apply: no questions, the saved answers, only what updates can't do (the system step)
 
 # Everything runs from main(), called on the last line, so a half-downloaded
 # script (curl | bash) runs nothing.
@@ -69,9 +84,46 @@ main() {
     exit 1
   fi
 
+  if [ "${1:-}" = --apply ]; then
+    APPLY=1
+  fi
   use_latest_installer "$@"
   load_modules
-  run_installer "$@"
+  if [ -n "$APPLY" ]; then
+    apply_saved_installation
+  else
+    run_installer "$@"
+  fi
+}
+
+# --apply (run by root's system step, noticeboard-system, at main's latest Release): what updates
+# can't do, with the saved answers and no questions: the Server's packages and services (without
+# restarting it: update.sh installs the code and restarts it next) and the Client, then the record.
+# Never the code, the sudo check, the firewall or a reboot.
+apply_saved_installation() {
+  load_answers
+  if [ -z "$SAVED_ROLE" ]; then
+    echo "ERROR: This device has no saved answers (/etc/noticeboard/install.env): run the installer once by hand."
+    exit 1
+  fi
+  set_role "$SAVED_ROLE"
+  PLATFORM=$SAVED_PLATFORM
+  SERVER_URL=$SAVED_SERVER_URL
+  DESKTOP_USER=${SAVED_DISPLAY_USER:-pi}
+  INSTALL_BRANCH=main
+  echo "Applying installer version $INSTALLER_VERSION ($(role_name "$ROLE"))..."
+  if has_server; then
+    install_server_packages
+    install_server_services --no-restart
+  fi
+  if has_client; then
+    install_client
+  fi
+  save_answers
+  if has_server; then
+    write_installer_record
+  fi
+  echo "Done: installer version $INSTALLER_VERSION applied."
 }
 
 # The questions and the steps, in order, once the installer's parts are loaded (the installer
@@ -243,7 +295,7 @@ followed_branch() {
 }
 
 # ── The installer's parts ─────────────────────────────────────────────────────
-# installers/lib/*.sh and installers/client/*, always from the same commit as this script:
+# installers/lib/*.sh, installers/client/* and installers/root/*, always from the same commit as this script:
 #   NOTICEBOARD_INSTALLER_SHA=local     next to this script (a copy of the repository)
 #   NOTICEBOARD_INSTALLER_SHA=<commit>  downloaded from GitHub at that commit: after the switch
 #                                       to the latest installer, or a hand-over from an older
@@ -274,7 +326,7 @@ load_modules() {
   fi
   if [ -z "$dir" ] || ! load_modules_from "$dir"; then
     if [ -n "$ref" ]; then rm -rf "$dir"; fi
-    echo "ERROR: Parts of the installer (installers/lib, installers/client) are missing or broken,"
+    echo "ERROR: Parts of the installer (installers/lib, client, root) are missing or broken,"
     echo "so nothing was changed. Run it with the command from the README, or from a complete copy"
     echo "of the repository."
     exit 1
@@ -284,7 +336,7 @@ load_modules() {
 
 download_modules() {   # download_modules <commit or branch> <folder>
   local name
-  mkdir -p "$2/lib" "$2/client"
+  mkdir -p "$2/lib" "$2/client" "$2/root"
   for name in "${INSTALLER_MODULES[@]}"; do
     curl -fsSL --max-time 60 -o "$2/lib/$name.sh" \
       "https://raw.githubusercontent.com/$GITHUB_REPO/$1/installers/lib/$name.sh" || return 1
@@ -293,12 +345,17 @@ download_modules() {   # download_modules <commit or branch> <folder>
     curl -fsSL --max-time 60 -o "$2/client/$name" \
       "https://raw.githubusercontent.com/$GITHUB_REPO/$1/installers/client/$name" || return 1
   done
+  for name in "${ROOT_FILES[@]}"; do
+    curl -fsSL --max-time 60 -o "$2/root/$name" \
+      "https://raw.githubusercontent.com/$GITHUB_REPO/$1/installers/root/$name" || return 1
+  done
 }
 
 # Load the parts from <folder> (installers/ in a copy of the repository, or the download): each
-# module checked with bash -n, then loaded; each of the Client's files checked with bash -n and
-# read in as CLIENT_FILE_<name> (. and - as _). Fails if anything is missing or broken, or a
-# function main() calls isn't there.
+# module checked with bash -n, then loaded; each of the Client's and root's files checked with bash -n
+# and read in as CLIENT_FILE_<name> and ROOT_FILE_<name> (. and - as _), and the parts root's files
+# load (ROOT_LIBS) read in as ROOT_LIB_<name>. Fails if anything is missing or broken, or a function
+# main() calls isn't there.
 load_modules_from() {   # load_modules_from <folder>
   local name file fn
   for name in "${INSTALLER_MODULES[@]}"; do
@@ -312,9 +369,18 @@ load_modules_from() {   # load_modules_from <folder>
     if [ ! -s "$file" ] || ! bash -n "$file"; then return 1; fi
     IFS= read -r -d '' "CLIENT_FILE_${name//[.-]/_}" < "$file" || true
   done
+  for name in "${ROOT_FILES[@]}"; do
+    file="$1/root/$name"
+    if [ ! -s "$file" ] || ! bash -n "$file"; then return 1; fi
+    IFS= read -r -d '' "ROOT_FILE_${name//[.-]/_}" < "$file" || true
+  done
+  for name in "${ROOT_LIBS[@]}"; do
+    IFS= read -r -d '' "ROOT_LIB_$name" < "$1/lib/$name.sh" || true
+  done
   for fn in has_tty banner load_answers choose_role refuse_role_change choose_branch choose_platform \
             ask_server_url is_raspberry_pi check_sudo_password install_server write_installer_record \
-            summary_server install_client remove_old_kiosks save_answers summary_client check_firewall offer_reboot; do
+            summary_server install_client remove_old_kiosks save_answers summary_client check_firewall offer_reboot \
+            install_server_packages install_server_services role_name set_role has_server has_client; do
     declare -F "$fn" >/dev/null || return 1
   done
 }

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
 # The files the installer writes onto a device (systemd units, the Client's launcher, autostart entry
-# and headless kiosk service, the Help shortcuts), generated for fixed answers and compared with
-# tests/fixtures/installer-golden/, recorded again on purpose with installer version 5 (the Client,
-# SYSTEM_DESIGN §18.7). The Client's own files are installed as they are in installers/client/. Restructuring the installer must not change
+# and headless kiosk service, the Help shortcuts, the system step's units), generated for fixed answers and compared with
+# tests/fixtures/installer-golden/, recorded again on purpose with installer versions 5 (the Client)
+# and 6 (the system step, SYSTEM_DESIGN §18.7). The Client's and root's own files are installed as
+# they are in installers/client/ and installers/root/. Restructuring the installer must not change
 # them (SYSTEM_DESIGN §8, §14 D30). NB_UPDATE_SNAPSHOT=1 records them again (only for a deliberate,
 # reviewed change, together with INSTALLER_VERSION).
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -24,6 +25,8 @@ pass=0; fail=0
   UPDATE_PATH_FILE="$OUT/noticeboard-update.path"
   write_service
   write_update_units
+  SYSTEM_SERVICE_FILE="$OUT/noticeboard-system.service"; SYSTEM_PATH_FILE="$OUT/noticeboard-system.path"; SYSTEM_STEP=/usr/local/sbin/noticeboard-system
+  write_system_units
   AUTOSTART_FILE="$OUT/autostart.desktop"; write_autostart "/usr/local/bin/noticeboard-client kiosk"
   CLIENT_DIR=/opt/noticeboard-client; CLIENT_LAUNCHER="$OUT/noticeboard-client"; write_client_launcher
   CLIENT_LAUNCHER=/usr/local/bin/noticeboard-client; KIOSK_SERVICE_FILE="$OUT/noticeboard-kiosk.service"; write_kiosk_service

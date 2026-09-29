@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# installers/root/noticeboard-system — the system step: main's latest Release's installer, run as root
+#
+# Responsibilities
+#   What updates can't do as the app's user (packages, services, the Client), done by the
+#   installer itself when a Release needs a newer one (SYSTEM_DESIGN §18.7 phase 2). Installed by
+#   the installer as /usr/local/sbin/noticeboard-system (root's), and started by
+#   noticeboard-system.service when update.sh (or the admin panel's Full update, or `noticeboard
+#   update --full`) writes /opt/noticeboard/tmp/system-request.
+#   Root never runs code from the app's folder, and never trusts the request: it reads a commit
+#   from it, and runs only the installer of main's latest published Release, downloaded from
+#   GitHub at that commit, once GitHub confirms the commit is that Release's. A Server following
+#   a development branch is refused: its installer is run by hand (the owner, 2026-09-29).
+#   The answer goes to /opt/noticeboard/tmp/system-result, for update.sh and the admin panel.
+#
+# The request   "<commit>" or "<commit> full" (Full update: run it even when nothing is behind)
+# The result    { commit, release, result: done | failed | refused, message, time } (lib/json.sh)
+#
+# Uses
+#   /usr/local/lib/noticeboard/{branch,json,release}.sh (the installer's copies of installers/lib);
+#   curl; GitHub's API and raw.githubusercontent.com. NOTICEBOARD_ROOT_LIB, NOTICEBOARD_DIR and
+#   NOTICEBOARD_GITHUB_API replace those in the tests.
+#
+# Change impact
+#   update.sh waits for the result with the requested commit; the result's names and values are a
+#   contract with update.sh and the server (services/updates/installerVersion.js).
+set -uo pipefail
+
+LIB=${NOTICEBOARD_ROOT_LIB:-/usr/local/lib/noticeboard}
+INSTALL_DIR=${NOTICEBOARD_DIR:-/opt/noticeboard}
+GITHUB_REPO="fructus-sum/noticeboard"
+REQUEST="$INSTALL_DIR/tmp/system-request"
+RESULT="$INSTALL_DIR/tmp/system-result"
+BRANCH_FILE="$INSTALL_DIR/data/update-branch.env"
+COMMIT=""
+TAG=""
+
+for lib in branch json release; do
+  # shellcheck source=/dev/null
+  if ! source "$LIB/$lib.sh"; then
+    echo "Can't load $LIB/$lib.sh: run the Noticeboard installer again." >&2
+    exit 1
+  fi
+done
+
+result() {   # result done|failed|refused <message>
+  write_json "$RESULT" commit "$COMMIT" release "$TAG" result "$1" message "$2" time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  chown "$(stat -c %U "$INSTALL_DIR")" "$RESULT" 2>/dev/null || true
+  echo "$2"
+  logger -t noticeboard-system "$1: $2" 2>/dev/null || true
+}
+
+main() {
+  if [ ! -f "$REQUEST" ]; then
+    exit 0
+  fi
+  local request branch code=0 sha dir
+  request=$(head -c 200 "$REQUEST" 2>/dev/null | tr -d '\r\n' || true)
+  rm -f "$REQUEST"
+  COMMIT=${request%% *}
+  if ! [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+    COMMIT=""
+    result refused "The request didn't name a commit, so nothing was run."
+    exit 1
+  fi
+  branch=$(read_branch_setting)
+  if [ "${branch:-main}" != main ]; then
+    result refused "This Server follows $branch, not main: the installer only runs by itself for main's Releases. Run it by hand on the Server."
+    exit 1
+  fi
+  TAG=$(latest_release) || code=$?
+  if [ "$code" -ne 0 ]; then
+    TAG=""
+    if [ "$code" -eq 3 ]; then
+      result refused "No Release of main has been published, so nothing was run."
+    else
+      result failed "Couldn't ask GitHub for main's latest Release; trying again at the next update."
+    fi
+    exit 1
+  fi
+  sha=$(curl -fsSL --max-time 20 -H 'Accept: application/vnd.github.sha' \
+          "${NOTICEBOARD_GITHUB_API:-https://api.github.com}/repos/$GITHUB_REPO/commits/$TAG" 2>/dev/null) || sha=""
+  if [ -z "$sha" ]; then
+    result failed "Couldn't ask GitHub which commit Release $TAG is; trying again at the next update."
+    exit 1
+  fi
+  if [ "$sha" != "$COMMIT" ]; then
+    result refused "${COMMIT:0:7} isn't main's latest Release ($TAG, ${sha:0:7}), so nothing was run."
+    exit 1
+  fi
+
+  dir=$(mktemp -d /tmp/noticeboard-system.XXXXXX) || { result failed "Couldn't make a temporary folder."; exit 1; }
+  chmod 700 "$dir"
+  if ! curl -fsSL --max-time 60 -o "$dir/install.sh" "https://raw.githubusercontent.com/$GITHUB_REPO/$COMMIT/installers/install.sh" \
+     || ! bash -n "$dir/install.sh"; then
+    rm -rf "$dir"
+    result failed "Couldn't download the installer of Release $TAG; trying again at the next update."
+    exit 1
+  fi
+  echo "Running the installer of Release $TAG (${COMMIT:0:7}) with --apply..."
+  if NOTICEBOARD_INSTALLER_SHA=$COMMIT NOTICEBOARD_INSTALLER_BRANCH=main NOTICEBOARD_INSTALLER_RELEASE=$TAG \
+       bash "$dir/install.sh" --apply > "$dir/log" 2>&1; then
+    cat "$dir/log"
+    rm -rf "$dir"
+    result done "The installer of Release $TAG set up what the Release needs."
+  else
+    cat "$dir/log"
+    result failed "The installer of Release $TAG failed: $(tail -n 3 "$dir/log" | tr '\n' ' ') (the whole log: journalctl -u noticeboard-system)"
+    rm -rf "$dir"
+    exit 1
+  fi
+}
+
+main "$@"; exit

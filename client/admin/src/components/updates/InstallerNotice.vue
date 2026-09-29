@@ -5,7 +5,9 @@
 // shortcuts), so when this version needs a newer installer run than the Server had, the Slideshows
 // page says so, with the command to copy. It stays until the installer has been run: there's
 // nothing to close. It also shows while a Release of main with the followed branch's work waits for
-// the installer before the Server returns to main (status.returning, SYSTEM_DESIGN §18.6).
+// the installer before the Server returns to main (status.returning, SYSTEM_DESIGN §18.6). On main
+// with root's system step set up, the installer runs by itself, so it shows only when that failed
+// (status.systemFailed, §18.7 phase 2).
 //
 // Used by: App.vue (every page but the login page)
 // Uses: useApi (GET /settings/updates/installer), installerCommand from @shared
@@ -41,7 +43,13 @@ async function copy() {
 <template>
   <div v-if="status?.needed" class="installer page-warning" role="alert">
     <strong>Run the installer again on the Server</strong>
-    <p v-if="status.returning">
+    <p v-if="status.systemFailed">
+      <template v-if="status.systemFailed.release">Release {{ status.systemFailed.release }}</template><template v-else>A new Release</template>
+      needs something that only the installer sets up. The installer runs by itself for that, but this time it didn't
+      work: {{ status.systemFailed.message }} The noticeboard keeps running the version it had. The update is tried
+      again with the next Release, or run the installer yourself now.
+    </p>
+    <p v-else-if="status.returning">
       The work of <strong>{{ status.returning.branch }}</strong>, the branch this noticeboard follows, is now in
       Release {{ status.returning.release }} of main. That Release needs something that only the installer sets up,
       so this noticeboard goes back to main once the installer has been run. When the installer asks which branch

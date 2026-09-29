@@ -2,7 +2,8 @@
 # installers/lib/system.sh — the device's system: what it is, packages, Node.js, the install folder's lock, the port
 #
 # Provides
-#   update_system        apt update, then a full upgrade (non-interactive, waits for apt's lock)
+#   update_system        apt update, then a full upgrade (non-interactive, waits for apt's lock; with
+#                        --apply, APPLY set, only the update)
 #   chromium_package     chromium-browser where apt still has it, else chromium
 #   is_raspberry_pi      the device tree says Raspberry Pi
 #   detect_platform      pi | desktop | headless, to preselect choose_platform
@@ -29,6 +30,11 @@ update_system() {
   local apt_opts=(-o DPkg::Lock::Timeout=300)
   echo "▸ Updating the package list..."
   apt-get "${apt_opts[@]}" update
+  # The system step (--apply) only adds what a Release needs: upgrading the whole system unattended
+  # is left to the device's owner (the README says how)
+  if [ -n "${APPLY:-}" ]; then
+    return 0
+  fi
   echo "▸ Upgrading installed packages (can take a while if it hasn't been updated recently)..."
   DEBIAN_FRONTEND=noninteractive apt-get "${apt_opts[@]}" -y \
     -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \

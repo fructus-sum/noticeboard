@@ -13,20 +13,25 @@
 //                               _AT), read by installers/lib/schedule.sh; update.sh removes _AT once
 //                               the set time has come
 //     tmp/update-request        its existence starts update.sh (systemd's noticeboard-update.path);
-//                               its text says what was asked: "install-now", "check",
+//                               its text says what was asked: "install-now", "check", "full",
 //                               "restore-defaults", or a switch
+//     tmp/system-result         root's system step's last answer (installers/root/noticeboard-system:
+//                               { commit, release, result: done | failed | refused, message, time })
 //
 // Provides
 //   readBranchSetting()        → Promise<string>  the branch updates follow ('main' if none)
 //   readStatus(), readCheck(), readNotice()  → the parsed file, or null
 //   deleteNotice()             → Promise
 //   requestPending()           → Promise<boolean>  tmp/update-request exists
-//   unitsEnabled()             → Promise<{ timer, path }>  the updater's systemd units are enabled
+//   unitsEnabled()             → Promise<{ timer, path, system }>  the updater's systemd units, and
+//                                the system step's path unit (installer version 6), are enabled
+//   readSystemResult()         → the system step's last answer, or null
 //   readSchedule()             → Promise<{ every, time, day, at }> (the defaults if there is no file)
 //   saveSchedule({ every, time, day }) → Promise  keeps a set time; records when (SINCE)
 //   saveInstallAt(iso|null)    → Promise  sets or removes the set time, keeping the schedule
 //   requestRun(what)           → Promise  writes tmp/update-request: "check" or "install-now"
-//   saveInstallNow(status)     → Promise  the status ("requested"), then the request
+//   saveInstallNow(status, what = 'install-now') → Promise  the status ("requested"), then the
+//                                request: "install-now", or "full" (a Full update)
 //   saveRestoreRequest(status) → Promise  the status, then the "restore-defaults" request
 //   saveSwitch(branch, status) → Promise  writes the branch setting, then the status, then the
 //                                request, each in one step. If any write fails, all three are
@@ -44,11 +49,12 @@ const path = require('path');
 const { writeFileAtomic, readJsonFile } = require('../../utils/configIO');
 const {
   updateBranchPath, updateStatusPath, updateCheckPath, updateNoticePath, updateRequestPath, updateSchedulePath,
-  systemdDir,
+  systemResultPath, systemdDir,
 } = require('../../utils/pathHelpers');
 const { DEFAULT } = require('./schedule');
 
 const UPDATE_UNIT = 'noticeboard-update';
+const SYSTEM_UNIT = 'noticeboard-system';
 
 async function exists(file) {
   try {
@@ -68,6 +74,7 @@ async function readBranchSetting() {
 const readStatus = async () => readJsonFile(updateStatusPath());
 const readCheck = async () => readJsonFile(updateCheckPath());
 const readNotice = async () => readJsonFile(updateNoticePath());
+const readSystemResult = async () => readJsonFile(systemResultPath());
 
 function deleteNotice() {
   return fs.rm(updateNoticePath(), { force: true });
@@ -78,11 +85,12 @@ function requestPending() {
 }
 
 async function unitsEnabled() {
-  const [timer, pathUnit] = await Promise.all([
+  const [timer, pathUnit, system] = await Promise.all([
     exists(path.join(systemdDir(), 'timers.target.wants', `${UPDATE_UNIT}.timer`)),
     exists(path.join(systemdDir(), 'paths.target.wants', `${UPDATE_UNIT}.path`)),
+    exists(path.join(systemdDir(), 'paths.target.wants', `${SYSTEM_UNIT}.path`)),
   ]);
-  return { timer, path: pathUnit };
+  return { timer, path: pathUnit, system };
 }
 
 // The schedule file as KEY=value lines (the last value of a key wins, like update.sh's first
@@ -128,9 +136,9 @@ function requestRun(what) {
   return writeFileAtomic(updateRequestPath(), `${what}\n`);
 }
 
-async function saveInstallNow(status) {
+async function saveInstallNow(status, what = 'install-now') {
   await writeFileAtomic(updateStatusPath(), `${JSON.stringify(status)}\n`);
-  await requestRun('install-now');
+  await requestRun(what);
 }
 
 async function saveRestoreRequest(status) {
@@ -159,6 +167,7 @@ module.exports = {
   readStatus,
   readCheck,
   readNotice,
+  readSystemResult,
   deleteNotice,
   requestPending,
   unitsEnabled,

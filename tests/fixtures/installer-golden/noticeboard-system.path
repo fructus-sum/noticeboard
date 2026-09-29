@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the Noticeboard system step when an update asks for it
+
+[Path]
+PathExists=/opt/noticeboard/tmp/system-request
+Unit=noticeboard-system.service
+
+[Install]
+WantedBy=paths.target

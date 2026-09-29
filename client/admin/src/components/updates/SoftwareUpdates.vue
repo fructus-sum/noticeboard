@@ -2,15 +2,15 @@
 // client/admin/src/components/updates/SoftwareUpdates.vue — Settings → Software updates
 //
 // Responsibilities
-//   The version this noticeboard runs, how updates went, and switching the GitHub branch updates
-//   come from. Nothing changes until the admin has checked the branch, entered the admin password
+//   The version this noticeboard runs, how updates went, switching the GitHub branch updates come
+//   from, and a Full update (on main: the installer's system step, then the code again). Nothing changes until the admin has checked the branch, entered the admin password
 //   and confirmed a final time; installers/update.sh does the rest. This card puts the parts
 //   together and shows the outcome of the last attempt under them. It stays open while an update
 //   runs or the server restarts, or the last attempt went wrong (a warning).
 //
 // Used by: views/SettingsView
 // Uses: useUpdateInfo (the data and polling), UpdateStatus, UpdateSchedule, BranchSwitcher,
-//   SwitchDialogs, CollapsibleCard
+//   SwitchDialogs, FullUpdate, CollapsibleCard
 import { ref, computed, onMounted } from 'vue';
 import CollapsibleCard from '../ui/CollapsibleCard.vue';
 import { useUpdateInfo } from '../../composables/useUpdateInfo.js';
@@ -18,6 +18,7 @@ import UpdateStatus from './UpdateStatus.vue';
 import UpdateSchedule from './UpdateSchedule.vue';
 import BranchSwitcher from './BranchSwitcher.vue';
 import SwitchDialogs from './SwitchDialogs.vue';
+import FullUpdate from './FullUpdate.vue';
 
 const { info, loadError, branches, branchesError, restarting, load, loadBranches, startPolling } = useUpdateInfo();
 
@@ -78,6 +79,13 @@ onMounted(() => {
         :branches-error="branchesError"
         @checking="message = ''"
         @switch="startSwitch"
+      />
+      <FullUpdate
+        v-if="info.autoUpdates || info.instant"
+        :info="info"
+        @cancelled="(note) => say(note, false)"
+        @failed="(text) => say(text, true)"
+        @started="switched"
       />
 
       <p v-if="message" :class="messageIsError ? 'error-msg' : 'muted'">{{ message }}</p>

@@ -21,7 +21,9 @@
 //                                 Release with the followed branch's work waits for the installer
 //                                 before update.sh returns to main, that Release's needs, with
 //                                 ref and returning.release its tag and returning.branch the branch
-//                                 (SYSTEM_DESIGN §18.6)
+//                                 (SYSTEM_DESIGN §18.6). On main with the system step set up
+//                                 (automatic), needed only when its last run failed (systemFailed:
+//                                 { release, message, time }, §18.7 phase 2)
 //
 // Used by
 //   services/updates/index.js (the branch check, the home page status), services/displaySettings.js
@@ -30,11 +32,11 @@
 //
 // Uses
 //   utils/configIO, utils/pathHelpers, services/updates/updateFiles (the branch, the last check),
-//   ./releases (releaseAt), ./git, ./branchName
+//   ./releases (releaseAt), ./git, ./branchName; updateFiles (readSystemResult, unitsEnabled)
 const fs = require('fs/promises');
 const { readJsonFile } = require('../../utils/configIO');
 const { installerRecordPath, serverKioskPath, requirementsPath } = require('../../utils/pathHelpers');
-const { readBranchSetting, readCheck } = require('./updateFiles');
+const { readBranchSetting, readCheck, readSystemResult, unitsEnabled } = require('./updateFiles');
 const { releaseAt } = require('./releases');
 const { git } = require('./git');
 const { validBranchName } = require('./branchName');
@@ -74,7 +76,21 @@ async function status() {
     if (needs.needed) return { ...needs, branch, ref: waiting, returning: { release: waiting, branch } };
   }
   const ref = branch === 'main' ? (await releaseAt()) || 'main' : branch;
-  return { ...installerNeeds(readJsonFile(requirementsPath()), installed), branch, ref, returning: null };
+  const needs = installerNeeds(readJsonFile(requirementsPath()), installed);
+  // On main with root's system step set up (installer version 6), the installer runs by itself: the
+  // notice only asks for something when its last run, for a Release not running yet, didn't work
+  // (SYSTEM_DESIGN §18.7 phase 2)
+  const [units, result, head] = await Promise.all([
+    unitsEnabled(), readSystemResult(), git(['rev-parse', 'HEAD']).catch(() => null),
+  ]);
+  const automatic = branch === 'main' && units.system;
+  const systemFailed = automatic && result && result.result !== 'done' && result.commit !== head
+    ? { release: result.release || null, message: String(result.message || ''), time: result.time || null } : null;
+  return {
+    ...needs,
+    needed: (needs.needed && !automatic) || !!systemFailed,
+    branch, ref, returning: null, automatic, systemFailed,
+  };
 }
 
 module.exports = { installedVersion, installerNeeds, status };

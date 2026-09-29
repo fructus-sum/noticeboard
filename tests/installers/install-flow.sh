@@ -29,6 +29,7 @@ stubs() {
   curl()      { echo "curl $*" >> "$T/calls.log"; }
   runuser()   { shift 3; "$@"; }                         # -u <user> -- cmd...
   getent()    { echo "pi:x:1000:1000::$T/home:/bin/bash"; }
+  xdg-user-dir() { echo "$T/home/Desktop"; }               # not this machine's own desktop (a CI runner has one)
   node()      { case "$*" in *process.version*) printf 24 ;; *) echo "node (config init)" >> "$T/calls.log" ;; esac; }
   has_tty()   { return 0; }
   ask()       { REPLY="${ANSWERS[0]-}"; ANSWERS=("${ANSWERS[@]:1}"); echo "  [answered: '${REPLY}']"; }
@@ -46,6 +47,9 @@ paths() {
   CLIENT_DIR="$r/opt-noticeboard-client"; CLIENT_LAUNCHER="$r/bin/noticeboard-client"
   KIOSK_SERVICE_FILE="$r/etc/noticeboard-kiosk.service"; OLD_CLIENT_KIOSK="$r/bin/noticeboard-kiosk.sh"
   DEVICE_MODEL_FILE="$r/model"; DISPLAY_MANAGER_UNIT="$r/etc/display-manager.service"
+  SYSTEM_SERVICE_FILE="$r/etc/noticeboard-system.service"; SYSTEM_PATH_FILE="$r/etc/noticeboard-system.path"
+  SYSTEM_STEP="$r/sbin/noticeboard-system"; SERVER_COMMAND="$r/bin/noticeboard"; ROOT_LIB_DIR="$r/lib-noticeboard"
+  mkdir -p "$r/sbin"
   export SUDO_USER; SUDO_USER=$(id -un)
 }
 # run_installer with the answers given; the output in $T/<name>.out, the exit code in RC
@@ -62,6 +66,7 @@ install() {   # install <name> <install folder> <answers...>
 }
 saved() { sed -n "s/^NOTICEBOARD_$1=//p" "$T/root/etc/noticeboard/install.env" 2>/dev/null; }
 R="$T/root"
+V=$(sed -n 's/^INSTALLER_VERSION=//p' "$REPO/installers/install.sh")   # the installer's version
 
 # Its GitHub: a bare copy of this repository whose main is the commit checked out here (a CI
 # checkout has no local main branch)
@@ -96,11 +101,27 @@ grep -q "^Exec=$R/bin/noticeboard-client kiosk$" "$R/autostart/noticeboard-kiosk
 [ ! -e "$T/opt-noticeboard/start-kiosk.sh" ] && [ ! -e "$R/etc/noticeboard-kiosk.service" ] && ok "the old start-kiosk.sh removed; no headless service" || bad "old kiosk left"
 grep -q "file://$T/opt-noticeboard/noticeboard-guide.html" "$T/home/Desktop/noticeboard-help.desktop" && ok "Help shortcut to the guide on the Server" || bad "help shortcut"
 grep -q "^check_sudo_password" "$T/calls.log" && ok "a Raspberry Pi: the sudo check is offered" || bad "sudo check on a Pi"
-node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')); process.exit(r.version===5?0:1)" "$T/opt-noticeboard/data/installer.json" \
-  && ok "the installer record says version 5" || bad "installer record"
+node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')); process.exit(r.version===Number(process.argv[2])?0:1)" "$T/opt-noticeboard/data/installer.json" "$V" \
+  && ok "the installer record says INSTALLER_VERSION" || bad "installer record"
 grep -q "Auto-update  : every 15 minutes" "$T/both.out" && grep -q "shows the slideshow from its own Server" "$T/both.out" && grep -q "Screen Blanking" "$T/both.out" \
   && ok "the summary: the Server's lines, the Client's, and the Pi's screen-blanking advice" || bad "summary"
 grep -q "Reboot later with" "$T/both.out" && ok "a Client: the reboot is offered" || bad "reboot offer"
+grep -q "^PathExists=$T/opt-noticeboard/tmp/system-request$" "$R/etc/noticeboard-system.path" && grep -q "^ExecStart=$R/sbin/noticeboard-system$" "$R/etc/noticeboard-system.service"   && grep -q "systemctl enable --now noticeboard-system.path" "$T/calls.log" && ok "the system step's units written and its path unit enabled" || bad "system units"
+cmp -s "$R/sbin/noticeboard-system" "$REPO/installers/root/noticeboard-system" && cmp -s "$R/bin/noticeboard" "$REPO/installers/root/noticeboard"   && cmp -s "$R/lib-noticeboard/release.sh" "$REPO/installers/lib/release.sh" && cmp -s "$R/lib-noticeboard/branch.sh" "$REPO/installers/lib/branch.sh"   && cmp -s "$R/lib-noticeboard/json.sh" "$REPO/installers/lib/json.sh" && ok "root's files (the system step, the noticeboard command and the parts they load) installed as they are" || bad "root files"
+
+# ── --apply (the system step): the saved answers, no questions, never the code ──
+before=$(git -C "$T/opt-noticeboard" rev-parse HEAD)
+: > "$T/calls.log"
+( load_installer; stubs; paths; INSTALL_DIR="$T/opt-noticeboard"; BRANCH_FILE="$INSTALL_DIR/data/update-branch.env"
+  ask() { echo "ASKED"; REPLY=""; }; APPLY=1
+  apply_saved_installation ) > "$T/apply.out" 2>&1
+RC=$?
+[ $RC -eq 0 ] && ! grep -q ASKED "$T/apply.out" && grep -q "Done: installer version $V applied" "$T/apply.out" && ok "--apply: runs with the saved answers, asking nothing" || { bad "apply"; tail -12 "$T/apply.out"; }
+! grep -q "^npm |dist-upgrade|systemctl restart noticeboard|^check_sudo_password" "$T/calls.log" && [ "$(git -C "$T/opt-noticeboard" rev-parse HEAD)" = "$before" ]   && ok "--apply: no code, build, system upgrade, restart or sudo check" || { bad "apply did too much"; grep -E "^npm |dist-upgrade|restart|sudo" "$T/calls.log"; }
+grep -q "apt-get -o DPkg::Lock::Timeout=300 update" "$T/calls.log" && grep -q "apt-get install -y -qq git ffmpeg curl" "$T/calls.log" && grep -q "apt-get install -y -qq chromium curl" "$T/calls.log"   && ok "--apply: the package list updated, the Server's and the Client's packages installed" || { bad "apply packages"; grep apt "$T/calls.log"; }
+node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')); process.exit(r.version===Number(process.argv[2])?0:1)" "$T/opt-noticeboard/data/installer.json" "$V" && [ "$(saved ROLE)" = both ]   && ok "--apply: the installer record written, the answers kept" || bad "apply record"
+( load_installer; stubs; paths; INSTALL_ENV_FILE="$T/none.env"; APPLY=1; apply_saved_installation ) > "$T/apply-none.out" 2>&1
+[ $? -ne 0 ] && grep -q "no saved answers" "$T/apply-none.out" && ok "--apply without saved answers: stops, says to run the installer by hand" || bad "apply without answers"
 
 # ── Client only, a fresh headless device (not a Pi): Enter and '4' refused, then 2; the URL ──
 rm -rf "$T/home"
@@ -117,6 +138,7 @@ grep -q "apt-get install -y -qq chromium curl cage " "$T/calls.log" && ok "headl
 ! grep -q "^check_sudo_password" "$T/calls.log" && ok "not a Raspberry Pi: no sudo offer" || bad "sudo offer off a Pi"
 first_two_are_update_then_upgrade && ok "Client only also updates, then upgrades, first" || bad "client upgrade order"
 [ ! -e "$T/nothing-here" ] && ok "Client only: no Server folder" || bad "server folder made"
+[ ! -e "$R/etc/noticeboard-system.path" ] && [ ! -e "$R/bin/noticeboard" ] && ok "Client only: no system step or noticeboard command" || bad "client-only system step"
 
 # ── Re-run on that Client: Enter keeps role, platform and URL ──
 install rerun "$T/nothing-here" "" "" "" n n

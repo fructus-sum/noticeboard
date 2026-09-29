@@ -22,7 +22,8 @@
 // The texts in the slots use the global .danger-dialog styles (styles/base.css): .warnings,
 // .choices, .tone-warn, and paragraph spacing.
 //
-// Used by: updates/SwitchDialogs (after its own Missing software step), settings/DeleteContentCard
+// Used by: updates/SwitchDialogs (after its own Missing software step), updates/FullUpdate,
+//   settings/DeleteContentCard
 // Uses: ModalDialog
 import { ref, nextTick } from 'vue';
 import ModalDialog from './ModalDialog.vue';

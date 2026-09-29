@@ -24,17 +24,21 @@
 //                            (it works out the next install time)
 //   setInstallAt(value, by) → info: a set time for the waiting update, then a check
 //   installNow(by)         → info: installs the latest version of the followed branch now
+//   fullUpdate(by)         → info: a Full update (main only, with the system step set up): root's
+//                            system step for main's latest Release, then its code again
+//                            (SYSTEM_DESIGN §18.7 phase 2)
 //   waitingUpdate(info)    → the version waiting to be installed ({ commit, release, subject,
 //                            date, nextInstall }), or null
 //   updaterReady()         → info, or throws (409) when this noticeboard can't update itself
-//   manualUpdateWaiting()  → whether the screens show the warning mark for it: manual
-//                            updates, and a version waiting (SYSTEM_DESIGN §14 D41)
+//   updateWaiting()        → whether the screens show the warning mark for it: a newer version
+//                            waiting, on any schedule (SYSTEM_DESIGN §14 D41, §18.7 phase 2)
 //   validBranchName                              (from branchName.js)
 //   issueToken(branch), takeToken(token, branch) the password check's one-time token for a
 //                            switch (services/actionTokens, action 'switch')
 //
 // Used by
-//   routes/api/settings/updates.js, services/displaySettings.js (manualUpdateWaiting),
+//   routes/api/settings/updates.js, routes/api/settings/maintenance.js (fullUpdate),
+//   services/displaySettings.js (updateWaiting),
 //   services/contentReset.js (updaterReady, getInfo)
 //
 // Uses
@@ -86,7 +90,7 @@ async function getInfo() {
       reason: "This copy of the noticeboard wasn't installed from GitHub by the installer, so it can't update itself.",
     };
   }
-  const [configured, status, lastCheck, units, pending, schedule, release] = await Promise.all([
+  const [configured, status, lastCheck, units, pending, schedule, release, lastSystemStep] = await Promise.all([
     files.readBranchSetting(),
     files.readStatus(),
     files.readCheck(),
@@ -94,6 +98,7 @@ async function getInfo() {
     files.requestPending(),
     files.readSchedule(),
     branch === 'main' ? releases.releaseAt(commit) : null,
+    files.readSystemResult(),
   ]);
   return {
     available: true,
@@ -104,6 +109,8 @@ async function getInfo() {
     configuredBranch: configured,
     autoUpdates: units.timer,      // checked every 15 minutes
     instant: units.path,           // a switch starts within seconds (else at the next check)
+    systemStep: units.system,      // root's system step is set up (installer version 6): Full update
+    lastSystemStep,                // its last answer ({ commit, release, result, message, time }), or null
     pending,
     busy: inProgress(status),
     status,                        // the last update or switch (update.sh)
@@ -125,13 +132,12 @@ function waitingUpdate({ commit, lastCheck }) {
   };
 }
 
-async function manualUpdateWaiting() {
-  const [schedule, lastCheck, commit] = await Promise.all([
-    files.readSchedule(),
+async function updateWaiting() {
+  const [lastCheck, commit] = await Promise.all([
     files.readCheck(),
     git(['rev-parse', 'HEAD']).catch(() => null),
   ]);
-  return schedule.every === 'manual' && !!waitingUpdate({ commit, lastCheck });
+  return !!waitingUpdate({ commit, lastCheck });
 }
 
 // The updater must be set up for any of these to happen
@@ -179,6 +185,33 @@ async function installNow(by) {
     time: new Date().toISOString(),
   });
   logger.info('Update now requested', { by });
+  return getInfo();
+}
+
+// A Full update: root's system step for main's latest Release (its installer, --apply), then its
+// code again. main only (a branch's installer is run by hand: the owner, 2026-09-29), and only
+// once the system step is set up (installer version 6).
+async function fullUpdate(by) {
+  const info = await updaterReady();
+  if (info.branch !== 'main' || info.configuredBranch !== 'main') {
+    throw userError(409, `A full update only runs by itself for main's Releases, and this noticeboard follows ${info.configuredBranch}. Run the installer on the Server by hand instead.`);
+  }
+  if (!info.systemStep) {
+    throw userError(409, "The installer's system step isn't set up on this noticeboard yet. Run the installer on the Server once by hand; after that, Full update works from here.");
+  }
+  if (info.busy) throw userError(409, 'An update is already in progress. Wait for it to finish.');
+  const when = info.instant ? 'It starts within a few seconds.' : 'It starts at the next update check, within 15 minutes.';
+  await files.saveInstallNow({
+    state: 'requested',
+    branch: 'main',
+    previousBranch: info.branch,
+    commit: info.commit,
+    previousCommit: info.commit,
+    target: '',
+    message: `Full update requested: the installer's system step, then main's latest Release installed again. ${when}`,
+    time: new Date().toISOString(),
+  }, 'full');
+  logger.warn('Full update requested', { by });
   return getInfo();
 }
 
@@ -341,8 +374,9 @@ module.exports = {
   setSchedule,
   setInstallAt,
   installNow,
+  fullUpdate,
   waitingUpdate,
-  manualUpdateWaiting,
+  updateWaiting,
   updaterReady,
   validBranchName,
   issueToken: (branch) => tokens.issue('switch', branch),

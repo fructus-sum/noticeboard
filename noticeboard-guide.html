@@ -1665,6 +1665,10 @@ sudo systemctl start noticeboard-kiosk</code></pre>
       <p>Updates change the Noticeboard app, but not what only the installer sets up on the Server and the Clients: the kiosk that shows the slideshow full screen, the system services, the desktop shortcuts and system packages. When a new version (or a branch you switch to) changes one of those, an amber box at the top of every admin page says <strong>Run the installer again on the Server</strong>. It lists what running it brings and shows the command to run, with a <strong>Copy</strong> button. The command is for the branch the Server follows. Until the installer has been run, every screen also shows a small red warning triangle in its bottom-right corner (see <a href="#viewer" style="color:var(--blue)">On the screen</a>).</p>
       <p>Run it in a terminal on the Server, or over SSH. It keeps your answers (press Enter), slideshows and settings, and offers to restart at the end. The box goes away once the installer has run; there's nothing to close. Until then the noticeboard works as before, just without what the box lists. If the box says so, run the installer on each Client too.</p>
       <p>Before you switch branch, the check tells you if that branch will need the installer run again (see <a href="#branches" style="color:var(--blue)">Switching branch</a>).</p>
+      <p><strong>On <em>main</em>, once the installer has been run by hand one more time, it runs by itself.</strong> When a new Release needs something only the installer sets up, the Server runs that Release's installer itself (as its administrator, downloaded straight from GitHub, and only for <em>main</em>'s latest Release), then installs the Release as usual. You don't need to do anything, and the box only appears if that didn't work: it says why, and the Server keeps running the version it had until the next Release. On a branch other than <em>main</em>, the installer is always run by hand, as above.</p>
+
+      <h3 id="full-update" style="scroll-margin-top:80px">Full update</h3>
+      <p>On <em>main</em>, <strong>Settings → Software updates → Full update…</strong> runs the installer of <em>main</em>'s latest Release on the Server (the system packages it needs, its services and the Server's own screen, with the answers given when it was installed), then installs that Release again. Use it if something the installer set up needs repairing. It asks for the admin password and a final confirmation, like switching branch. Your slideshows, audio and settings are kept. On the Server itself, <code>sudo noticeboard update --full</code> does the same.</p>
 
       <h3 id="branches" style="scroll-margin-top:80px">Switching branch</h3>
       <p>Besides <em>main</em>, the project on GitHub can have other branches holding work in progress, such as a new feature being tried out. You can switch this noticeboard to one of them from the admin panel. Updates then come from that branch until you switch back. Nothing changes until you've checked the branch and confirmed twice.</p>
@@ -1736,6 +1740,10 @@ sudo systemctl start noticeboard-kiosk</code></pre>
         <thead><tr><th>To…</th><th>Run this on the Server</th></tr></thead>
         <tbody>
           <tr><td>See what the updater did</td><td><code>sudo journalctl -u noticeboard-update</code> (or look at Settings → Software updates)</td></tr>
+          <tr><td>See what's running, and how updates went</td><td><code>noticeboard status</code></td></tr>
+          <tr><td>Update now, whatever the schedule says</td><td><code>sudo noticeboard update</code></td></tr>
+          <tr><td>Run a full update (on <em>main</em>: the installer, then the Release again)</td><td><code>sudo noticeboard update --full</code> (or Settings → Software updates → Full update…)</td></tr>
+          <tr><td>See what the installer did when it ran by itself</td><td><code>sudo journalctl -u noticeboard-system</code></td></tr>
           <tr><td>Check for an update now</td><td><code>bash /opt/noticeboard/installers/update.sh</code></td></tr>
           <tr><td>Retry a version that was skipped</td><td><code>bash /opt/noticeboard/installers/update.sh --force</code></td></tr>
           <tr><td>Switch branch</td><td>Use Settings → Software updates in the admin panel</td></tr>
