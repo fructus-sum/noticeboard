@@ -1,0 +1,10 @@
+[Unit]
+Description=Check the Noticeboard Server for new Client files every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

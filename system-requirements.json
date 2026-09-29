@@ -2,14 +2,15 @@
   "_comment": "The software this branch needs on the Noticeboard Server, besides the packages npm installs. Keep it up to date on every branch: when a change needs new software, or a newer version of something listed, update this file in the same commit. Before switching branch, the admin panel checks the Server against the target branch's list (Settings → Software updates). versions: space-separated conditions must all hold; || separates alternatives; * means any version.",
   "installer": {
     "_comment": "Updates can't change what only the installer sets up: kiosk scripts, system services, desktop shortcuts and system packages. When install.sh changes any of those, raise version here and INSTALLER_VERSION in install.sh to the same number (in the same commit), and add a line to changes saying what running it again brings. displays: true when Clients need it too. A Server whose last installer run is older warns on the admin home page, and before switching to this branch.",
-    "version": 6,
+    "version": 7,
     "changes": [
       { "version": 1, "change": "The full-screen kiosk only for the slideshow, in a browser of its own, with an exit button", "displays": true },
       { "version": 2, "change": "A Noticeboard Help shortcut on the desktop, and the viewer hiding the mouse cursor by itself (unclutter is no longer used)", "displays": true },
       { "version": 3, "change": "Background audio: the full-screen kiosk may play sound without anyone clicking first", "displays": true },
       { "version": 4, "change": "The Server's own screen follows the port set in Settings, and a Client's waiting page says \"Server\" and \"Client\"", "displays": true },
       { "version": 5, "change": "One installer for every device: Client + Server, Client only or Server only, on Raspberry Pi OS or Debian, with a desktop or headless; the answers saved for next time; one Client for every screen", "displays": true },
-      { "version": 6, "change": "On main, a Release that needs the installer runs it by itself (the system step), with Full update in Software updates and the noticeboard command (sudo noticeboard update, noticeboard status)" }
+      { "version": 6, "change": "On main, a Release that needs the installer runs it by itself (the system step), with Full update in Software updates and the noticeboard command (sudo noticeboard update, noticeboard status)" },
+      { "version": 7, "change": "A Client only follows its Server's version by itself (signed updates, put back if the screen doesn't come back), with sudo noticeboard-client trust-server and reinstall-stable", "displays": true }
     ]
   },
   "software": [

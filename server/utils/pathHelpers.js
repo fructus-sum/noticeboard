@@ -2,7 +2,7 @@
 //
 // Provides
 //   ROOT; data/ (config, slideshows, branding, the update files and schedule, the Restore Defaults
-//   marker); logs/; tmp/ (tmpRootDir, and tmpDir: the uploads; the system step's answer); the built
+//   marker); logs/; tmp/ (tmpRootDir, and tmpDir: the uploads; the system step's answer; the Client bundle); the Client signing key; the built
 //   apps; the guide; sample-data/; what the installer set up (installer.json, the server kiosk
 //   script, the systemd units: NOTICEBOARD_SYSTEMD_DIR for tests); mediaUrl(folder, file)
 //
@@ -41,6 +41,9 @@ function restoreMarkerPath() { return path.join(dataDir(), 'restore-defaults'); 
 // What install.sh set up: the version of its last run, and the Server's kiosk script
 function installerRecordPath() { return path.join(dataDir(), 'installer.json'); }
 function systemResultPath() { return path.join(ROOT, 'tmp', 'system-result'); }
+// The key a Client only's updates are signed with, and the bundle it downloads (SYSTEM_DESIGN §18.7 phase 3)
+function clientKeyPath() { return path.join(dataDir(), 'client-signing.key'); }
+function clientBundlePath(commit) { return path.join(ROOT, 'tmp', `client-bundle-${commit}.tar.gz`); }
 function serverKioskPath() { return path.join(ROOT, 'start-kiosk.sh'); }
 function requirementsPath() { return path.join(ROOT, 'system-requirements.json'); }
 // Where install.sh puts the systemd units; NOTICEBOARD_SYSTEMD_DIR points elsewhere for tests
@@ -81,6 +84,8 @@ module.exports = {
   restoreMarkerPath,
   installerRecordPath,
   systemResultPath,
+  clientKeyPath,
+  clientBundlePath,
   serverKioskPath,
   requirementsPath,
   systemdDir,

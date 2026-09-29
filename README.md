@@ -115,6 +115,7 @@ Running it again is safe: it offers your previous answers (saved in `/etc/notice
 - Installs the Client in `/opt/noticeboard-client`, run by `noticeboard-client kiosk`: at login with a desktop, or from start-up when headless
 - Shows the viewer full screen (kiosk mode), in a browser profile of its own, and opens it again if it closes or crashes. Until its Server answers, it shows a waiting page with the device's MAC address and the reason it's waiting (Server unreachable, or not yet approved by MAC filtering), and switches to the slideshow by itself as soon as it can
 - With a desktop, puts a **Noticeboard Help** shortcut on it; the viewer's exit button leaves the kiosk for an ordinary browser window. Headless, the kiosk stops with `sudo systemctl stop noticeboard-kiosk`
+- A Client only follows its Server's version by itself: every 15 minutes it asks the Server which Client files it runs, and installs them when they change, but only if they carry the Server's signature (the installer shows the Server's key fingerprint and asks you to trust it). If the slideshow doesn't come back after such an update, the Client puts its previous files back. `sudo noticeboard-client reinstall-stable` reinstalls the Client from `main`'s latest Release on GitHub; `noticeboard-client status` shows its version and Server
 
 After the installer's reboot, the slideshow appears automatically.
 
@@ -130,7 +131,7 @@ The Server checks GitHub every 15 minutes and installs new versions by itself: o
 
 - **Current:** everything listed above is implemented and described in the user guide.
 - **Tested:** the slide timing (`npm test`, including a simulated 30 days), the viewer in a real browser under outages, freezes, crashes and updates, the admin panel end to end, and the installer, kiosk scripts and updater against stand-ins for systemd, apt and the browser. The installer is in use on Raspberry Pi OS Trixie (labwc desktop).
-- **Limitations:** only the Server updates itself (Clients load new versions from it); kiosk scripts and system settings only change when the installer runs; a screen can't wake a monitor that is switched off (screen blanking is set in the operating system).
+- **Limitations:** a Client only's own files follow its Server (installer version 7 or later, and a Server running 0.9.0 or later); on a development branch, what only the installer sets up on the Server changes when the installer is run by hand; a screen can't wake a monitor that is switched off (screen blanking is set in the operating system).
 
 ## Development
 

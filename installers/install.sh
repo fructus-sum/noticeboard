@@ -17,7 +17,8 @@
 # steps are in installers/lib/*.sh, the Client's files it installs in installers/client/ and root's
 # own files (the system step, the noticeboard command) in installers/root/ (see load_modules).
 #   sudo bash install.sh --apply   no questions: the saved answers, only what updates can't do (run
-#                                  by root's system step at main's latest Release, §18.7 phase 2)
+#                                  by root's system step at main's latest Release, §18.7 phase 2,
+#                                  and on a Client only by noticeboard-client check, phase 3)
 # Older installers hand over by
 # downloading only this file, so it must keep its name, pass bash -n and keep the line
 # starting INSTALLER_VERSION=.
@@ -51,6 +52,9 @@ CLIENT_DIR="/opt/noticeboard-client"               # the Client's files: current
 CLIENT_LAUNCHER="/usr/local/bin/noticeboard-client"
 KIOSK_SERVICE_FILE="/etc/systemd/system/noticeboard-kiosk.service"   # a headless Client's kiosk
 OLD_CLIENT_KIOSK="/usr/local/bin/noticeboard-kiosk.sh"   # a Client's kiosk before 0.9.0 (removed)
+CLIENT_UPDATE_SERVICE_FILE="/etc/systemd/system/noticeboard-client-update.service"   # a Client only follows its Server
+CLIENT_UPDATE_TIMER_FILE="/etc/systemd/system/noticeboard-client-update.timer"
+SERVER_KEY_FILE="/etc/noticeboard/server.pub"      # the Server's key a Client only trusts
 DEVICE_MODEL_FILE="/proc/device-tree/model"         # says Raspberry Pi on one (lib/system.sh)
 DISPLAY_MANAGER_UNIT="/etc/systemd/system/display-manager.service"   # there's a desktop
 SUDOERS_BACKUP_DIR="/root/noticeboard-sudoers-backup"
@@ -64,7 +68,7 @@ ROOT_LIB_DIR="/usr/local/lib/noticeboard"
 # updates can't: the Client, system services, desktop shortcuts or system packages. A Server
 # whose last installer run (data/installer.json) is older is told to run it again, or on main
 # runs it by itself (the system step).
-INSTALLER_VERSION=6
+INSTALLER_VERSION=7
 # A Server follows main unless another branch was chosen in the admin panel (choose_branch)
 INSTALL_BRANCH=main
 # The installer's parts, from the same commit as this script (see load_modules)
@@ -96,7 +100,8 @@ main() {
   fi
 }
 
-# --apply (run by root's system step, noticeboard-system, at main's latest Release): what updates
+# --apply (run by root's system step, noticeboard-system, at main's latest Release; on a Client
+# only by noticeboard-client check, from its Server's signed bundle): what updates
 # can't do, with the saved answers and no questions: the Server's packages and services (without
 # restarting it: update.sh installs the code and restarts it next) and the Client, then the record.
 # Never the code, the sudo check, the firewall or a reboot.
@@ -175,6 +180,9 @@ run_installer() {
     remove_old_kiosks
   fi
   save_answers
+  if [ "$ROLE" = client ]; then
+    pin_server_key
+  fi
   if has_server; then
     write_installer_record   # last: a run that stopped part way doesn't count
     summary_server
@@ -380,7 +388,8 @@ load_modules_from() {   # load_modules_from <folder>
   for fn in has_tty banner load_answers choose_role refuse_role_change choose_branch choose_platform \
             ask_server_url is_raspberry_pi check_sudo_password install_server write_installer_record \
             summary_server install_client remove_old_kiosks save_answers summary_client check_firewall offer_reboot \
-            install_server_packages install_server_services role_name set_role has_server has_client; do
+            install_server_packages install_server_services role_name set_role has_server has_client \
+            pin_server_key write_root_libs; do
     declare -F "$fn" >/dev/null || return 1
   done
 }

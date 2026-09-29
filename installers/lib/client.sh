@@ -15,6 +15,8 @@
 #   write_client_files      the Client's files and version into CLIENT_DIR
 #   write_client_launcher   /usr/local/bin/noticeboard-client (compared with tests/fixtures/installer-golden)
 #   write_kiosk_service     noticeboard-kiosk.service (compared with tests/fixtures/installer-golden)
+#   write_client_update_units  a Client only's noticeboard-client-update.{service,timer} (golden too)
+#   pin_server_key          a new Client only trusts its Server's key (noticeboard-client trust-server)
 #   remove_old_kiosks       start-kiosk.sh and noticeboard-kiosk.sh of installers before 0.9.0
 #   summary_client
 #
@@ -25,7 +27,8 @@
 #   system.sh (update_system, chromium_package, is_raspberry_pi), desktop.sh (write_autostart,
 #   write_help_shortcut), ui.sh (ask, banner, has_server), sudo.sh (SUDO_STATUS); the Client's files read in by install.sh
 #   (CLIENT_FILES, CLIENT_FILE_<name>); CLIENT_DIR, CLIENT_LAUNCHER, KIOSK_SERVICE_FILE,
-#   AUTOSTART_FILE, OLD_CLIENT_KIOSK, INSTALL_DIR, ROLE, PLATFORM, DESKTOP_USER (install.sh, ui.sh)
+#   AUTOSTART_FILE, OLD_CLIENT_KIOSK, INSTALL_DIR, ROLE, PLATFORM, DESKTOP_USER, CLIENT_UPDATE_*_FILE,
+#   SERVER_KEY_FILE, INSTALL_ENV_FILE (install.sh, ui.sh); server.sh (write_root_libs)
 #
 # Change impact
 #   What's written here only changes on an installer run: changing it means raising
@@ -60,6 +63,7 @@ install_client() {
   echo "▸ Installing the Client (the slideshow on this device's screen)..."
   local packages=("$(chromium_package)" curl)
   if [ "$PLATFORM" = headless ]; then packages+=(cage); fi
+  if ! has_server; then packages+=(openssl); fi   # a Client only checks its Server's signature
   apt-get install -y -qq "${packages[@]}"
 
   write_client_files
@@ -86,6 +90,57 @@ install_client() {
     fi
   fi
   remove_old_kiosks
+  # A Client only follows its Server (SYSTEM_DESIGN §18.7 phase 3): every 15 minutes, as root; a
+  # Client + Server's screen is kept up to date with its Server instead (the system step)
+  if ! has_server; then
+    write_root_libs
+    write_client_update_units
+    systemctl daemon-reload
+    systemctl enable --now noticeboard-client-update.timer --quiet
+    echo "  Follows its Server's version by itself: noticeboard-client check, every 15 minutes."
+  fi
+}
+
+# A Client only: noticeboard-client check every 15 minutes, as root
+write_client_update_units() {
+  cat > "$CLIENT_UPDATE_SERVICE_FILE" <<SVC
+[Unit]
+Description=Noticeboard Client: install the Client files its Server runs, when they change
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$CLIENT_LAUNCHER check
+TimeoutStartSec=20min
+SVC
+
+  cat > "$CLIENT_UPDATE_TIMER_FILE" <<TIMER
+[Unit]
+Description=Check the Noticeboard Server for new Client files every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
+TIMER
+}
+
+# A new Client only trusts its Server's key (shown as a fingerprint, pinned after a yes), so it can
+# check what it installs. Asked once, after the answers are saved; never with --apply.
+pin_server_key() {
+  if [ -s "$SERVER_KEY_FILE" ]; then
+    return 0
+  fi
+  echo ""
+  if ! NOTICEBOARD_CONFIG="$INSTALL_ENV_FILE" NOTICEBOARD_SERVER_KEY="$SERVER_KEY_FILE" NOTICEBOARD_CLIENT_DIR="$CLIENT_DIR" \
+       "$CLIENT_LAUNCHER" trust-server; then
+    echo "  This Client won't update itself until it trusts its Server: once the Server runs 0.9.0 or"
+    echo "  newer and can be reached, run: sudo noticeboard-client trust-server"
+  fi
 }
 
 # The Client's files as the installer has them (the same commit as the installer), and their version

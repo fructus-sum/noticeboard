@@ -18,7 +18,8 @@
 #   write_service, write_update_units, write_system_units   the systemd units (compared with
 #                                       tests/fixtures/installer-golden)
 #   write_root_files                    /usr/local/sbin/noticeboard-system, /usr/local/bin/noticeboard
-#                                       and /usr/local/lib/noticeboard/{branch,json,release}.sh
+#                                       and (write_root_libs, also used by client.sh)
+#                                       /usr/local/lib/noticeboard/{branch,json,release}.sh
 #   save_branch_setting                 data/update-branch.env (only if the branch changed) and
 #                                       data/update-status.json
 #   write_installer_record              data/installer.json, written last by install.sh (after the
@@ -206,6 +207,15 @@ PATHUNIT
 # Root's own files: the system step and the noticeboard command, with the installer's parts they
 # load, root-owned and outside the app's folder (root never runs code from there)
 write_root_files() {
+  write_root_libs
+  printf '%s' "$ROOT_FILE_noticeboard_system" > "$SYSTEM_STEP"
+  printf '%s' "$ROOT_FILE_noticeboard" > "$SERVER_COMMAND"
+  chmod 755 "$SYSTEM_STEP" "$SERVER_COMMAND"
+}
+
+# The installer's parts root's files load (ROOT_LIBS), root's, in ROOT_LIB_DIR (also on a Client
+# only: noticeboard-client reinstall-stable loads release.sh)
+write_root_libs() {
   local name var
   mkdir -p "$ROOT_LIB_DIR"
   chmod 755 "$ROOT_LIB_DIR"
@@ -214,9 +224,6 @@ write_root_files() {
     printf '%s' "${!var}" > "$ROOT_LIB_DIR/$name.sh"
     chmod 644 "$ROOT_LIB_DIR/$name.sh"
   done
-  printf '%s' "$ROOT_FILE_noticeboard_system" > "$SYSTEM_STEP"
-  printf '%s' "$ROOT_FILE_noticeboard" > "$SERVER_COMMAND"
-  chmod 755 "$SYSTEM_STEP" "$SERVER_COMMAND"
 }
 
 # What this installer run set up, so the admin panel can tell when a newer version needs the

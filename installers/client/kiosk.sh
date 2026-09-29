@@ -6,7 +6,8 @@
 #   (http://localhost:<port in its settings>), a Client only the Server it was given. Until the
 #   Server answers it shows a waiting page with this device's MAC addresses (for MAC filtering)
 #   and why it's waiting; then the viewer, in a browser profile of its own, started again if it
-#   exits or crashes. With a desktop, the viewer's exit button leaves the kiosk for an ordinary
+#   exits or crashes, and started again from new Client files as soon as they're installed (a
+#   Client only following its Server). With a desktop, the viewer's exit button leaves the kiosk for an ordinary
 #   browser window; headless (cage, no desktop) the viewer opens with ?kiosk=headless, which hides
 #   that button. See what it did: journalctl -t noticeboard-kiosk
 #
@@ -19,7 +20,9 @@
 #   /etc/noticeboard/install.env (lib/answers.sh: NOTICEBOARD_ROLE, _PLATFORM, _SERVER_URL); the
 #   Server's config through its own code (/opt/noticeboard/server/utils/configIO.js) for a Client +
 #   Server; Chromium, curl, logger; GET / and POST /api/device/kiosk-exit/claim on the Server.
-#   NOTICEBOARD_CONFIG, NOTICEBOARD_DIR and NOTICEBOARD_SYS_NET replace those paths in the tests.
+#   /opt/noticeboard-client/version (new files: start again) and /tmp/noticeboard-kiosk-up (the
+#   version, once the viewer is up). NOTICEBOARD_CONFIG, NOTICEBOARD_DIR, NOTICEBOARD_SYS_NET,
+#   NOTICEBOARD_CLIENT_DIR and NOTICEBOARD_KIOSK_UP replace those paths in the tests.
 #
 # Change impact
 #   The kiosk-exit answer ({"exit":true}, exactly), GET / answering 200 or 404, and ?kiosk=off and
@@ -28,6 +31,12 @@
 CONFIG=${NOTICEBOARD_CONFIG:-/etc/noticeboard/install.env}
 SERVER_DIR=${NOTICEBOARD_DIR:-/opt/noticeboard}
 SYS_NET=${NOTICEBOARD_SYS_NET:-/sys/class/net}
+HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+CLIENT_DIR=${NOTICEBOARD_CLIENT_DIR:-/opt/noticeboard-client}
+# Written once the viewer has been up a few seconds: the Client's update waits for its version
+# before it counts an update as working (noticeboard-client check, SYSTEM_DESIGN §18.7 phase 3)
+KIOSK_UP=${NOTICEBOARD_KIOSK_UP:-/tmp/noticeboard-kiosk-up}
+START_VERSION=$(cat "$CLIENT_DIR/version" 2>/dev/null)
 PAGE=/tmp/noticeboard-waiting.html
 # The waiting page runs in its own browser profile, so it can't hand over to the real one
 WAITING_PROFILE=/tmp/noticeboard-waiting-profile
@@ -171,7 +180,20 @@ wait_for_server() {
       WAITING_PID=$!
     fi
     sleep 10
+    if new_files; then
+      stop_waiting_page
+      start_again
+    fi
   done
+}
+
+# New Client files were installed (their version changed): start again from them
+new_files() {
+  [ "$(cat "$CLIENT_DIR/version" 2>/dev/null)" != "$START_VERSION" ]
+}
+start_again() {
+  log "New Client files ($(cat "$CLIENT_DIR/version" 2>/dev/null)): starting the kiosk again"
+  exec bash "$HERE/kiosk.sh"
 }
 
 # The exit button in the viewer's top-right corner asks the Server; the answer is for this device
@@ -199,8 +221,18 @@ while true; do
   log "Server $BASE answered; starting $BROWSER"
   "$BROWSER" "${FLAGS[@]}" --user-data-dir="$KIOSK_PROFILE" --kiosk "$BASE/$VIEW" &
   pid=$!
+  seconds=0
   while kill -0 "$pid" 2>/dev/null; do
     sleep 3
+    seconds=$((seconds + 3))
+    if [ "$seconds" = 12 ]; then
+      printf '%s\n' "$START_VERSION" > "$KIOSK_UP" 2>/dev/null || true
+    fi
+    if new_files; then
+      kill "$pid" 2>/dev/null
+      wait "$pid" 2>/dev/null
+      start_again
+    fi
     if [ "$PLATFORM" != headless ] && exit_requested; then
       leave_kiosk "$pid"
     fi

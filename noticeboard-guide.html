@@ -1753,6 +1753,19 @@ sudo systemctl start noticeboard-kiosk</code></pre>
         </tbody>
       </table>
 
+      <h3>Clients' updates</h3>
+      <p>A <em>Client only</em> keeps its own files in step with its Server: every 15 minutes it asks the Server which version it runs and, when the Client's files changed, downloads them, checks they carry the Server's signature, installs them and starts the slideshow again. A Server update that doesn't change the Client's files leaves the screen alone. If the slideshow doesn't come back within 3 minutes, the Client puts its previous files back and waits for the Server's next version. When the installer sets up a Client, it shows the Server's key fingerprint and asks you to trust it, as SSH does the first time you connect to a computer.</p>
+      <table>
+        <thead><tr><th>To…</th><th>Run this on the Client</th></tr></thead>
+        <tbody>
+          <tr><td>See the Client's version, its Server and the trusted key</td><td><code>noticeboard-client status</code></td></tr>
+          <tr><td>Check the Server for new Client files now</td><td><code>sudo noticeboard-client check</code></td></tr>
+          <tr><td>Trust the Server's key again (after rebuilding the Server)</td><td><code>sudo noticeboard-client trust-server</code></td></tr>
+          <tr><td>Reinstall the Client from <em>main</em>'s latest Release on GitHub (if it stopped working)</td><td><code>sudo noticeboard-client reinstall-stable</code></td></tr>
+          <tr><td>See what the Client's updates did</td><td><code>sudo journalctl -u noticeboard-client-update</code></td></tr>
+        </tbody>
+      </table>
+
       <p><strong>Installed before automatic updates existed?</strong> Run the installer once and let it reboot at the end; after that the Server updates itself. Clients only need the installer again when the way they start the slideshow changes. Run it once on each Client set up before the kiosk learned to reopen the browser and leave the waiting page by itself (over SSH is fine); after that they never need a visit.</p>
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>

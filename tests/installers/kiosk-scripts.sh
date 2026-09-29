@@ -16,7 +16,8 @@ CLIENT="$REPO/installers/client/noticeboard-client"
 
 # The device: its saved answers, the Server folder a Client + Server reads its port from, and its
 # network interfaces
-export NOTICEBOARD_CONFIG="$T/install.env" NOTICEBOARD_DIR="$T/server" NOTICEBOARD_SYS_NET="$T/net"
+export NOTICEBOARD_CONFIG="$T/install.env" NOTICEBOARD_DIR="$T/server" NOTICEBOARD_SYS_NET="$T/net" \n  NOTICEBOARD_CLIENT_DIR="$T/client-files" NOTICEBOARD_KIOSK_UP="$T/kiosk-up"
+mkdir -p "$T/client-files"; echo "v1" > "$T/client-files/version"
 mkdir -p "$T/bin" "$T/home" "$T/server" "$T/net/lo" "$T/net/eth0" "$T/net/wlan0"
 echo "00:00:00:00:00:00" > "$T/net/lo/address"
 echo "dc:a6:32:01:02:03" > "$T/net/eth0/address"
@@ -127,6 +128,15 @@ waitfor "$T/launch.log" "LAUNCH .*--kiosk http://192.168.1.10:3000/?kiosk=headle
 grep -- "--kiosk http" "$T/launch.log" | grep -q -- "--ozone-platform-hint=auto" && ok "headless: Chromium finds cage's Wayland display" || bad "headless ozone"
 /usr/bin/sleep 2
 ! grep -q "kiosk-exit/claim" "$T/curl.log" && ok "headless: no exit requests asked for (no desktop to go to)" || bad "headless polling"
+stop
+
+# ── New Client files: the kiosk says when it's up, and starts again from new files ──
+reset; rm -f "$T/kiosk-up"; echo v1 > "$T/client-files/version"; answers client desktop "http://192.168.1.10:3000"; touch "$T/crashed"; printf '200
+' > "$T/answers"
+start
+waitfor "$T/kiosk-up" "^v1$" && ok "the viewer up for a few seconds: the kiosk writes its version (for the Client's update)" || bad "kiosk-up"
+echo v2 > "$T/client-files/version"
+waitfor "$T/logger.log" "New Client files (v2): starting the kiosk again" && waitfor "$T/kiosk-up" "^v2$"   && ok "new Client files installed: the kiosk closes its browser and starts again from them" || { bad "restart"; cat "$T/logger.log"; }
 stop
 
 # ── Client only without a Server address ──

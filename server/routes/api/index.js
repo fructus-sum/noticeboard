@@ -3,6 +3,7 @@
 // Responsibilities
 //   At most 120 requests a minute per IP for everything under /api, then:
 //     /auth, /device    the MAC filter only (logging in; the location pin and the kiosk exit)
+//     /client           the MAC filter only (a Client only's updates, SYSTEM_DESIGN §18.7 phase 3)
 //     /settings         adminAuth
 //     /slideshows       adminAuth, once: the slides API is mounted inside it (…/:folder/slides)
 //
@@ -10,8 +11,8 @@
 //   routes/index.js
 //
 // Uses
-//   express-rate-limit, middleware/macFilter (auth, device), middleware/adminAuth (the rest), and
-//   the routers: auth, device, settings, slideshows, slides, audioshows, tracks
+//   express-rate-limit, middleware/macFilter (auth, device, client), middleware/adminAuth (the rest), and
+//   the routers: auth, device, client, settings, slideshows, slides, audioshows, tracks
 //
 // Change impact
 //   The URLs, status codes and JSON shapes are a contract with open admin panels, the kiosk scripts
@@ -22,6 +23,7 @@ const macFilter = require('../../middleware/macFilter');
 const adminAuth = require('../../middleware/adminAuth');
 const authRouter = require('./auth');
 const deviceRouter = require('./device');
+const clientRouter = require('./client');
 const settingsRouter = require('./settings');
 const slideshowsRouter = require('./slideshows');
 const slidesRouter = require('./slides');
@@ -45,6 +47,9 @@ router.use('/auth', macFilter, authRouter);
 
 // Display info pop-up: MAC filter only, like the display itself
 router.use('/device', macFilter, deviceRouter);
+
+// A Client only updating itself from its Server: MAC filter only, like the viewer it shows
+router.use('/client', macFilter, clientRouter);
 
 // Protected: MAC + JWT. The slides routes sit inside the slideshows API, so each request is
 // checked once (mounted side by side, a slide request was checked twice).

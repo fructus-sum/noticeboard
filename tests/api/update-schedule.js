@@ -1,8 +1,8 @@
 // The update schedule on the server side (SYSTEM_DESIGN §14 D41): the schedule and a set time are
 // checked, saved in data/update-schedule.env as update.sh reads it, and followed by a "check"
 // request; Update now writes the status and an "install-now" request; the waiting version comes
-// from update-check.json; the screens' warning mark (display:settings updateAvailable) shows only
-// with manual updates and a version waiting; nothing works without the updater set up.
+// from update-check.json; the screens' warning mark (display:settings updateAvailable) shows
+// while a version waits, on any schedule; nothing works without the updater set up.
 const fs = require('fs');
 const path = require('path');
 const { MODULES, makeApp, server, check, done, sleep, git } = require('../helpers/app.js');
@@ -76,7 +76,7 @@ const settingsOnConnect = (base) => new Promise((resolve) => {
   fs.writeFileSync(checkFile, JSON.stringify(waiting));
   await s.api('PUT', '/api/settings/updates/schedule', { every: 'daily', time: '00:00' });
   shown = await settingsOnConnect(env.base);
-  check('with automatic updates, no mark (the version installs by itself)', shown?.updateAvailable === false);
+  check('with automatic updates too, the mark while a version waits (any schedule, SYSTEM_DESIGN §18.7 phase 2)', shown?.updateAvailable === true, JSON.stringify(shown));
 
   // Update now
   fs.rmSync(requestFile, { force: true });

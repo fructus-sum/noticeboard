@@ -50,6 +50,8 @@ paths() {
   SYSTEM_SERVICE_FILE="$r/etc/noticeboard-system.service"; SYSTEM_PATH_FILE="$r/etc/noticeboard-system.path"
   SYSTEM_STEP="$r/sbin/noticeboard-system"; SERVER_COMMAND="$r/bin/noticeboard"; ROOT_LIB_DIR="$r/lib-noticeboard"
   mkdir -p "$r/sbin"
+  CLIENT_UPDATE_SERVICE_FILE="$r/etc/noticeboard-client-update.service"; CLIENT_UPDATE_TIMER_FILE="$r/etc/noticeboard-client-update.timer"
+  SERVER_KEY_FILE="$r/etc/noticeboard/server.pub"
   export SUDO_USER; SUDO_USER=$(id -un)
 }
 # run_installer with the answers given; the output in $T/<name>.out, the exit code in RC
@@ -64,6 +66,10 @@ install() {   # install <name> <install folder> <answers...>
   ) > "$T/$name.out" 2>&1
   RC=$?
 }
+# The Client's command runs as its own process: its curl can't reach any Server here (at once)
+mkdir -p "$T/bin"; printf '#!/usr/bin/env bash
+exit 7
+' > "$T/bin/curl"; chmod +x "$T/bin/curl"; export PATH="$T/bin:$PATH"
 saved() { sed -n "s/^NOTICEBOARD_$1=//p" "$T/root/etc/noticeboard/install.env" 2>/dev/null; }
 R="$T/root"
 V=$(sed -n 's/^INSTALLER_VERSION=//p' "$REPO/installers/install.sh")   # the installer's version
@@ -107,6 +113,7 @@ grep -q "Auto-update  : every 15 minutes" "$T/both.out" && grep -q "shows the sl
   && ok "the summary: the Server's lines, the Client's, and the Pi's screen-blanking advice" || bad "summary"
 grep -q "Reboot later with" "$T/both.out" && ok "a Client: the reboot is offered" || bad "reboot offer"
 grep -q "^PathExists=$T/opt-noticeboard/tmp/system-request$" "$R/etc/noticeboard-system.path" && grep -q "^ExecStart=$R/sbin/noticeboard-system$" "$R/etc/noticeboard-system.service"   && grep -q "systemctl enable --now noticeboard-system.path" "$T/calls.log" && ok "the system step's units written and its path unit enabled" || bad "system units"
+[ ! -e "$R/etc/noticeboard-client-update.timer" ] && ok "a Client + Server's screen doesn't follow its own Server (the system step keeps it up to date)" || bad "both has client timer"
 cmp -s "$R/sbin/noticeboard-system" "$REPO/installers/root/noticeboard-system" && cmp -s "$R/bin/noticeboard" "$REPO/installers/root/noticeboard"   && cmp -s "$R/lib-noticeboard/release.sh" "$REPO/installers/lib/release.sh" && cmp -s "$R/lib-noticeboard/branch.sh" "$REPO/installers/lib/branch.sh"   && cmp -s "$R/lib-noticeboard/json.sh" "$REPO/installers/lib/json.sh" && ok "root's files (the system step, the noticeboard command and the parts they load) installed as they are" || bad "root files"
 
 # ── --apply (the system step): the saved answers, no questions, never the code ──
@@ -139,6 +146,9 @@ grep -q "apt-get install -y -qq chromium curl cage " "$T/calls.log" && ok "headl
 first_two_are_update_then_upgrade && ok "Client only also updates, then upgrades, first" || bad "client upgrade order"
 [ ! -e "$T/nothing-here" ] && ok "Client only: no Server folder" || bad "server folder made"
 [ ! -e "$R/etc/noticeboard-system.path" ] && [ ! -e "$R/bin/noticeboard" ] && ok "Client only: no system step or noticeboard command" || bad "client-only system step"
+grep -q "^ExecStart=$R/bin/noticeboard-client check$" "$R/etc/noticeboard-client-update.service" && grep -q "OnUnitActiveSec=15min" "$R/etc/noticeboard-client-update.timer"   && grep -q "systemctl enable --now noticeboard-client-update.timer" "$T/calls.log" && ok "Client only: follows its Server (noticeboard-client check every 15 minutes)" || bad "client update units"
+grep -q "apt-get install -y -qq chromium curl cage openssl" "$T/calls.log" && cmp -s "$R/lib-noticeboard/release.sh" "$REPO/installers/lib/release.sh"   && ok "Client only: openssl (to check signatures) and the parts reinstall-stable loads" || bad "client openssl or libs"
+grep -q "won't update itself until it trusts its Server" "$T/client.out" && [ ! -e "$R/etc/noticeboard/server.pub" ]   && ok "Client only: its Server's key asked for; the Server out of reach, so nothing pinned and it says what to run" || { bad "pin"; tail -5 "$T/client.out"; }
 
 # ── Re-run on that Client: Enter keeps role, platform and URL ──
 install rerun "$T/nothing-here" "" "" "" n n
