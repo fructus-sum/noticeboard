@@ -39,7 +39,7 @@ request() {   # request install-now|full
   branch=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$INSTALL_DIR/data/update-branch.env" 2>/dev/null | head -n 1)
   if [ "$1" = full ] && [ "${branch:-main}" != main ]; then
     echo "This Server follows $branch: a full update only runs by itself for main's Releases."
-    echo "Run the installer instead: curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/$branch/installers/install.sh | sudo bash"
+    echo "Run the installer instead: curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/$branch/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=$branch bash"
     exit 1
   fi
   owner=$(stat -c %U "$INSTALL_DIR")
@@ -63,7 +63,11 @@ status() {
   tag=$(git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" tag --points-at HEAD 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
   branch=$(sed -n 's/^NOTICEBOARD_BRANCH=//p' "$d/update-branch.env" 2>/dev/null | head -n 1)
   echo "Running      : ${tag:+Release $tag, }$commit (following ${branch:-main})"
-  echo "Last check   : $(value "$d/update-check.json" time) $(value "$d/update-check.json" message)"
+  if [ -f "$d/update-check.json" ]; then
+    echo "Last check   : $(value "$d/update-check.json" time) $(value "$d/update-check.json" message)"
+  else
+    echo "Last check   : not yet (the first is within 15 minutes of installing)"
+  fi
   echo "Last update  : $(value "$d/update-status.json" time) $(value "$d/update-status.json" state): $(value "$d/update-status.json" message)"
   echo "Installer    : version $(value "$d/installer.json" version), run $(value "$d/installer.json" time)"
   if [ -f "$INSTALL_DIR/tmp/system-result" ]; then

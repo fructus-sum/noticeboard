@@ -21,7 +21,7 @@
 #   Server's config through its own code (/opt/noticeboard/server/utils/configIO.js) for a Client +
 #   Server; Chromium, curl, logger; GET / and POST /api/device/kiosk-exit/claim on the Server.
 #   /opt/noticeboard-client/version (new files: start again) and /tmp/noticeboard-kiosk-up (the
-#   version, once the viewer is up). NOTICEBOARD_CONFIG, NOTICEBOARD_DIR, NOTICEBOARD_SYS_NET,
+#   version, once the viewer is up; removed when the kiosk ends). NOTICEBOARD_CONFIG, NOTICEBOARD_DIR, NOTICEBOARD_SYS_NET,
 #   NOTICEBOARD_CLIENT_DIR and NOTICEBOARD_KIOSK_UP replace those paths in the tests.
 #
 # Change impact
@@ -36,6 +36,11 @@ CLIENT_DIR=${NOTICEBOARD_CLIENT_DIR:-/opt/noticeboard-client}
 # Written once the viewer has been up a few seconds: the Client's update waits for its version
 # before it counts an update as working (noticeboard-client check, SYSTEM_DESIGN §18.7 phase 3)
 KIOSK_UP=${NOTICEBOARD_KIOSK_UP:-/tmp/noticeboard-kiosk-up}
+# …and removed when the kiosk ends (stopped, or left for a normal window), so an update never
+# waits for a kiosk that isn't running and puts the files back for nothing (found in a Debian VM,
+# §18.7). Starting again from new files (exec) keeps it: the new kiosk writes its own version.
+trap 'rm -f "$KIOSK_UP"' EXIT
+trap 'exit 0' TERM INT HUP
 START_VERSION=$(cat "$CLIENT_DIR/version" 2>/dev/null)
 PAGE=/tmp/noticeboard-waiting.html
 # The waiting page runs in its own browser profile, so it can't hand over to the real one

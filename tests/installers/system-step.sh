@@ -94,9 +94,14 @@ cmd update --full
 [ $RC -eq 0 ] && [ "$(cat "$C/tmp/update-request")" = full ] && ok "noticeboard update --full: asks for a Full update" || bad "full" "$OUT"
 rm -f "$C/tmp/update-request"; echo "NOTICEBOARD_BRANCH=feature/x" > "$C/data/update-branch.env"
 cmd update --full
-[ $RC -ne 0 ] && [ ! -f "$C/tmp/update-request" ] && grep -q "feature/x/installers/install.sh" <<<"$OUT" && ok "noticeboard update --full on a branch: refused, with the installer command" || bad "full branch" "$OUT"
+[ $RC -ne 0 ] && [ ! -f "$C/tmp/update-request" ] && grep -q "feature/x/installers/install.sh | sudo NOTICEBOARD_INSTALL_BRANCH=feature/x bash" <<<"$OUT" && ok "noticeboard update --full on a branch: refused, with the installer command (naming the branch)" || bad "full branch" "$OUT"
 rm -f "$C/data/update-branch.env"
 cmd status
+grep -q "^Last check   : not yet" <<<"$OUT" && ok "noticeboard status before the first check: says not yet (found in a Debian VM)" || bad "status not yet" "$OUT"
+printf '{"result":"up-to-date","message":"Up to date.","time":"2026-09-29T08:30:00Z"}
+' > "$C/data/update-check.json"
+cmd status
+grep -q "^Last check   : 2026-09-29T08:30:00Z Up to date." <<<"$OUT" && ok "  … and the last check once there is one" || bad "status check" "$OUT"
 grep -q "^Running      : Release v0.3.0, " <<<"$OUT" && grep -q "Updated to Release v0.3.0 (abc1234), fine." <<<"$OUT" && grep -q "^Installer    : version 6" <<<"$OUT" \
   && grep -q "^System step  : .*done: All set." <<<"$OUT" && ok "noticeboard status: the Release, the last update (commas and all), the installer, the system step" || bad "status" "$OUT"
 cmd nonsense

@@ -138,6 +138,7 @@ waitfor "$T/kiosk-up" "^v1$" && ok "the viewer up for a few seconds: the kiosk w
 echo v2 > "$T/client-files/version"
 waitfor "$T/logger.log" "New Client files (v2): starting the kiosk again" && waitfor "$T/kiosk-up" "^v2$"   && ok "new Client files installed: the kiosk closes its browser and starts again from them" || { bad "restart"; cat "$T/logger.log"; }
 stop
+[ ! -e "$T/kiosk-up" ] && ok "  … and once stopped, it no longer says it's up (an update never waits for a kiosk that isn't running)" || bad "kiosk-up left behind"
 
 # ── Client only without a Server address ──
 reset; answers client desktop ""; printf '200\n' > "$T/answers"
