@@ -40,9 +40,10 @@ scenario() {   # scenario <name> <branch setting or ""> <answers...>
     load_installer; stubs; set -euo pipefail
     INSTALL_DIR="$T/opt"; BRANCH_FILE="$T/opt/data/update-branch.env"; SERVICE_FILE="$T/svc"
     UPDATE_SERVICE_FILE="$T/upd.service"; UPDATE_TIMER_FILE="$T/upd.timer"; UPDATE_PATH_FILE="$T/upd.path"
-    AUTOSTART_FILE="$T/autostart.desktop"; KIOSK_SCRIPT="$T/none.sh"; DESKTOP_USER=$(id -un); ANSWERS=("$@")
-    choose_mode; choose_branch; echo "INSTALL_BRANCH=$INSTALL_BRANCH"
-    install_server; summary_server
+    AUTOSTART_FILE="$T/autostart.desktop"; OLD_CLIENT_KIOSK="$T/none.sh"; INSTALL_ENV_FILE="$T/install.env"
+    DESKTOP_USER=$(id -un); ANSWERS=("$@")
+    choose_role; choose_branch; echo "INSTALL_BRANCH=$INSTALL_BRANCH"
+    install_server; write_installer_record; summary_server
   ) > "$T/$name.out" 2>&1
   RC=$?
   ON=$(git -C "$T/opt" branch --show-current); VER=$(cat "$T/opt/VERSION")

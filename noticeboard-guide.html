@@ -724,7 +724,8 @@
           <tr><td>Raspberry Pi 3</td><td>yes</td><td>yes</td><td>H.264 only, 1080p only</td><td>Supported (choose H.264 in <strong>Settings → Display</strong>)</td></tr>
           <tr><td>Raspberry Pi 4</td><td>yes</td><td>yes</td><td>H.264 and H.265</td><td>Supported</td></tr>
           <tr><td>Raspberry Pi 5</td><td>yes</td><td>yes</td><td>H.264 and H.265</td><td>Supported</td></tr>
-          <tr><td>Orange Pi Zero 2W</td><td>no</td><td>yes, headless</td><td>H.264 and H.265</td><td>Planned: needs a headless Client installer</td></tr>
+          <tr><td>Orange Pi Zero 2W</td><td>no</td><td>yes, headless</td><td>H.264 and H.265</td><td>The installer can set it up as a headless Client; not yet checked on the device</td></tr>
+          <tr><td>A PC or virtual machine with Debian</td><td>yes</td><td>yes, with a desktop or headless</td><td>depends on the hardware</td><td>The installer can set it up; not yet checked on real hardware</td></tr>
         </tbody>
       </table>
       <p>New videos are converted to <strong>H.265 (HEVC)</strong> by default; <strong>H.264</strong> is the fallback for older hardware such as the Raspberry Pi 3 (see <a href="#settings" style="color:var(--blue)">Settings</a>).</p>
@@ -809,10 +810,10 @@
         <h2>Installation</h2>
       </div>
 
-      <p>One installer sets up a Server or a Client: when it starts, it asks which this device is. It needs a Raspberry Pi running Raspberry Pi OS with the desktop: the current release (Trixie) or Bookworm (see <a href="#devices" style="color:var(--blue)">Supported devices</a>).</p>
+      <p>One installer sets up every device. When it starts, it asks what this device does: <strong>Client + Server</strong> (it runs the noticeboard and shows the slideshow on its own screen), <strong>Client only</strong> (it shows the slideshow from a Server elsewhere) or <strong>Server only</strong> (it runs the noticeboard, with no screen of its own). With a Client, it also asks how the device shows the slideshow, and suggests the answer: a Raspberry Pi with its desktop, Debian with a desktop, or <em>headless</em> (no desktop at all). It runs on Raspberry Pi OS, the current release (Trixie) or Bookworm, and on Debian (see <a href="#devices" style="color:var(--blue)">Supported devices</a>).</p>
 
-      <h3>Option A — A Server (it also shows the slideshow on its own screen)</h3>
-      <p>Every noticeboard has one Server. It also shows the slideshow on its own screen, so a single device is enough to start with.</p>
+      <h3>Option A — A Client + Server (it runs the noticeboard and shows the slideshow on its own screen)</h3>
+      <p>Every noticeboard has one Server. Set up as a Client + Server, it also shows the slideshow on its own screen, so a single device is enough to start with.</p>
 
       <div class="steps">
         <div class="step">
@@ -833,7 +834,7 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Answer the installer's questions</strong>
-            <p>When asked what this device is, type <code>1</code> (<em>Server</em>). Then answer the sudo question — see the note below.</p>
+            <p>When asked what this device does, type <code>1</code> (<em>Client + Server</em>). When asked how it shows the slideshow, press Enter to take the suggestion (on a Raspberry Pi with its desktop, <code>1</code>). On a Raspberry Pi, answer the sudo question next — see the note below.</p>
           </div>
         </div>
         <div class="step">
@@ -861,10 +862,10 @@
 
       <div class="callout tip">
         <div class="callout-icon">🔒</div>
-        <div class="callout-body"><strong>The sudo question.</strong> Raspberry Pi OS lets you run <code>sudo</code> commands without a password, so anything that takes over its user account can take over the whole device. The installer offers to make <code>sudo</code> ask for your password — we recommend answering <strong>y</strong>. It backs up the setting first and asks you to type your password once to prove it works, so you can't lock yourself out. If you answer <strong>n</strong>, nothing changes, and you can run the installer again later to change your mind.</div>
+        <div class="callout-body"><strong>The sudo question</strong> (Raspberry Pi only). Raspberry Pi OS lets you run <code>sudo</code> commands without a password, so anything that takes over its user account can take over the whole device. The installer offers to make <code>sudo</code> ask for your password — we recommend answering <strong>y</strong>. It backs up the setting first and asks you to type your password once to prove it works, so you can't lock yourself out. If you answer <strong>n</strong>, nothing changes, and you can run the installer again later to change your mind.</div>
       </div>
 
-      <h3>Option B — A Client (it shows the slideshow from a Server)</h3>
+      <h3>Option B — A Client only (it shows the slideshow from a Server)</h3>
       <p>Use this to add another screen: a Client shows the slideshow from a Server that is already running.</p>
 
       <div class="steps">
@@ -879,14 +880,14 @@
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Run the installer on the Client</strong>
-            <p>On the new Client, open a terminal and run the command below. When asked what this device is, type <code>2</code> (<em>Client</em>). After your answers, it brings the device's software fully up to date before installing, which can take a while.</p>
+            <p>On the new Client, open a terminal (or log in over SSH) and run the command below. When asked what this device does, type <code>2</code> (<em>Client only</em>). When asked how it shows the slideshow, press Enter to take the suggestion: <code>3</code> (<em>headless</em>) on a device without a desktop, such as an Orange Pi Zero 2W. After your answers, it brings the device's software fully up to date before installing, which can take a while.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num"></div>
           <div class="step-body">
             <strong>Enter the server URL when prompted</strong>
-            <p>You will be asked: <em>"Noticeboard server URL"</em> — enter it in the format <code>http://192.168.1.42:3000</code> (use the IP from step 1). Then answer the sudo question (see the note above).</p>
+            <p>You will be asked: <em>"Noticeboard server URL"</em> — enter it in the format <code>http://192.168.1.42:3000</code> (use the IP from step 1). On a Raspberry Pi, answer the sudo question next (see the note above).</p>
           </div>
         </div>
         <div class="step">
@@ -907,6 +908,14 @@
 
       <pre data-label="Terminal"><code>curl -fsSL https://raw.githubusercontent.com/fructus-sum/noticeboard/main/installers/install.sh | sudo bash</code></pre>
 
+      <h3>Option C — A Server only (no screen of its own)</h3>
+      <p>For a Server kept out of sight, such as a small computer in a cupboard or a virtual machine: when asked what this device does, type <code>3</code> (<em>Server only</em>). It installs the noticeboard and its automatic updates, with no browser or kiosk. Open the admin panel from any browser on your network, and show the slideshow with Clients.</p>
+
+      <h3 id="headless" style="scroll-margin-top:80px">A Client without a desktop (headless)</h3>
+      <p>A headless Client shows the slideshow full screen straight on its screen as soon as it starts up, with no desktop behind it (the installer sets up <em>cage</em> for this). Everything else works the same, including the waiting page with its MAC address. There's no exit button in the viewer's corner, as there's no desktop to go to. To stop the slideshow on its screen, and start it again:</p>
+      <pre data-label="Terminal"><code>sudo systemctl stop noticeboard-kiosk
+sudo systemctl start noticeboard-kiosk</code></pre>
+
       <h3 id="static-ip" style="scroll-margin-top:80px">Give the Server a fixed address</h3>
       <p>Clients find the Server by its IP address, so that address must not change. Most home and office networks hand out addresses automatically and can give a device a different one after a restart. If you use Clients, fix the Server's address in one of two ways:</p>
       <ul style="margin:0 0 14px 20px;line-height:1.7">
@@ -916,7 +925,7 @@
       <p>If the Server's address does change, run the installer again on each Client and give it the new address.</p>
 
       <h3>Running the installer again</h3>
-      <p>You can run the installer again at any time — for example to point a Client at a different Server, or to answer the sudo question differently. It offers your answers from last time, so pressing Enter keeps them. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub, from the branch the Server follows (<em>main</em> unless you've switched), so what it sets up matches the version it installs. It never touches your slideshows, slides or settings.</p>
+      <p>You can run the installer again at any time — for example to point a Client at a different Server, or to answer the sudo question differently. It offers your answers from last time (it keeps them in <code>/etc/noticeboard/install.env</code>), so pressing Enter keeps them. It won't change what a device does (Client + Server, Client only, Server only): to do that, remove the Noticeboard from the device first. You never need to update the installer first: it always downloads and runs the newest version of itself from GitHub, from the branch the Server follows (<em>main</em> unless you've switched), so what it sets up matches the version it installs. It never touches your slideshows, slides or settings.</p>
       <p>On a Server that follows a branch other than <em>main</em> (see <a href="#branches" style="color:var(--blue)">Switching branch</a>), it also asks whether to keep that branch or go back to <em>main</em>. Enter keeps it. If you go back to <em>main</em>, it hands over to <em>main</em>'s installer, which carries on with your answers.</p>
 
       <h3 id="firewall" style="scroll-margin-top:80px">Firewall (optional)</h3>

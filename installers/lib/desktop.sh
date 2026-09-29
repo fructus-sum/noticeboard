@@ -6,7 +6,7 @@
 #   write_help_shortcut <url>      a "Noticeboard Help" link on the desktop user's desktop
 #
 # Used by
-#   server.sh, display.sh
+#   client.sh
 #
 # Uses
 #   AUTOSTART_FILE, DESKTOP_USER (install.sh)

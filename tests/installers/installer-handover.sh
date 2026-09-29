@@ -126,12 +126,12 @@ grep -q "QA INSTALLER" "$T/out" && ok "main's installer (branch installer was to
 # The answers carried over are used, not asked again
 ( load_installer; ask() { echo ASKED; REPLY=1; }
   NOTICEBOARD_MODE=server NOTICEBOARD_INSTALL_BRANCH=main; BRANCH_FILE="$T/b.env"; echo NOTICEBOARD_BRANCH=QALife-updates > "$T/b.env"
-  choose_mode; choose_branch; echo "MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
-grep -q "MODE=server BRANCH=main" "$T/out" && ! grep -q ASKED "$T/out" && ! grep -q "Is this device the Server or a Client" "$T/out" \
+  choose_role; choose_branch; echo "ROLE=$ROLE MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "ROLE=both MODE=server BRANCH=main" "$T/out" && ! grep -q ASKED "$T/out" && ! grep -q "What should this device do" "$T/out" \
   && ok "handed-over answers: mode and branch not asked again" || bad "answers" "$T/out"
 ( load_installer; ask() { echo ASKED; REPLY=2; }
-  unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH; INSTALL_DIR="$T/nothing"; KIOSK_SCRIPT="$T/nothing"; BRANCH_FILE="$T/b.env"
-  choose_mode; choose_branch; echo "MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
-grep -q "ASKED" "$T/out" && grep -q "MODE=display" "$T/out" && ok "without them: asked as before" || bad "asked" "$T/out"
+  unset NOTICEBOARD_MODE NOTICEBOARD_INSTALL_BRANCH; INSTALL_DIR="$T/nothing"; OLD_CLIENT_KIOSK="$T/nothing"; BRANCH_FILE="$T/b.env"
+  choose_role; choose_branch; echo "ROLE=$ROLE MODE=$MODE BRANCH=$INSTALL_BRANCH" ) > "$T/out" 2>&1
+grep -q "ASKED" "$T/out" && grep -q "ROLE=client MODE=display" "$T/out" && ok "without them: asked as before" || bad "asked" "$T/out"
 
 rm -rf "$T"; echo "passed=$pass failed=$fail"; [ $fail -eq 0 ]

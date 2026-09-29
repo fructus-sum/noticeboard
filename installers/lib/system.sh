@@ -1,18 +1,20 @@
 # shellcheck shell=bash
-# installers/lib/system.sh — the device's system: packages, Node.js, the install folder's lock, the port
+# installers/lib/system.sh — the device's system: what it is, packages, Node.js, the install folder's lock, the port
 #
 # Provides
 #   update_system        apt update, then a full upgrade (non-interactive, waits for apt's lock)
 #   chromium_package     chromium-browser where apt still has it, else chromium
+#   is_raspberry_pi      the device tree says Raspberry Pi
+#   detect_platform      pi | desktop | headless, to preselect choose_platform
 #   node_new_enough      the installed Node.js is new enough (system-requirements.json)
 #   lock_install_dir     holds update.sh's lock (tmp/update.lock) until the installer exits
 #   slideshow_port       the port in data/config.json (read by the server's own code), or 3000
 #
 # Used by
-#   server.sh, display.sh, firewall.sh
+#   server.sh, client.sh, firewall.sh, ui.sh (detect_platform), install.sh main (is_raspberry_pi)
 #
 # Uses
-#   INSTALL_DIR (install.sh)
+#   INSTALL_DIR, DEVICE_MODEL_FILE, DISPLAY_MANAGER_UNIT (install.sh); systemctl
 #
 # Change impact
 #   node_new_enough must accept the same versions as system-requirements.json, which the admin
@@ -41,6 +43,27 @@ chromium_package() {
     echo chromium-browser
   else
     echo chromium
+  fi
+}
+
+# A Raspberry Pi: its device tree says so
+is_raspberry_pi() {
+  grep -qa "Raspberry Pi" "$DEVICE_MODEL_FILE" 2>/dev/null
+}
+
+# How this device can show the slideshow, to preselect the answer (choose_platform): pi (a
+# Raspberry Pi with a desktop), desktop (another machine with one), headless (no desktop)
+detect_platform() {
+  local desktop=""
+  if [ -e "$DISPLAY_MANAGER_UNIT" ] || [ "$(systemctl get-default 2>/dev/null)" = graphical.target ]; then
+    desktop=1
+  fi
+  if [ -z "$desktop" ]; then
+    echo headless
+  elif is_raspberry_pi; then
+    echo pi
+  else
+    echo desktop
   fi
 }
 

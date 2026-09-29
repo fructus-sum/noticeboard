@@ -49,6 +49,14 @@ const styles = (selector) => `(() => {
   await sleep(300);
   look['exit pop-up'] = await c.evaluate(styles('.exit-popup'));
   look['exit pop-up buttons'] = await c.evaluate(styles('.exit-actions button'));
+  // A headless Client (cage, no desktop to go to: ?kiosk=headless) has no exit button; the pin stays
+  await c.go(env.base + '/?kiosk=headless');
+  await c.until(`!!document.querySelector('.info-button')`);
+  await c.mouse(300, 300);
+  await c.mouse(320, 320);
+  await sleep(800);
+  check('?kiosk=headless: no exit button, the pin still there',
+    await c.evaluate(`!document.querySelector('.exit-button') && !!document.querySelector('.info-button')`));
   c.close();
   await s.stop();
 

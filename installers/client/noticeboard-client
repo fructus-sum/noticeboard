@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# installers/client/noticeboard-client — the Noticeboard Client's command
+#
+#   noticeboard-client kiosk      show the slideshow full screen (kiosk.sh, next to this file)
+#   noticeboard-client version    the version of the Client files installed here
+#
+# Responsibilities
+#   The one way into the Client's files: /usr/local/bin/noticeboard-client (written by the
+#   installer) runs /opt/noticeboard-client/current/noticeboard-client, so the files in current/
+#   can be replaced as a whole (the Client's updates, SYSTEM_DESIGN §18.7 phase 3) while the
+#   autostart entry and noticeboard-kiosk.service keep calling the same command.
+#
+# Used by
+#   the desktop's autostart (/etc/xdg/autostart/noticeboard-kiosk.desktop), noticeboard-kiosk.service
+#   (headless), people
+#
+# Uses
+#   kiosk.sh (the same folder); /opt/noticeboard-client/version (NOTICEBOARD_CLIENT_DIR in tests)
+set -u
+HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+CLIENT_DIR=${NOTICEBOARD_CLIENT_DIR:-/opt/noticeboard-client}
+
+case "${1:-}" in
+  kiosk)
+    exec bash "$HERE/kiosk.sh"
+    ;;
+  version)
+    cat "$CLIENT_DIR/version" 2>/dev/null || { echo "unknown"; exit 1; }
+    ;;
+  *)
+    echo "Usage: noticeboard-client kiosk | version"
+    [ "${1:-}" = "" ] || [ "$1" = help ] || [ "$1" = --help ] || exit 2
+    ;;
+esac

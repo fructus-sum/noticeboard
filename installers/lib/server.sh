@@ -1,10 +1,10 @@
 # shellcheck shell=bash
-# installers/lib/server.sh — setting up a Server (it also shows the slideshow on its own screen)
+# installers/lib/server.sh — setting up a Server (a Client + Server's screen is the Client's: client.sh)
 #
 # Responsibilities
 #   System packages and Node.js, the install folder (a clone, or the chosen branch fetched; then
 #   checked out, on main at its latest Release), dependencies and the build, the first
-#   config.json, .env, the branch setting and update status, the service, the kiosk start-up, the Help shortcut, the update timer and path
+#   config.json, .env, the branch setting and update status, the service, the update timer and path
 #   units, and last the installer record. Then the summary.
 #
 # Provides
@@ -12,7 +12,8 @@
 #   write_service, write_update_units   the systemd units (compared with tests/fixtures/installer-golden)
 #   save_branch_setting                 data/update-branch.env (only if the branch changed) and
 #                                       data/update-status.json
-#   write_installer_record              data/installer.json, written last: a run that stopped
+#   write_installer_record              data/installer.json, written last by install.sh main(), after the
+#                                       Client too: a run that stopped
 #                                       part way doesn't count
 #   fetch_branch <owner> <branch>
 #   main_ref <owner>                    main's latest Release fetched (MAIN_REF, MAIN_RELEASE), else
@@ -22,8 +23,7 @@
 #   install.sh main()
 #
 # Uses
-#   system.sh, branch.sh, json.sh, release.sh (latest_release), kiosk.sh (write_server_kiosk),
-#   desktop.sh, ui.sh (banner);
+#   system.sh, branch.sh, json.sh, release.sh (latest_release), ui.sh (banner);
 #   the configuration in install.sh (INSTALL_DIR, INSTALL_BRANCH, the unit file paths, ...)
 #
 # Change impact
@@ -39,7 +39,7 @@ install_server() {
   # ── System packages ─────────────────────────────────────────────────────────
   update_system
   echo "▸ Installing system packages..."
-  apt-get install -y -qq git ffmpeg "$(chromium_package)" curl
+  apt-get install -y -qq git ffmpeg curl
 
   # ── Node.js 20 LTS via NodeSource, when the installed one is missing or too old ──────
   if ! node_new_enough; then
@@ -132,14 +132,6 @@ ENV
   systemctl restart "$SERVICE_NAME"
   echo "  Service started."
 
-  # ── Kiosk start script ──────────────────────────────────────────────────────
-  echo "▸ Installing kiosk autostart..."
-  write_server_kiosk
-  chmod +x "$INSTALL_DIR/start-kiosk.sh"
-  write_autostart "$INSTALL_DIR/start-kiosk.sh"
-  # The guide ships with the app, so the shortcut works even while the server is down
-  write_help_shortcut "file://$INSTALL_DIR/noticeboard-guide.html"
-
   # Fix ownership
   chown -R "$DESKTOP_USER:$DESKTOP_USER" "$INSTALL_DIR"
 
@@ -150,8 +142,6 @@ ENV
   systemctl enable --now "${SERVICE_NAME}-update.timer" --quiet
   systemctl enable --now "${SERVICE_NAME}-update.path" --quiet
   echo "  Checks GitHub for updates every 15 minutes, and straight away after a branch switch."
-
-  write_installer_record
 }
 
 # What this installer run set up, so the admin panel can tell when a newer version needs the

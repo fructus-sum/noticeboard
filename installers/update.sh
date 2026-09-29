@@ -55,7 +55,7 @@ INSTALLER_RECORD="$INSTALL_DIR/data/installer.json"  # the last installer run, w
 # What a Restore Defaults clean keeps (git clean patterns; a name without a slash in the middle also
 # matches deeper in the folder, which only keeps more, and none starts with / because Git Bash would
 # rewrite it on Windows, where the tests run): what the server
-# resets itself (data, tmp, logs), what the installer made (.env, start-kiosk.sh, and its files in
+# resets itself (data, tmp, logs), what the installer made (.env; start-kiosk.sh, from installers before 0.9.0; its files in
 # data/ and tmp/), and what keeps the running server working until it restarts (both rebuilt
 # anyway). A file the installer adds to the folder must be added here (SYSTEM_DESIGN §15).
 RESTORE_KEEP=(data/ tmp/ logs/ .env start-kiosk.sh node_modules/ 'client/*/dist/')

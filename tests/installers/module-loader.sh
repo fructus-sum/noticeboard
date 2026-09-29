@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2016,SC2034  # the installer is loaded from files; $… in the probe is for the installer
-# install.sh's parts (installers/lib, installers/kiosk) always come from the same commit as the
+# install.sh's parts (installers/lib, installers/client) always come from the same commit as the
 # script: next to it for a local copy, else downloaded from GitHub at the commit it was switched
 # to, else at the followed branch. Anything missing or broken stops it before any change. And an
 # older installer (the baseline, which only downloads install.sh) can hand over to this one.
@@ -14,9 +14,9 @@ ok()  { pass=$((pass+1)); echo "PASS  $1"; }
 bad() { fail=$((fail+1)); echo "FAIL  $1"; [ -n "${2:-}" ] && sed 's/^/        /' "$2"; }
 
 # "GitHub": this working tree's installers, with install.sh's last line (main) replaced by a probe
-PROBE='load_modules; echo "LOADED sha=${NOTICEBOARD_INSTALLER_SHA:-none} $(declare -F install_server write_display_kiosk check_firewall | tr "\n" " ")templates=$([ -n "${KIOSK_TEMPLATE_server:-}" ] && [ -n "${KIOSK_TEMPLATE_display:-}" ] && echo yes)"'
+PROBE='load_modules; echo "LOADED sha=${NOTICEBOARD_INSTALLER_SHA:-none} $(declare -F install_server install_client check_firewall | tr "\n" " ")client=$([ -n "${CLIENT_FILE_kiosk_sh:-}" ] && [ -n "${CLIENT_FILE_noticeboard_client:-}" ] && echo yes)"'
 probe_copy() {   # probe_copy <folder>: installers/ with the probe install.sh
-  mkdir -p "$1"; cp -r "$REPO/installers/lib" "$REPO/installers/kiosk" "$1/"
+  mkdir -p "$1"; cp -r "$REPO/installers/lib" "$REPO/installers/client" "$1/"
   { sed '$d' "$REPO/installers/install.sh"; echo "$PROBE"; } > "$1/install.sh"
 }
 probe_copy "$T/github/installers"
@@ -49,8 +49,8 @@ run() {   # run <script> [env...]: runs the probe installer as a file
 # ── A local copy (NOTICEBOARD_INSTALLER_SHA=local): the parts next to it, no downloads ──
 probe_copy "$T/checkout/installers"
 run "$T/checkout/installers/install.sh" NOTICEBOARD_INSTALLER_SHA=local
-[ $RC -eq 0 ] && grep -q "LOADED sha=local install_server write_display_kiosk check_firewall templates=yes" "$T/out" && [ ! -f "$T/curl.log" ] \
-  && ok "local copy: every module and both kiosk templates loaded from next to it, nothing downloaded" || bad "local" "$T/out"
+[ $RC -eq 0 ] && grep -q "LOADED sha=local install_server install_client check_firewall client=yes" "$T/out" && [ ! -f "$T/curl.log" ] \
+  && ok "local copy: every module and the Client's files loaded from next to it, nothing downloaded" || bad "local" "$T/out"
 
 # ── Not switched (GitHub couldn't be asked), but in a copy of the repository: that copy's parts ──
 run "$T/checkout/installers/install.sh" NOTICEBOARD_INSTALLER_SHA=
@@ -64,14 +64,14 @@ run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=local
 
 # ── Switched to a commit: every part downloaded at that commit, then the download deleted ──
 run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=$SHA
-[ $RC -eq 0 ] && grep -q "LOADED sha=$SHA install_server write_display_kiosk check_firewall templates=yes" "$T/out" \
+[ $RC -eq 0 ] && grep -q "LOADED sha=$SHA install_server install_client check_firewall client=yes" "$T/out" \
   && ok "at a commit: all parts downloaded and loaded" || bad "sha" "$T/out"
 n_lib=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/lib/" "$T/curl.log")
-n_kiosk=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/kiosk/" "$T/curl.log")
+n_client=$(grep -c "raw.githubusercontent.com/fructus-sum/noticeboard/$SHA/installers/client/" "$T/curl.log")
 # The installer's own parts (INSTALLER_MODULES); installers/lib also holds parts only update.sh loads
 n_parts=$(sed -n 's/^INSTALLER_MODULES=(\([^)]*\)).*/\1/p' "$REPO/installers/install.sh" | wc -w)
-[ "$n_lib" = "$n_parts" ] && [ "$n_kiosk" = 2 ] && ! grep -q "/main/installers" "$T/curl.log" \
-  && ok "every download pinned to that commit ($n_lib modules, $n_kiosk kiosk templates)" || bad "pinned ($n_lib, $n_kiosk)" "$T/curl.log"
+[ "$n_lib" = "$n_parts" ] && [ "$n_client" = 2 ] && ! grep -q "/main/installers" "$T/curl.log" \
+  && ok "every download pinned to that commit ($n_lib modules, $n_client Client files)" || bad "pinned ($n_lib, $n_client)" "$T/curl.log"
 [ "$(leftovers)" = "$BEFORE" ] && ok "the downloaded parts are deleted once loaded" || bad "temp folder left in /tmp"
 
 # ── A download fails, or a part is broken: stops before doing anything ──
@@ -80,8 +80,8 @@ run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=$SHA FAIL_PATH=lib/firewall
   && ok "a part can't be downloaded: stops, nothing changed, says to check the connection" || bad "download fails" "$T/out"
 run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=$SHA BREAK_PATH=lib/server.sh
 [ $RC -eq 1 ] && grep -q "missing or broken" "$T/out" && ! grep -q LOADED "$T/out" && ok "a broken part (fails bash -n): stops before loading it" || bad "broken" "$T/out"
-run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=$SHA FAIL_PATH=kiosk/display.sh
-[ $RC -eq 1 ] && ! grep -q LOADED "$T/out" && ok "a kiosk template missing: stops" || bad "template missing" "$T/out"
+run "$T/lonely/install.sh" NOTICEBOARD_INSTALLER_SHA=$SHA FAIL_PATH=client/kiosk.sh
+[ $RC -eq 1 ] && ! grep -q LOADED "$T/out" && ok "one of the Client's files missing: stops" || bad "template missing" "$T/out"
 [ "$(leftovers)" = "$BEFORE" ] && ok "failed downloads are deleted too" || bad "temp folder left after a failure"
 
 # ── Not switched and not in a checkout (e.g. GitHub's API was busy): the followed branch's parts ──
@@ -97,7 +97,7 @@ if git -C "$REPO" show "$BASELINE:installers/install.sh" > "$T/old-install.sh" 2
   ( source <(sed '$d' "$T/old-install.sh")
     unset NOTICEBOARD_INSTALLER_SHA NOTICEBOARD_INSTALLER_BRANCH; BRANCH_FILE="$T/none"
     use_latest_installer ) > "$T/out" 2>&1
-  grep -q "Running the latest installer (3333333)" "$T/out" && grep -q "LOADED sha=$SHA install_server write_display_kiosk check_firewall templates=yes" "$T/out" \
+  grep -q "Running the latest installer (3333333)" "$T/out" && grep -q "LOADED sha=$SHA install_server install_client check_firewall client=yes" "$T/out" \
     && grep -q "$SHA/installers/install.sh" "$T/curl.log" && grep -q "$SHA/installers/lib/ui.sh" "$T/curl.log" \
     && ok "baseline installer ($BASELINE) → this install.sh → its parts at the same commit" || bad "handover from the baseline" "$T/out"
 else

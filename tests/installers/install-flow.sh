@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1090,SC2034  # functions are loaded from the installers; the variables set here are read by them
-# Run install.sh's real functions end to end for both modes, with system commands
-# (apt-get, npm, systemctl, chown, ...) replaced by stand-ins that record their calls.
+# install.sh's real questions and steps in order (run_installer) for each role and platform
+# (SYSTEM_DESIGN §8, §18.7), with system commands (apt-get, npm, systemctl, chown, ...) replaced by
+# stand-ins that record their calls, and every path the installer writes in a temporary folder:
+# Client + Server re-run on a Raspberry Pi, a fresh headless Client only, its re-run with the saved
+# answers, a different role refused, Server only, and the answers an older installer hands over.
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO/tests/helpers/installer.sh"
 T=$(mktemp -d); export T
@@ -17,78 +20,142 @@ first_two_are_update_then_upgrade() {
 
 stubs() {
   apt-get()   { echo "apt-get $* [DEBIAN_FRONTEND=${DEBIAN_FRONTEND:-}]" >> "$T/calls.log"; }
+  apt-cache() { return 1; }                               # no chromium-browser package: chromium
   npm()       { echo "npm $*" >> "$T/calls.log"; }
-  systemctl() { echo "systemctl $*" >> "$T/calls.log"; }
+  systemctl() { if [ "$1" = get-default ]; then echo multi-user.target; return; fi; echo "systemctl $*" >> "$T/calls.log"; }
   chown()     { echo "chown $*" >> "$T/calls.log"; }
   flock()     { :; }
   hostname()  { echo "192.168.1.50"; }
   curl()      { echo "curl $*" >> "$T/calls.log"; }
   runuser()   { shift 3; "$@"; }                         # -u <user> -- cmd...
+  getent()    { echo "pi:x:1000:1000::$T/home:/bin/bash"; }
   node()      { case "$*" in *process.version*) printf 24 ;; *) echo "node (config init)" >> "$T/calls.log" ;; esac; }
   has_tty()   { return 0; }
-  ask()       { REPLY="${ANSWERS[0]}"; ANSWERS=("${ANSWERS[@]:1}"); echo "  [answered: '${REPLY}']"; }
+  ask()       { REPLY="${ANSWERS[0]-}"; ANSWERS=("${ANSWERS[@]:1}"); echo "  [answered: '${REPLY}']"; }
   # The sudo check has its own test (sudo-password.sh); here it mustn't depend on this machine's
   # sudoers rules (a CI runner's user has NOPASSWD, as a Pi's does)
   check_sudo_password() { echo "check_sudo_password" >> "$T/calls.log"; SUDO_STATUS=""; }
 }
+# Every path the installer writes, inside $T/root (a fresh device: nothing there yet)
+paths() {
+  local r="$T/root"
+  mkdir -p "$r/etc" "$r/bin" "$r/autostart" "$T/home"
+  SERVICE_FILE="$r/etc/noticeboard.service"; UPDATE_SERVICE_FILE="$r/etc/noticeboard-update.service"
+  UPDATE_TIMER_FILE="$r/etc/noticeboard-update.timer"; UPDATE_PATH_FILE="$r/etc/noticeboard-update.path"
+  AUTOSTART_FILE="$r/autostart/noticeboard-kiosk.desktop"; INSTALL_ENV_FILE="$r/etc/noticeboard/install.env"
+  CLIENT_DIR="$r/opt-noticeboard-client"; CLIENT_LAUNCHER="$r/bin/noticeboard-client"
+  KIOSK_SERVICE_FILE="$r/etc/noticeboard-kiosk.service"; OLD_CLIENT_KIOSK="$r/bin/noticeboard-kiosk.sh"
+  DEVICE_MODEL_FILE="$r/model"; DISPLAY_MANAGER_UNIT="$r/etc/display-manager.service"
+  export SUDO_USER; SUDO_USER=$(id -un)
+}
+# run_installer with the answers given; the output in $T/<name>.out, the exit code in RC
+install() {   # install <name> <install folder> <answers...>
+  local name=$1 dir=$2; shift 2
+  : > "$T/calls.log"
+  (
+    load_installer; stubs; paths
+    INSTALL_DIR=$dir; BRANCH_FILE="$dir/data/update-branch.env"
+    ANSWERS=("$@")
+    run_installer
+  ) > "$T/$name.out" 2>&1
+  RC=$?
+}
+saved() { sed -n "s/^NOTICEBOARD_$1=//p" "$T/root/etc/noticeboard/install.env" 2>/dev/null; }
+R="$T/root"
 
-# ── Server, re-run on an existing install (Enter accepts the default) ──
 # Its GitHub: a bare copy of this repository whose main is the commit checked out here (a CI
 # checkout has no local main branch)
 git clone -q --bare "$REPO" "$T/origin.git" 2>/dev/null
 git -C "$T/origin.git" update-ref refs/heads/main "$(git -C "$REPO" rev-parse HEAD)"
 git clone -q "$T/origin.git" "$T/opt-noticeboard" 2>/dev/null
-(
-  load_installer
-  stubs
-  INSTALL_DIR="$T/opt-noticeboard"; SERVICE_FILE="$T/noticeboard.service"
-  UPDATE_SERVICE_FILE="$T/noticeboard-update.service"; UPDATE_TIMER_FILE="$T/noticeboard-update.timer"; UPDATE_PATH_FILE="$T/noticeboard-update.path"; BRANCH_FILE="$T/opt-noticeboard/data/update-branch.env"
-  AUTOSTART_FILE="$T/autostart-server.desktop"; KIOSK_SCRIPT="$T/not-installed.sh"
-  DESKTOP_USER=$(id -un); ANSWERS=("")
-  choose_mode && echo "MODE=$MODE"
-  check_sudo_password
-  install_server
-  summary_server
-) > "$T/server.out" 2>&1
-rc=$?
-[ $rc -eq 0 ] && ok "server mode runs to the end under set -euo pipefail" || { bad "server mode exited $rc"; tail -20 "$T/server.out"; }
-grep -q "MODE=server" "$T/server.out" && ok "re-run defaults to 'Server' (Enter)" || bad "default mode"
-grep -E '^(apt-get|npm|systemctl)' "$T/calls.log" | cut -c1-72 | sed 's/^/      /'
+
+# ── Client + Server, re-run on a Raspberry Pi installed before 0.9.0 (Enter keeps everything) ──
+mkdir -p "$R/etc" "$R/autostart"
+echo "Raspberry Pi 4 Model B Rev 1.5" > "$R/model"; touch "$R/etc/display-manager.service"
+echo "old kiosk" > "$T/opt-noticeboard/start-kiosk.sh"
+printf '[Desktop Entry]\nExec=/opt/noticeboard/start-kiosk.sh\n' > "$R/autostart/noticeboard-kiosk.desktop"
+install both "$T/opt-noticeboard" "" "" n n
+[ $RC -eq 0 ] && ok "Client + Server runs to the end under set -euo pipefail" || { bad "Client + Server exited $RC"; tail -20 "$T/both.out"; }
+grep -q "\[answered: ''\]" "$T/both.out" && [ "$(saved ROLE)" = both ] && [ "$(saved PLATFORM)" = pi ] \
+  && ok "re-run: Enter takes Client + Server (a Server folder) and Raspberry Pi (detected)" || { bad "defaults"; grep -A1 "Choose" "$T/both.out"; }
 first_two_are_update_then_upgrade && ok "apt update, then full upgrade, before anything else" || bad "upgrade order"
 grep -q 'dist-upgrade \[DEBIAN_FRONTEND=noninteractive\]' "$T/calls.log" && ok "upgrade is non-interactive" || bad "noninteractive"
+[ "$(grep -c ' dist-upgrade ' "$T/calls.log")" = 1 ] && ok "the system is upgraded once (the Client doesn't do it again)" || bad "upgraded twice"
+grep -q "apt-get install -y -qq git ffmpeg curl " "$T/calls.log" && grep -q "apt-get install -y -qq chromium curl " "$T/calls.log" \
+  && ok "the Server's packages, then the Client's (Chromium)" || { bad "packages"; grep "install" "$T/calls.log"; }
 [ "$(git -C "$T/opt-noticeboard" branch --show-current)" = main ] && ok "install folder updated to main (git as owner, forced checkout)" || bad "git update"
 missing=0
-for f in noticeboard.service noticeboard-update.service noticeboard-update.timer autostart-server.desktop opt-noticeboard/start-kiosk.sh opt-noticeboard/.env; do
-  [ -s "$T/$f" ] || { bad "missing $f"; missing=1; }
+for f in "$R/etc/noticeboard.service" "$R/etc/noticeboard-update.service" "$R/etc/noticeboard-update.timer" "$T/opt-noticeboard/.env" \
+         "$R/opt-noticeboard-client/current/kiosk.sh" "$R/opt-noticeboard-client/current/noticeboard-client" "$R/opt-noticeboard-client/version" "$R/bin/noticeboard-client"; do
+  [ -e "$f" ] || { bad "missing ${f#"$T"/}"; missing=1; }
 done
-[ $missing -eq 0 ] && ok "service, update timer, kiosk script, autostart and .env written"
-grep -q "Auto-update  : every 15 minutes" "$T/server.out" && ok "summary shows the auto-update line" || bad "summary"
+[ $missing -eq 0 ] && ok "service, update units, .env, the Client's files, version and launcher written"
+cmp -s "$R/opt-noticeboard-client/current/kiosk.sh" "$REPO/installers/client/kiosk.sh" && cmp -s "$R/opt-noticeboard-client/current/noticeboard-client" "$REPO/installers/client/noticeboard-client" \
+  && ok "the Client's files are installed exactly as in installers/client/" || bad "client files differ"
+grep -q "^Exec=$R/bin/noticeboard-client kiosk$" "$R/autostart/noticeboard-kiosk.desktop" && ok "the desktop's autostart runs noticeboard-client kiosk" || { bad "autostart"; cat "$R/autostart/noticeboard-kiosk.desktop"; }
+[ ! -e "$T/opt-noticeboard/start-kiosk.sh" ] && [ ! -e "$R/etc/noticeboard-kiosk.service" ] && ok "the old start-kiosk.sh removed; no headless service" || bad "old kiosk left"
+grep -q "file://$T/opt-noticeboard/noticeboard-guide.html" "$T/home/Desktop/noticeboard-help.desktop" && ok "Help shortcut to the guide on the Server" || bad "help shortcut"
+grep -q "^check_sudo_password" "$T/calls.log" && ok "a Raspberry Pi: the sudo check is offered" || bad "sudo check on a Pi"
+node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')); process.exit(r.version===5?0:1)" "$T/opt-noticeboard/data/installer.json" \
+  && ok "the installer record says version 5" || bad "installer record"
+grep -q "Auto-update  : every 15 minutes" "$T/both.out" && grep -q "shows the slideshow from its own Server" "$T/both.out" && grep -q "Screen Blanking" "$T/both.out" \
+  && ok "the summary: the Server's lines, the Client's, and the Pi's screen-blanking advice" || bad "summary"
+grep -q "Reboot later with" "$T/both.out" && ok "a Client: the reboot is offered" || bad "reboot offer"
 
-# ── Client, fresh device: Enter (no default) and '3' are refused, then 2; empty URL, then one with a slash ──
-: > "$T/calls.log"
-(
-  load_installer
-  stubs
-  INSTALL_DIR="$T/nothing-here"; KIOSK_SCRIPT="$T/noticeboard-kiosk.sh"; AUTOSTART_FILE="$T/autostart-display.desktop"
-  DESKTOP_USER=$(id -un); ANSWERS=("" "3" "2" "" "http://10.0.0.5:3000/")
-  choose_mode && echo "MODE=$MODE"
-  ask_server_url && echo "SERVER_URL=$SERVER_URL"
-  install_display
-  summary_display
-) > "$T/display.out" 2>&1
-rc=$?
-[ $rc -eq 0 ] && ok "display mode runs to the end" || { bad "display mode exited $rc"; tail -20 "$T/display.out"; }
-[ "$(grep -c "Please type 1 or 2" "$T/display.out")" = 2 ] && grep -q "MODE=display" "$T/display.out" && ok "fresh Pi: no default, re-asks on Enter and on '3', accepts '2'" || bad "mode prompt"
-grep -q "The server URL is required" "$T/display.out" && grep -q "SERVER_URL=http://10.0.0.5:3000$" "$T/display.out" && ok "URL: re-asks when empty, strips the trailing slash" || bad "url prompt"
-grep -q 'SERVER_URL="http://10.0.0.5:3000"' "$T/noticeboard-kiosk.sh" && ok "kiosk script points at the server" || bad "kiosk url"
-first_two_are_update_then_upgrade && ok "display mode also updates, then upgrades, first" || bad "display upgrade order"
+# ── Client only, a fresh headless device (not a Pi): Enter and '4' refused, then 2; the URL ──
+rm -rf "$T/home"
+rm -rf "$R"
+install client "$T/nothing-here" "" "4" "2" "" "" "http://10.0.0.5:3000/" n n
+[ $RC -eq 0 ] && ok "Client only (headless) runs to the end" || { bad "Client exited $RC"; tail -20 "$T/client.out"; }
+[ "$(grep -c "Please type 1 to 3" "$T/client.out")" = 2 ] && ok "a fresh device: no default role, re-asks on Enter and on '4'" || bad "role prompt"
+grep -q "The server URL is required" "$T/client.out" && [ "$(saved SERVER_URL)" = "http://10.0.0.5:3000" ] \
+  && [ "$(saved ROLE)" = client ] && [ "$(saved PLATFORM)" = headless ] && ok "answers saved: Client only, headless (detected: no desktop), the URL without its slash" || { bad "saved answers"; cat "$R/etc/noticeboard/install.env"; }
+grep -q "^User=$(id -un)$" "$R/etc/noticeboard-kiosk.service" && grep -q "^ExecStart=/usr/bin/cage -s -- $R/bin/noticeboard-client kiosk$" "$R/etc/noticeboard-kiosk.service" \
+  && grep -q "systemctl enable noticeboard-kiosk" "$T/calls.log" && ok "headless: noticeboard-kiosk.service (cage on tty1) enabled" || { bad "kiosk service"; cat "$R/etc/noticeboard-kiosk.service"; }
+grep -q "apt-get install -y -qq chromium curl cage " "$T/calls.log" && ok "headless: cage installed with Chromium" || { bad "cage"; grep install "$T/calls.log"; }
+[ ! -e "$R/autostart/noticeboard-kiosk.desktop" ] && [ ! -e "$T/home/Desktop/noticeboard-help.desktop" ] && ok "headless: no autostart or desktop shortcut" || bad "desktop pieces"
+! grep -q "^check_sudo_password" "$T/calls.log" && ok "not a Raspberry Pi: no sudo offer" || bad "sudo offer off a Pi"
+first_two_are_update_then_upgrade && ok "Client only also updates, then upgrades, first" || bad "client upgrade order"
+[ ! -e "$T/nothing-here" ] && ok "Client only: no Server folder" || bad "server folder made"
 
-# ── Re-run on that Client: Enter, Enter keeps mode and URL ──
-(
-  load_installer; stubs
-  INSTALL_DIR="$T/nothing-here"; KIOSK_SCRIPT="$T/noticeboard-kiosk.sh"; ANSWERS=("" "")
-  choose_mode && ask_server_url && echo "MODE=$MODE SERVER_URL=$SERVER_URL"
-) > "$T/rerun.out" 2>&1
-grep -q "MODE=display SERVER_URL=http://10.0.0.5:3000$" "$T/rerun.out" && ok "display re-run: Enter, Enter keeps mode and URL" || { bad "display re-run defaults"; cat "$T/rerun.out"; }
+# ── Re-run on that Client: Enter keeps role, platform and URL ──
+install rerun "$T/nothing-here" "" "" "" n n
+[ $RC -eq 0 ] && [ "$(saved ROLE)" = client ] && [ "$(saved PLATFORM)" = headless ] && [ "$(saved SERVER_URL)" = "http://10.0.0.5:3000" ] \
+  && ! grep -qE "Please type|is required" "$T/rerun.out" && ok "Client re-run: Enter keeps role, platform and URL (the saved answers)" || { bad "client re-run"; tail -20 "$T/rerun.out"; }
+
+# ── A different role: refused before anything changes ──
+install other "$T/nothing-here" "1"
+[ $RC -ne 0 ] && grep -q 'set up as "Client only"' "$T/other.out" && ! grep -q "^apt-get" "$T/calls.log" \
+  && ok "choosing another role than the saved one: refused, nothing changed" || { bad "role change"; tail -8 "$T/other.out"; }
+
+# ── Server only, over an older Client + Server (its kiosk goes) ──
+rm -rf "$R"; mkdir -p "$R/autostart"
+printf '[Desktop Entry]\nExec=/opt/noticeboard/start-kiosk.sh\n' > "$R/autostart/noticeboard-kiosk.desktop"
+echo "old kiosk" > "$T/opt-noticeboard/start-kiosk.sh"
+install server "$T/opt-noticeboard" "3" n
+[ $RC -eq 0 ] && ok "Server only runs to the end" || { bad "Server only exited $RC"; tail -20 "$T/server.out"; }
+grep -q "What should this device do" "$T/server.out" && ! grep -q "How does this device show the slideshow" "$T/server.out" && ! grep -qE "Reboot later|Rebooting" "$T/server.out" \
+  && ok "Server only: no platform question, no reboot" || bad "server-only questions"
+! grep -q "chromium" "$T/calls.log" && [ ! -e "$R/opt-noticeboard-client" ] && [ ! -e "$R/autostart/noticeboard-kiosk.desktop" ] && [ ! -e "$T/opt-noticeboard/start-kiosk.sh" ] \
+  && ok "Server only: no Chromium or Client; the old kiosk and its autostart removed" || bad "server-only client pieces"
+[ "$(saved ROLE)" = server ] && [ -z "$(saved PLATFORM)" ] && ok "Server only: the role saved" || bad "server-only saved"
+
+# ── The answers an older installer hands over (NOTICEBOARD_MODE only) ──
+( load_installer; stubs; paths; INSTALL_DIR="$T/none"; ask() { echo ASKED; REPLY=1; }
+  NOTICEBOARD_MODE=display; choose_role; echo "ROLE=$ROLE MODE=$MODE"
+  NOTICEBOARD_MODE=server; choose_role; echo "ROLE=$ROLE MODE=$MODE"
+  unset NOTICEBOARD_MODE; NOTICEBOARD_ROLE=server; choose_role; echo "ROLE=$ROLE MODE=$MODE"
+  NOTICEBOARD_PLATFORM=headless; choose_platform; echo "PLATFORM=$PLATFORM"
+  NOTICEBOARD_SERVER_URL=http://10.0.0.9:3000/; ask_server_url; echo "URL=$SERVER_URL" ) > "$T/handed.out" 2>&1
+! grep -q ASKED "$T/handed.out" && grep -q "ROLE=client MODE=display" "$T/handed.out" && grep -q "ROLE=both MODE=server" "$T/handed.out" \
+  && grep -q "ROLE=server MODE=server" "$T/handed.out" && grep -q "PLATFORM=headless" "$T/handed.out" && grep -q "URL=http://10.0.0.9:3000$" "$T/handed.out" \
+  && ok "handed-over answers used, not asked: an older installer's mode, and the new role, platform and URL" || { bad "handed over"; cat "$T/handed.out"; }
+
+# ── A Client installed before 0.9.0: its kiosk script gives the defaults ──
+rm -rf "$R"; mkdir -p "$R/bin"
+printf '#!/usr/bin/env bash\nSERVER_URL="http://10.0.0.7:3000"\n' > "$R/bin/noticeboard-kiosk.sh"
+install oldclient "$T/nothing-here-either" "" "2" "" n n
+[ $RC -eq 0 ] && [ "$(saved ROLE)" = client ] && [ "$(saved SERVER_URL)" = "http://10.0.0.7:3000" ] && [ "$(saved PLATFORM)" = desktop ] && [ ! -e "$R/bin/noticeboard-kiosk.sh" ] \
+  && ok "an older Client: Enter keeps Client only and its Server; the old kiosk script removed" || { bad "older client"; tail -12 "$T/oldclient.out"; }
 
 rm -rf "$T"; echo "passed=$pass failed=$fail"; [ $fail -eq 0 ]
