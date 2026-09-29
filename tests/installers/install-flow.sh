@@ -194,4 +194,14 @@ install oldclient "$T/nothing-here-either" "" "2" "" n n
 [ $RC -eq 0 ] && [ "$(saved ROLE)" = client ] && [ "$(saved SERVER_URL)" = "http://10.0.0.7:3000" ] && [ "$(saved PLATFORM)" = desktop ] && [ ! -e "$R/bin/noticeboard-kiosk.sh" ] \
   && ok "an older Client: Enter keeps Client only and its Server; the old kiosk script removed" || { bad "older client"; tail -12 "$T/oldclient.out"; }
 
+# ── Found in a Debian 13 VM (SYSTEM_DESIGN §18.7) ──
+policy() { printf 'chromium-browser:\n  Installed: (none)\n  Candidate: %s\n' "$1"; }
+[ "$(load_installer; apt-cache() { policy "(none)"; }; chromium_package)" = chromium ] \
+  && [ "$(load_installer; apt-cache() { policy "1:131.0.6778.204-rpt1"; }; chromium_package)" = chromium-browser ] \
+  && ok "Chromium: chromium-browser only where apt can install it (Debian only mentions it: chromium)" || bad "chromium package"
+rm -rf "$R"; mkdir -p "$R/etc"
+[ "$(load_installer; paths; systemctl() { echo graphical.target; }; detect_platform)" = headless ] \
+  && [ "$(load_installer; paths; touch "$DISPLAY_MANAGER_UNIT"; detect_platform)" = desktop ] \
+  && ok "a desktop means a display manager, not Debian's default graphical target" || bad "detect platform"
+
 rm -rf "$T"; echo "passed=$pass failed=$fail"; [ $fail -eq 0 ]

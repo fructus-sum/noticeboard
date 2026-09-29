@@ -4,7 +4,7 @@
 # Provides
 #   update_system        apt update, then a full upgrade (non-interactive, waits for apt's lock; with
 #                        --apply, APPLY set, only the update)
-#   chromium_package     chromium-browser where apt still has it, else chromium
+#   chromium_package     chromium-browser where apt can install it, else chromium
 #   is_raspberry_pi      the device tree says Raspberry Pi
 #   detect_platform      pi | desktop | headless, to preselect choose_platform
 #   node_new_enough      the installed Node.js is new enough (system-requirements.json)
@@ -42,10 +42,12 @@ update_system() {
 }
 
 # Newer Raspberry Pi OS ships Debian's chromium package; older releases called it
-# chromium-browser. Keep the old name where apt still has it (on releases in between
-# it just pulls in chromium); the kiosk scripts launch whichever command exists.
+# chromium-browser. Keep the old name where apt can install it (on releases in between
+# it just pulls in chromium); the kiosk scripts launch whichever command exists. Debian only
+# mentions chromium-browser (apt-cache show finds it, but there's nothing to install: "Candidate:
+# (none)"), so it's the install candidate that counts (SYSTEM_DESIGN §18.7, found in a Debian VM).
 chromium_package() {
-  if apt-cache show chromium-browser >/dev/null 2>&1; then
+  if apt-cache policy chromium-browser 2>/dev/null | grep -q 'Candidate: [^(]'; then
     echo chromium-browser
   else
     echo chromium
@@ -59,12 +61,10 @@ is_raspberry_pi() {
 
 # How this device can show the slideshow, to preselect the answer (choose_platform): pi (a
 # Raspberry Pi with a desktop), desktop (another machine with one), headless (no desktop)
+# A desktop means a display manager (lightdm on Raspberry Pi OS, gdm and others on Debian): the
+# default target isn't a sign, Debian's is graphical.target even with no desktop installed.
 detect_platform() {
-  local desktop=""
-  if [ -e "$DISPLAY_MANAGER_UNIT" ] || [ "$(systemctl get-default 2>/dev/null)" = graphical.target ]; then
-    desktop=1
-  fi
-  if [ -z "$desktop" ]; then
+  if [ ! -e "$DISPLAY_MANAGER_UNIT" ]; then
     echo headless
   elif is_raspberry_pi; then
     echo pi
