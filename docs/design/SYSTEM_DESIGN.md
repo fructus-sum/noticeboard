@@ -421,6 +421,7 @@ A slideshow entry looks like `{ folder, name, priority, schedule: { type: 'alway
 | `NOTICEBOARD_BRANCH` | the user (a one-off) | update.sh |
 | `NOTICEBOARD_INSTALLER_SHA`, `NOTICEBOARD_INSTALLER_BRANCH`, `NOTICEBOARD_INSTALLER_RELEASE`, `NOTICEBOARD_MODE`, `NOTICEBOARD_INSTALL_BRANCH` | install.sh, set when it re-runs itself | install.sh |
 | `NOTICEBOARD_GITHUB_API` | tests only (a stand-in for https://api.github.com) | lib/release.sh, updates/releases.js |
+| `NOTICEBOARD_API_RATE_LIMIT` | tests only (a test that clicks faster than a person) | routes/api/index.js, the API rate limit (120 a minute per address) |
 
 ### 5.3 Hard-coded settings (not configurable)
 

@@ -30,7 +30,9 @@ execFileSync(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:
   // H.264, which a PC's headless Chrome can play
   const env = makeApp({ port: 3956, config: { display: { defaultSlideDurationSeconds: 3, videoFormat: 'h264' } } });
   const s = server(env);
-  await s.start();
+  // It clicks through the admin panel much faster than a person: past the 120 API requests a
+  // minute on a fast machine (a CI runner)
+  await s.start({ NOTICEBOARD_API_RATE_LIMIT: '1000' });
   await s.login();
 
   // A published slideshow with an image, a published audio show with a track, and an unpublished one

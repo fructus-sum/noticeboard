@@ -219,7 +219,8 @@ const waitFor = async (fn, ms = 60000) => { const end = Date.now() + ms; while (
   const c = cfg();
   c.slideshows = c.slideshows.filter((x) => x.folder !== sm.folder);
   c.sampleSlideshow = { folder: null, signature: 'old' };
-  fs.rmSync(path.join(env.APP, 'data/slideshows', sm.folder), { recursive: true, force: true });
+  // The stopped server's ffmpeg may still be writing a thumbnail there: retry briefly
+  fs.rmSync(path.join(env.APP, 'data/slideshows', sm.folder), { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   fs.writeFileSync(path.join(env.APP, 'data/config.json'), JSON.stringify(c));
   await s.start(FF);
   await s.login();

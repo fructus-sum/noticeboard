@@ -48,12 +48,20 @@ async function capture(c, map, prefix) {
   fs.writeFileSync(path.join(units, 'paths.target.wants/noticeboard-update.path'), '');
   // A last update to show
   fs.writeFileSync(path.join(env.APP, 'data/update-status.json'), JSON.stringify({ state: 'updated', branch: 'main', commit: 'x', message: 'Updated to 1234567 from main.', time: '2026-09-01T10:00:00Z' }));
-  // Checking main shows main's latest Release (SYSTEM_DESIGN §18.6), from a stand-in GitHub: the
-  // copy's own commit, published as v0.1.0 in a bare copy of this repository that becomes its origin
-  // (so this repository gets no tag, and the Release isn't older than what runs)
+  // Checking main shows main's latest Release (SYSTEM_DESIGN §18.6), from a stand-in GitHub: a
+  // commit on top of the copy's own, published as v0.1.0 in a bare copy of this repository that
+  // becomes its origin (so this repository gets no tag, and the Release isn't older than what
+  // runs). Its software list names one program no machine has, so the switch dialog's "Missing
+  // software" step and its text are the same on every machine.
   const origin = path.join(env.T, 'origin.git');
   git(env.T, 'clone', '-q', '--bare', REPO, 'origin.git');
-  git(env.APP, 'push', '-q', origin, 'HEAD:refs/tags/v0.1.0');
+  git(env.T, 'clone', '-q', env.APP, 'release');
+  const release = path.join(env.T, 'release');
+  const list = JSON.parse(fs.readFileSync(path.join(release, 'system-requirements.json'), 'utf8'));
+  list.software = [{ name: 'Widget', commands: ['no-such-program-xyz'], versionArgs: ['--version'], versions: '*', neededFor: 'Showing widgets.', install: 'sudo apt install widget' }];
+  fs.writeFileSync(path.join(release, 'system-requirements.json'), JSON.stringify(list, null, 2));
+  git(release, 'commit', '-qam', 'Release 0.1.0');
+  git(release, 'push', '-q', origin, 'HEAD:refs/tags/v0.1.0');
   git(env.APP, 'remote', 'set-url', 'origin', origin);
   const mock = path.join(env.T, 'mock');
   fs.mkdirSync(mock);
@@ -133,7 +141,7 @@ async function capture(c, map, prefix) {
   await sleep(300);
   Object.assign(look, await capture(c, { 'check result': '.checked', 'software panel': '.software', 'switch button': 'text:button:Switch to main' }, 'settings:'));
   await c.click('Switch to main');
-  // This PC lacks some software main lists (e.g. Chromium), so the 'Missing software' step comes first
+  // main's Release lists a program no machine has (above), so the 'Missing software' step comes first
   await c.until(`!!document.querySelector('.dialog')`);
   await sleep(300);
   Object.assign(look, await capture(c, {

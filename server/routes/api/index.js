@@ -32,7 +32,9 @@ const router = express.Router();
 
 router.use(rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  // 120 requests a minute per address; NOTICEBOARD_API_RATE_LIMIT is for tests only (one that
+  // clicks through the admin panel much faster than a person can)
+  max: Number(process.env.NOTICEBOARD_API_RATE_LIMIT) || 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests' },
