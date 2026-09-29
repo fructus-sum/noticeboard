@@ -6,7 +6,8 @@
 #   1. An "installed Pi" on the baseline (NB_BASELINE, default fc4ba53) with realistic data made
 #      through its own API, a logged-in admin, and its server kept running by a systemd stand-in
 #      (restarted whenever it stops, like Restart=always).
-#   2. The BASELINE's update.sh installs the code under test (the working tree): real git, real
+#   2. The BASELINE's update.sh installs the code under test (the working tree, on main and, for a
+#      baseline that follows Releases, as main's latest Release): real git, real
 #      npm run build, real restart and health check. Then data, API, playlist, login and kiosk
 #      answer must be exactly as before.
 #   3. The NEW update.sh (now on disk) installs a following commit, published as main's latest
@@ -149,7 +150,10 @@ node "$STATE" snapshot "$BASE" "$PI" "$T/cookie" > "$T/before.json" || { bad "co
 ok "baseline ${BASELINE_SHA:0:7} installed, with 4 slideshows (incl. the sample), a logo, settings and a logged-in admin"
 
 # ── 1. The baseline's own update.sh installs the code under test ──
+# Published as main's latest Release too: a baseline from 0.8.0 on installs only that (§18.6);
+# older ones follow main's commits and never ask
 git -C "$T/cand" push -q -f "$T/origin.git" HEAD:refs/heads/main
+( cd "$T/cand" && git remote set-url origin "$T/origin.git" && publish_release v98.0.0 )
 if update "$CANDIDATE" "1. old updater → code under test"; then
   same_as_before "1. after the update"
 fi
@@ -158,7 +162,7 @@ fi
 git -C "$T/cand" -c user.name=t -c user.email=t@t commit -qm "a later commit" --allow-empty
 NEXT=$(git -C "$T/cand" rev-parse HEAD)
 git -C "$T/cand" push -q -f "$T/origin.git" HEAD:refs/heads/main
-( cd "$T/cand" && git remote set-url origin "$T/origin.git" && publish_release v99.0.0 )
+( cd "$T/cand" && publish_release v99.0.0 )
 if update "$NEXT" "2. new updater → next commit (main's latest Release)"; then
   same_as_before "2. after the next update"
 fi

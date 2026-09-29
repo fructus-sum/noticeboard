@@ -11,10 +11,13 @@
 //                                 set up before the record existed are told apart by the kiosk
 //                                 script they got (with the exit button: 1, else 0). null: not set
 //                                 up by the installer (e.g. a copy on a PC): nothing to say
-//   installerNeeds(list, installed) → { required, installed, needed, changes, displays }
+//   installerNeeds(list, installed) → { required, installed, needed, changes, displays, clientsFollow }
 //                                 for a version whose system-requirements.json is <list>; changes
-//                                 are only the versions this Server missed; displays: Clients
-//                                 need it too
+//                                 are only the versions this Server missed; displays: each Client
+//                                 needs one run by hand too (a change for them, and this Server's
+//                                 record from before CLIENTS_FOLLOW_FROM: its Clients don't follow
+//                                 it yet); clientsFollow: a change for them that reaches them by
+//                                 itself (SYSTEM_DESIGN §18.7 phases 3, 4)
 //   status()                    → Promise<installerNeeds + { branch, ref, returning }>: for the
 //                                 running version, with ref the Release's tag on main (else main,
 //                                 or the followed branch) for the installer command; or, while a
@@ -23,7 +26,8 @@
 //                                 ref and returning.release its tag and returning.branch the branch
 //                                 (SYSTEM_DESIGN §18.6). On main with the system step set up
 //                                 (automatic), needed only when its last run failed (systemFailed:
-//                                 { release, message, time }, §18.7 phase 2)
+//                                 { release, message, time }, §18.7 phase 2); lastByHand: on main,
+//                                 this run by hand sets the system step up (§18.7 phase 4)
 //
 // Used by
 //   services/updates/index.js (the branch check, the home page status), services/displaySettings.js
@@ -49,17 +53,24 @@ async function installedVersion() {
   return kiosk.includes('kiosk-exit') ? 1 : 0;
 }
 
+// The installer version that set up root's system step (§18.7 phase 2), and the one from which a
+// Client only follows its Server (phase 3)
+const SYSTEM_STEP_FROM = 6;
+const CLIENTS_FOLLOW_FROM = 7;
+
 function installerNeeds(list, installed) {
   const required = Number.isInteger(list?.installer?.version) ? list.installer.version : 0;
   const needed = installed !== null && installed < required;
   const changes = !needed ? [] : (Array.isArray(list.installer.changes) ? list.installer.changes : [])
     .filter((c) => Number.isInteger(c?.version) && c.version > installed && c.version <= required);
+  const forClients = changes.some((c) => c.displays === true);
   return {
     required,
     installed,
     needed,
     changes: changes.map((c) => String(c.change || '')).filter(Boolean),
-    displays: changes.some((c) => c.displays === true),
+    displays: forClients && installed < CLIENTS_FOLLOW_FROM,
+    clientsFollow: forClients && installed >= CLIENTS_FOLLOW_FROM,
   };
 }
 
@@ -90,6 +101,8 @@ async function status() {
     ...needs,
     needed: (needs.needed && !automatic) || !!systemFailed,
     branch, ref, returning: null, automatic, systemFailed,
+    // Not set up yet (a Server from before 0.9.0): this run by hand is the last one on main
+    lastByHand: branch === 'main' && !units.system && needs.needed && needs.required >= SYSTEM_STEP_FROM,
   };
 }
 

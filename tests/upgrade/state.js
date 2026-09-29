@@ -67,6 +67,13 @@ async function seed() {
   logo.append('logo', await png('#f39c12'), 'logo.png');
   await api('POST', '/api/settings/logo', logo, cookie);
   await waitQuiet(cookie);
+  // Since 0.7.0 a changed playlist reaches the screens when the slide on air ends (SYSTEM_DESIGN
+  // §18.8): wait for that, so the first snapshot has the playlist as seeded
+  const { playlist: onAir } = await playlist();
+  if (onAir?.startedAt) {
+    const { boundaryAfter } = await import('../../shared/slideTimeline.mjs');
+    await sleep(Math.max(0, boundaryAfter(onAir.slides, onAir.startedAt, Date.now()) - Date.now()) + 1000);
+  }
 }
 
 function hash(file) {

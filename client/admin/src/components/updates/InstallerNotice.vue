@@ -7,7 +7,10 @@
 // nothing to close. It also shows while a Release of main with the followed branch's work waits for
 // the installer before the Server returns to main (status.returning, SYSTEM_DESIGN §18.6). On main
 // with root's system step set up, the installer runs by itself, so it shows only when that failed
-// (status.systemFailed, §18.7 phase 2).
+// (status.systemFailed, §18.7 phase 2). A Server from before that is told this run is the last one
+// by hand (status.lastByHand), and Clients from before installer 7 need one run each as Client
+// only; after that they follow the Server by themselves (status.displays, status.clientsFollow,
+// §18.7 phase 4).
 //
 // Used by: App.vue (every page but the login page)
 // Uses: useApi (GET /settings/updates/installer), installerCommand from @shared
@@ -70,7 +73,15 @@ async function copy() {
       <code>{{ command }}</code>
       <button type="button" class="btn-ghost" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
     </div>
-    <p v-if="status.displays">Run it on each Client as well (choose "Client" there).</p>
+    <p v-if="status.lastByHand">
+      This is the last time on the Server: once it has run, the noticeboard runs the installer by itself whenever a
+      new Release needs it.
+    </p>
+    <p v-if="status.displays">
+      Run it once on each Client as well, choosing <em>Client only</em> and this Server's address. After that, each
+      Client follows this Server's version by itself.
+    </p>
+    <p v-else-if="status.clientsFollow">The Clients follow this Server by themselves: nothing to do on them.</p>
     <p class="installer__more">
       This goes away once the installer has run.
       <a href="/admin/help#installer-needed" target="_blank" rel="noopener">More in Help ↗</a>

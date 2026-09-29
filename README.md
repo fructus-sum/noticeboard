@@ -121,7 +121,7 @@ After the installer's reboot, the slideshow appears automatically.
 
 **Using Clients? Give the Server a fixed IP address** (a reservation in your router, or a static address on the Server itself), since the Clients find it by its address. The user guide explains both.
 
-**Installed before?** Run the installer again once on each Server and Client (over SSH is fine) to get the new Client and the saved answers (installer version 5). After that, the Server keeps itself up to date.
+**Installed before 0.9.0?** Run the installer again once on each Server and each Client (over SSH is fine; on a Client, choose *Client only* and the same Server address). It keeps your answers and content. After that, a Server on `main` runs the installer by itself when a Release needs it, and each Client follows its Server's version by itself.
 
 ## Updates
 
