@@ -29,7 +29,7 @@ const styles = (finder) => `(() => {
   for (const p of ${JSON.stringify(PROPS)}) out[p] = cs.getPropertyValue(p);
   return out;
 })()`;
-const text = (sel) => `(document.querySelector(${JSON.stringify(sel)})?.innerText ?? '').replace(/\\s+/g, ' ').replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, 'UUID').replace(/[0-9a-f]{7,40}/g, 'SHA').replace(/\\d{1,2}\\/\\d{1,2}\\/\\d{4}, \\d{1,2}:\\d{2}:\\d{2}/g, 'TIME').trim()`;
+const text = (sel) => `(document.querySelector(${JSON.stringify(sel)})?.innerText ?? '').replace(/\\s+/g, ' ').replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, 'UUID').replace(/[0-9a-f]{7,40}/g, 'SHA').replace(/\\d{1,2}\\/\\d{1,2}\\/\\d{4}, \\d{1,2}:\\d{2}:\\d{2}(?: [AP]M)?/g, 'TIME').trim()`;   // a time, 24-hour or with AM/PM (Linux's Chrome)
 
 async function capture(c, map, prefix) {
   const out = {};
